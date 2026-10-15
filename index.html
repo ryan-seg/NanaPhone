@@ -132,6 +132,11 @@
     }
     .tone-btn.selected { border-color: #22c55e; background: #064e3b; color: #fef08a; }
 
+    /* Missing Secret Key Warning Screen */
+    #auth-error-screen {
+      background: #450a0a; justify-content: center; gap: 20px;
+    }
+
     /* Software Night Mode Overlay */
     #night-dimmer {
       display: none; position: fixed; inset: 0;
@@ -147,6 +152,12 @@
   <div id="night-dimmer" onclick="wakeFromNightMode()">
     <div id="night-clock" style="font-size: 5.5rem; font-weight: bold;"></div>
     <p>Tap screen anywhere to wake up</p>
+  </div>
+
+  <!-- Missing Key Screen (Blocks strangers who don't have ?key=YOUR_SECRET) -->
+  <div id="auth-error-screen" class="screen">
+    <h1 style="font-size: 3rem;">🔒 Private Family Portal</h1>
+    <p style="font-size: 1.5rem; color: #fca5a5;">Please open this page using the full secret family link sent to you.</p>
   </div>
 
   <!-- Ringtone Picker Modal (Open by tapping clock 3 times or from Family screen) -->
@@ -215,18 +226,18 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getDatabase, ref, set, update, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+    import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
     // =========================================================================
-    // 👇 ONLY FILL IN THESE 4 LINES BELOW! (NO CHAT IDs NEEDED!) 👇
+    // 👇 FILL IN THESE 4 PUBLIC URLS BELOW (ZERO SECRETS OR TOKENS IN CODE!) 👇
     // =========================================================================
     const CONFIG = {
-      appVersion: "1.0.3",
-      dailyRoomUrl: "https://nanaphone.daily.co/YOUR-ROOM-NAME", // <-- 1. Check room name after slash!
-      telegramBotUsername: "MyraNanaPhone_bot",                  // <-- 2. Your Bot's username (without @)
-      telegramBotToken: "PASTE_YOUR_BOTFATHER_TOKEN_HERE",       // <-- 3. Token from @BotFather
+      appVersion: "1.0.4",
+      dailyRoomUrl: "https://nanaphone.daily.co/YOUR-ROOM-NAME",               // <-- 1. Your Daily.co Room URL
+      telegramBotUsername: "YOUR_BOT_USERNAME_bot",                            // <-- 2. Your Bot Username (no @)
+      googleScriptUrl: "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec", // <-- 3. Your Google Apps Script URL
       firebase: {
-        databaseURL: "https://nanaphone-XXXX-default-rtdb.europe-west1.firebasedatabase.app" // <-- 4. Your Firebase URL
+        databaseURL: "https://nanaphone-XXXX-default-rtdb.europe-west1.firebasedatabase.app" // <-- 4. Your Firebase DB URL
       },
       familyMembers: [
         { id: "phil",     name: "Phil",     spokenName: "Phil",   photo: "photos/phil.jpg",     fallback: "https://ui-avatars.com/api/?name=Phil&size=256&background=1d4ed8&color=fff&bold=true&font-size=0.45" },
@@ -239,14 +250,14 @@
       ]
     };
 
-    const app = initializeApp(CONFIG.firebase);
-    const db = getDatabase(app);
-    const callStateRef = ref(db, 'portal/callState');
-    const versionRef = ref(db, 'portal/version');
-    const ringtoneRef = ref(db, 'portal/ringtone');
-    const chatIdsRef = ref(db, 'portal/chatIds');
-
     const params = new URLSearchParams(window.location.search);
+
+    // Save the secret key from URL (?key=...) into device localStorage so it's never hardcoded
+    if (params.get('key')) {
+      localStorage.setItem('nana_family_secret', params.get('key'));
+    }
+    const FAMILY_SECRET = localStorage.getItem('nana_family_secret') || '';
+
     const role = params.get('role') || 'nana';
     const callerId = params.get('id') || 'ryan';
     const autoAnswerFromTelegram = params.get('answer') === 'true';
@@ -257,54 +268,33 @@
     let ringInterval = null;
     let outboundTimeout = null;
     let currentState = 'idle';
-    let savedChatIds = {};
+    let connectedTelegramMembers = [];
     let selectedRingtone = localStorage.getItem('nana_ringtone') || 'uk-phone';
     let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-    // Listen to saved Telegram Chat IDs in Firebase
-    onValue(chatIdsRef, (snap) => {
-      savedChatIds = snap.val() || {};
-      updateFamilyTelegramButtonUI();
-    });
-
-    // Automatically check Telegram Bot for new "/start <id>" clicks and save their Chat ID to Firebase!
-    async function syncTelegramChatIds() {
-      if (!CONFIG.telegramBotToken || CONFIG.telegramBotToken.includes("PASTE_")) return;
-      try {
-        const res = await fetch(`https://api.telegram.org/bot${CONFIG.telegramBotToken}/getUpdates`);
-        const data = await res.json();
-        if (!data.ok || !data.result) return;
-
-        const updatesToSave = {};
-        data.result.forEach(item => {
-          const msg = item.message;
-          if (msg && msg.text && msg.chat && msg.chat.id) {
-            // If they clicked "?start=phil", msg.text is "/start phil"
-            const parts = msg.text.trim().split(' ');
-            if (parts[0] === '/start' && parts[1]) {
-              const memberId = parts[1].toLowerCase();
-              updatesToSave[memberId] = String(msg.chat.id);
-            }
-          }
-        });
-
-        if (Object.keys(updatesToSave).length > 0) {
-          await update(chatIdsRef, updatesToSave);
-        }
-      } catch (e) {}
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
     }
 
-    function updateFamilyTelegramButtonUI() {
-      const btn = document.getElementById('telegram-link-btn');
-      if (!btn) return;
-      if (savedChatIds[activeFamilyMember.id]) {
-        btn.innerText = "✅ Telegram Alerts Connected!";
-        btn.style.background = "#065f46";
-        btn.style.borderColor = "#22c55e";
-      } else {
-        btn.href = `https://t.me/${CONFIG.telegramBotUsername}?start=${activeFamilyMember.id}`;
-      }
+    function setPhotoWithFallback(imgEl, member) {
+      imgEl.onerror = () => { imgEl.onerror = null; imgEl.src = member.fallback; };
+      imgEl.src = member.photo;
     }
+
+    // Stop immediately if someone opens the URL without the Family Secret Key
+    if (!FAMILY_SECRET) {
+      showScreen('auth-error-screen');
+      throw new Error("Missing Family Secret Key in URL.");
+    }
+
+    // Connect to the secret-protected Firebase path: portals/<FAMILY_SECRET>/...
+    const app = initializeApp(CONFIG.firebase);
+    const db = getDatabase(app);
+    const basePath = `portals/${FAMILY_SECRET}`;
+    const callStateRef = ref(db, `${basePath}/callState`);
+    const versionRef = ref(db, `${basePath}/version`);
+    const ringtoneRef = ref(db, `${basePath}/ringtone`);
 
     // Build the 7-person photo grid with oversized clear nameplates underneath
     const gridEl = document.getElementById('family-grid');
@@ -321,28 +311,50 @@
       gridEl.appendChild(card);
     });
 
-    function showScreen(id) {
-      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
+    // Ask Google Apps Script to sync any new "/start <id>" clicks into Google's private storage
+    async function syncTelegramViaGoogleScript() {
+      if (!CONFIG.googleScriptUrl || CONFIG.googleScriptUrl.includes("YOUR_SCRIPT_ID")) return;
+      try {
+        const res = await fetch(CONFIG.googleScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            secret: FAMILY_SECRET,
+            action: "sync"
+          })
+        });
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.connected)) {
+          connectedTelegramMembers = data.connected;
+          updateFamilyTelegramButtonUI();
+        }
+      } catch (e) {}
     }
 
-    function setPhotoWithFallback(imgEl, member) {
-      imgEl.onerror = () => { imgEl.onerror = null; imgEl.src = member.fallback; };
-      imgEl.src = member.photo;
+    function updateFamilyTelegramButtonUI() {
+      const btn = document.getElementById('telegram-link-btn');
+      if (!btn) return;
+      if (connectedTelegramMembers.includes(activeFamilyMember.id)) {
+        btn.innerText = "✅ Telegram Alerts Connected!";
+        btn.style.background = "#065f46";
+        btn.style.borderColor = "#22c55e";
+      } else {
+        btn.href = `https://t.me/${CONFIG.telegramBotUsername}?start=${activeFamilyMember.id}`;
+      }
     }
 
     if (role === 'family') {
       document.getElementById('family-greeting').innerText = `Call Nana (as ${activeFamilyMember.name})`;
       setPhotoWithFallback(document.getElementById('family-self-photo'), activeFamilyMember);
       updateFamilyTelegramButtonUI();
-      syncTelegramChatIds();
-      setInterval(syncTelegramChatIds, 8000); // Auto-detects as soon as they tap Start in Telegram
+      syncTelegramViaGoogleScript();
+      setInterval(syncTelegramViaGoogleScript, 10000);
       showScreen('family-screen');
       if (autoAnswerFromTelegram) answerNanaFromFamilyPhone();
     } else {
       showScreen('grid-screen');
-      syncTelegramChatIds();
-      setInterval(syncTelegramChatIds, 15000);
+      syncTelegramViaGoogleScript();
+      setInterval(syncTelegramViaGoogleScript, 30000);
       setInterval(updateClockAndNightMode, 10000);
       updateClockAndNightMode();
     }
@@ -454,10 +466,9 @@
     });
 
     // =========================================================================
-    // 3. NANA CALLS FAMILY & FAMILY CALLS NANA
+    // 3. NANA CALLS FAMILY (THROUGH GOOGLE SCRIPT PROXY) & FAMILY CALLS NANA
     // =========================================================================
     async function startCallFromNana(member) {
-      await syncTelegramChatIds(); // Ensure latest Chat IDs are loaded
       currentState = 'calling_family';
       setPhotoWithFallback(document.getElementById('outbound-photo'), member);
       document.getElementById('outbound-title').innerText = `Calling ${member.name}...`;
@@ -486,44 +497,29 @@
     }
 
     async function ringFamilyOnTelegramLoop(member) {
-      const targetChatId = savedChatIds[member.id];
-      if (!targetChatId) {
-        console.warn(`No Telegram Chat ID registered yet for ${member.name}`);
-        return;
-      }
-
       let lastMessageId = null;
-      const baseApi = `https://api.telegram.org/bot${CONFIG.telegramBotToken}`;
       const originUrl = window.location.origin + window.location.pathname;
-      const answerUrl = `${originUrl}?role=family&id=${encodeURIComponent(member.id)}&answer=true`;
+      const answerUrl = `${originUrl}?role=family&id=${encodeURIComponent(member.id)}&key=${encodeURIComponent(FAMILY_SECRET)}&answer=true`;
 
       for (let i = 1; i <= 6; i++) {
         const snap = await get(callStateRef);
         if (!snap.exists() || snap.val().status !== 'calling_family') break;
 
-        if (lastMessageId) {
-          fetch(`${baseApi}/deleteMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: targetChatId, message_id: lastMessageId })
-          }).catch(() => {});
-        }
-
         try {
-          const res = await fetch(`${baseApi}/sendMessage`, {
+          const res = await fetch(CONFIG.googleScriptUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
-              chat_id: targetChatId,
-              text: `📞 *NANA IS CALLING YOU!* (Ring ${i}/6)\nTap the green button below to answer her video call:`,
-              parse_mode: 'Markdown',
-              reply_markup: {
-                inline_keyboard: [[{ text: "🟢 ANSWER NANA'S CALL", url: answerUrl }]]
-              }
+              secret: FAMILY_SECRET,
+              action: "ring",
+              memberId: member.id,
+              ringNum: i,
+              lastMessageId: lastMessageId,
+              answerUrl: answerUrl
             })
           });
           const json = await res.json();
-          if (json.ok && json.result) lastMessageId = json.result.message_id;
+          if (json.ok && json.messageId) lastMessageId = json.messageId;
         } catch (e) {}
 
         await new Promise(r => setTimeout(r, 5000));
@@ -543,123 +539,3 @@
     window.startCallFromFamily = async () => {
       await set(callStateRef, {
         status: 'ringing_nana',
-        callerId: activeFamilyMember.id,
-        callerName: activeFamilyMember.name,
-        timestamp: Date.now()
-      });
-      await joinDailyRoom(true);
-    };
-
-    window.answerCallAsNana = async () => {
-      stopRingingUI();
-      await set(callStateRef, {
-        status: 'connected',
-        callerName: 'Nana',
-        timestamp: Date.now()
-      });
-      await joinDailyRoom(false);
-    };
-
-    window.endCall = async () => {
-      clearTimeout(outboundTimeout);
-      stopRingingUI();
-      await set(callStateRef, { status: 'idle', timestamp: Date.now() });
-      if (role === 'family' && autoAnswerFromTelegram) {
-        window.history.replaceState({}, document.title, `/?role=family&id=${encodeURIComponent(activeFamilyMember.id)}`);
-      }
-    };
-
-    onValue(callStateRef, (snapshot) => {
-      const data = snapshot.val();
-      if (!data) return;
-      currentState = data.status;
-
-      if (role === 'nana') {
-        document.getElementById('night-dimmer').style.display = 'none';
-        if (data.status === 'ringing_nana' && !callFrame) {
-          const callerObj = CONFIG.familyMembers.find(m => m.id === data.callerId) || CONFIG.familyMembers[4];
-          startRingingUI(callerObj);
-        } else if (data.status === 'connected') {
-          clearTimeout(outboundTimeout);
-          stopRingingUI();
-          showScreen('call-screen');
-        } else if (data.status === 'idle') {
-          clearTimeout(outboundTimeout);
-          stopRingingUI();
-          destroyVideoFrame();
-          showScreen('grid-screen');
-        }
-      } else if (role === 'family') {
-        if (data.status === 'idle' && callFrame) {
-          destroyVideoFrame();
-          showScreen('family-screen');
-        }
-      }
-    });
-
-    onValue(versionRef, (snapshot) => {
-      const remoteVer = snapshot.val();
-      if (remoteVer && remoteVer !== CONFIG.appVersion) {
-        window.location.reload(true);
-      }
-    });
-
-    async function joinDailyRoom(isFamily) {
-      showScreen('call-screen');
-      const container = document.getElementById('video-container');
-      container.innerHTML = '';
-
-      callFrame = window.DailyIframe.createFrame(container, {
-        showLeaveButton: false,
-        showFullscreenButton: false,
-        showLocalVideo: isFamily,
-        iframeStyle: { width: '100%', height: '100%', border: '0' }
-      });
-
-      await callFrame.join({
-        url: CONFIG.dailyRoomUrl,
-        userName: role === 'nana' ? 'Nana' : activeFamilyMember.name
-      });
-    }
-
-    function destroyVideoFrame() {
-      if (callFrame) {
-        callFrame.leave();
-        callFrame.destroy();
-        callFrame = null;
-      }
-    }
-
-    function speakOutLoud(text) {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const msg = new SpeechSynthesisUtterance(text);
-        msg.rate = 0.9;
-        window.speechSynthesis.speak(msg);
-      }
-    }
-
-    function playChimeAndAnnounce(spokenName) {
-      playSelectedRingtoneAudio(selectedRingtone);
-      setTimeout(() => {
-        speakOutLoud(`Incoming video call from ${spokenName}. Tap the big green button to answer.`);
-      }, 1600);
-    }
-
-    function startRingingUI(callerObj) {
-      setPhotoWithFallback(document.getElementById('caller-photo'), callerObj);
-      document.getElementById('caller-title').innerText = `${callerObj.name} is calling!`;
-      showScreen('ringing-screen');
-      playChimeAndAnnounce(callerObj.spokenName);
-      if (ringInterval) clearInterval(ringInterval);
-      ringInterval = setInterval(() => playChimeAndAnnounce(callerObj.spokenName), 6500);
-    }
-
-    function stopRingingUI() {
-      if (ringInterval) clearInterval(ringInterval);
-      ringInterval = null;
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-    }
-  </script>
-</body>
-</html>
