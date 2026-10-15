@@ -18,59 +18,71 @@
     .screen {
       display: none; width: 100vw; height: 100vh;
       flex-direction: column; align-items: center; justify-content: space-between;
-      padding: 14px 20px; text-align: center;
+      padding: 12px 20px; text-align: center;
     }
     .active { display: flex; }
 
     /* Top Header on Nana's Tablet */
     .header-bar {
       width: 100%; display: flex; justify-content: space-between; align-items: center;
-      padding: 0 10px; height: 8vh;
+      padding: 0 10px; height: 7vh;
     }
-    .header-title { font-size: 2.3rem; font-weight: 900; color: #ffffff; }
+    .header-title { font-size: 2.1rem; font-weight: 900; color: #ffffff; }
     .clock-pill {
-      font-size: 2rem; font-weight: 800; color: #e2e8f0;
-      background: #1e293b; padding: 8px 20px; border-radius: 16px;
+      font-size: 1.9rem; font-weight: 800; color: #e2e8f0;
+      background: #1e293b; padding: 6px 18px; border-radius: 16px;
       border: 2px solid #475569; cursor: pointer;
+    }
+
+    /* Missed Call Banner (Appears at top if she missed a call) */
+    #missed-call-banner {
+      display: none; width: 100%; background: #7f1d1d; border: 4px solid #f87171;
+      border-radius: 20px; padding: 12px 20px; align-items: center; justify-content: space-between;
+      margin-bottom: 8px; animation: pulseMissed 1.5s infinite; cursor: pointer;
+    }
+    @keyframes pulseMissed {
+      0%, 100% { background: #7f1d1d; }
+      50% { background: #991b1b; }
+    }
+    .missed-text { font-size: 2rem; font-weight: 900; color: #fef08a; }
+    .missed-btn {
+      background: #22c55e; color: #000; font-size: 1.8rem; font-weight: 900;
+      border: 3px solid #fff; border-radius: 14px; padding: 10px 24px; cursor: pointer;
     }
 
     /* 7-Contact Grid: 4 Top + 3 Bottom Centered */
     .family-grid {
       display: flex; flex-wrap: wrap; justify-content: center;
-      align-content: space-between; gap: 16px;
-      width: 100%; height: 88vh;
+      align-content: space-between; gap: 14px;
+      width: 100%; height: 80vh;
     }
     .family-card {
       width: calc(25% - 14px);
       height: calc(50% - 10px);
-      background: #1e293b; border: 5px solid #64748b; border-radius: 28px;
+      background: #1e293b; border: 5px solid #64748b; border-radius: 26px;
       display: flex; flex-direction: column; align-items: center; justify-content: space-between;
-      cursor: pointer; padding: 14px 10px 10px 10px;
-      box-shadow: 0 12px 28px rgba(0,0,0,0.6);
+      cursor: pointer; padding: 12px 10px 8px 10px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.6);
       transition: transform 0.1s, border-color 0.1s;
     }
     .family-card:active {
-      transform: scale(0.96);
-      background: #334155;
-      border-color: #22c55e;
+      transform: scale(0.96); background: #334155; border-color: #22c55e;
     }
     .photo-wrapper {
       flex: 1; display: flex; align-items: center; justify-content: center;
       width: 100%; overflow: hidden;
     }
     .family-card img {
-      width: 135px; height: 135px; border-radius: 50%;
-      object-fit: cover; border: 5px solid #ffffff;
+      width: 120px; height: 120px; border-radius: 50%;
+      object-fit: cover; border: 4px solid #ffffff;
       background: #0f172a; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     }
-    /* High-Visibility Nameplate Underneath Each Photo */
     .contact-nameplate {
       width: 100%; background: #0f172a;
-      border: 3px solid #facc15; border-radius: 18px;
-      padding: 8px 6px; margin-top: 8px;
-      font-size: 2.5rem; font-weight: 900; color: #fef08a;
+      border: 3px solid #facc15; border-radius: 16px;
+      padding: 6px 4px; margin-top: 6px;
+      font-size: 2.3rem; font-weight: 900; color: #fef08a;
       letter-spacing: 0.5px; line-height: 1.1;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.8);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
@@ -132,9 +144,9 @@
     }
     .tone-btn.selected { border-color: #22c55e; background: #064e3b; color: #fef08a; }
 
-    /* Missing Secret Key Warning Screen */
-    #auth-error-screen {
-      background: #450a0a; justify-content: center; gap: 20px;
+    /* Auth & Error Screens */
+    #auth-error-screen, #error-screen {
+      background: #450a0a; justify-content: center; gap: 20px; padding: 40px;
     }
 
     /* Software Night Mode Overlay */
@@ -154,13 +166,19 @@
     <p>Tap screen anywhere to wake up</p>
   </div>
 
-  <!-- Missing Key Screen (Blocks strangers who don't have ?key=YOUR_SECRET) -->
+  <!-- Missing Key Screen -->
   <div id="auth-error-screen" class="screen">
     <h1 style="font-size: 3rem;">🔒 Private Family Portal</h1>
-    <p style="font-size: 1.5rem; color: #fca5a5;">Please open this page using the full secret family link sent to you.</p>
+    <p style="font-size: 1.6rem; color: #fca5a5;">Please open this page using your full family link containing <code style="background:#000; padding:4px 10px; border-radius:8px;">?key=YOUR_SECRET</code></p>
   </div>
 
-  <!-- Ringtone Picker Modal (Open by tapping clock 3 times or from Family screen) -->
+  <!-- JS Error Catch Screen (Shows exact error if setup fails) -->
+  <div id="error-screen" class="screen">
+    <h1 style="font-size: 2.8rem; color: #f87171;">⚠️ Setup Error</h1>
+    <p id="error-message" style="font-size: 1.4rem; color: #fef08a; word-break: break-all; max-width: 900px;"></p>
+  </div>
+
+  <!-- Ringtone Picker Modal -->
   <div id="ringtone-modal">
     <h1 style="font-size: 2.8rem; margin: 0;">Choose Nana's Ringtone</h1>
     <p style="font-size: 1.4rem; color: #94a3b8;">Tap any sound below to preview and save it:</p>
@@ -179,6 +197,13 @@
       <div class="header-title">Tap a photo to start a video call</div>
       <div id="clock" class="clock-pill" onclick="handleClockTap()">12:00</div>
     </div>
+    
+    <!-- Missed Call Banner -->
+    <div id="missed-call-banner" onclick="callBackMissedCall()">
+      <div class="missed-text" id="missed-call-text">Missed call from someone!</div>
+      <button class="missed-btn">📞 CALL BACK</button>
+    </div>
+
     <div id="family-grid" class="family-grid"></div>
   </div>
 
@@ -214,7 +239,6 @@
       📹 Ring Nana Now
     </button>
 
-    <!-- 1-Tap Auto-Linker for Telegram Alerts -->
     <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="font-size: 1.2rem; padding: 14px 20px; width: 88vw; background: #0284c7; border-color: #38bdf8;">
       🔔 1-Tap Setup: Connect My Telegram Alerts
     </a>
@@ -228,11 +252,16 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
+    window.addEventListener('error', (event) => {
+      document.getElementById('error-message').innerText = event.message + " (At line " + event.lineno + ")";
+      showScreen('error-screen');
+    });
+
     // =========================================================================
-    // 👇 FILL IN THESE 4 PUBLIC URLS BELOW (ZERO SECRETS OR TOKENS IN CODE!) 👇
+    // 👇 FILL IN YOUR 4 PUBLIC URLS BELOW 👇
     // =========================================================================
     const CONFIG = {
-      appVersion: "1.0.4",
+      appVersion: "1.0.5",
       dailyRoomUrl: "https://nanaphone.daily.co/NanaPhone",               // <-- 1. Your Daily.co Room URL
       telegramBotUsername: "Nanaphone_bot",                            // <-- 2. Your Bot Username (no @)
       googleScriptUrl: "https://script.google.com/macros/s/AKfycbwsFHE8oyj1RBGxLJT79bbPsvJ2hTkVrF9dCoj369ApEREXyrdQKE_vA0QrobBOeLE2/exec", // <-- 3. Your Google Apps Script URL
@@ -252,7 +281,6 @@
 
     const params = new URLSearchParams(window.location.search);
 
-    // Save the secret key from URL (?key=...) into device localStorage so it's never hardcoded
     if (params.get('key')) {
       localStorage.setItem('nana_family_secret', params.get('key'));
     }
@@ -269,6 +297,7 @@
     let outboundTimeout = null;
     let currentState = 'idle';
     let connectedTelegramMembers = [];
+    let missedCallerObj = null;
     let selectedRingtone = localStorage.getItem('nana_ringtone') || 'uk-phone';
     let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -282,21 +311,20 @@
       imgEl.src = member.photo;
     }
 
-    // Stop immediately if someone opens the URL without the Family Secret Key
     if (!FAMILY_SECRET) {
       showScreen('auth-error-screen');
       throw new Error("Missing Family Secret Key in URL.");
     }
 
-    // Connect to the secret-protected Firebase path: portals/<FAMILY_SECRET>/...
     const app = initializeApp(CONFIG.firebase);
     const db = getDatabase(app);
     const basePath = `portals/${FAMILY_SECRET}`;
     const callStateRef = ref(db, `${basePath}/callState`);
     const versionRef = ref(db, `${basePath}/version`);
     const ringtoneRef = ref(db, `${basePath}/ringtone`);
+    const missedCallRef = ref(db, `${basePath}/missedCall`);
 
-    // Build the 7-person photo grid with oversized clear nameplates underneath
+    // Build 7-person grid
     const gridEl = document.getElementById('family-grid');
     CONFIG.familyMembers.forEach(member => {
       const card = document.createElement('div');
@@ -307,21 +335,20 @@
         </div>
         <div class="contact-nameplate">${member.name}</div>
       `;
-      card.onclick = () => startCallFromNana(member);
+      card.onclick = () => {
+        clearMissedCallBanner();
+        startCallFromNana(member);
+      };
       gridEl.appendChild(card);
     });
 
-    // Ask Google Apps Script to sync any new "/start <id>" clicks into Google's private storage
     async function syncTelegramViaGoogleScript() {
       if (!CONFIG.googleScriptUrl || CONFIG.googleScriptUrl.includes("YOUR_SCRIPT_ID")) return;
       try {
         const res = await fetch(CONFIG.googleScriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            secret: FAMILY_SECRET,
-            action: "sync"
-          })
+          body: JSON.stringify({ secret: FAMILY_SECRET, action: "sync" })
         });
         const data = await res.json();
         if (data.ok && Array.isArray(data.connected)) {
@@ -375,7 +402,7 @@
     };
 
     // =========================================================================
-    // 2. MULTI-RINGTONE SYNTHESIZER (4 DISTINCT RINGTONES FOR NANA)
+    // RINGTONE SYNTHESIZER
     // =========================================================================
     function playNote(freq, startTime, duration, type = 'sine', peakGain = 0.6) {
       if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -395,7 +422,6 @@
       try {
         if (audioCtx.state === 'suspended') audioCtx.resume();
         const now = audioCtx.currentTime;
-
         if (toneName === 'uk-phone') {
           [0, 0.55].forEach(offset => {
             playNote(400, now + offset, 0.35, 'square', 0.35);
@@ -466,7 +492,37 @@
     });
 
     // =========================================================================
-    // 3. NANA CALLS FAMILY (THROUGH GOOGLE SCRIPT PROXY) & FAMILY CALLS NANA
+    // MISSED CALL LISTENER & CALL BACK
+    // =========================================================================
+    onValue(missedCallRef, (snapshot) => {
+      const data = snapshot.val();
+      if (role === 'nana' && data && data.callerId) {
+        missedCallerObj = CONFIG.familyMembers.find(m => m.id === data.callerId);
+        if (missedCallerObj) {
+          document.getElementById('missed-call-text').innerText = `Missed call from ${missedCallerObj.name}!`;
+          document.getElementById('missed-call-banner').style.display = 'flex';
+        }
+      } else if (role === 'nana' && (!data || !data.callerId)) {
+        document.getElementById('missed-call-banner').style.display = 'none';
+      }
+    });
+
+    window.callBackMissedCall = () => {
+      if (missedCallerObj) {
+        clearMissedCallBanner();
+        startCallFromNana(missedCallerObj);
+      }
+    };
+
+    async function clearMissedCallBanner() {
+      document.getElementById('missed-call-banner').style.display = 'none';
+      if (role === 'nana') {
+        await set(missedCallRef, { callerId: null, timestamp: Date.now() });
+      }
+    }
+
+    // =========================================================================
+    // CALL STATE & ROUTING
     // =========================================================================
     async function startCallFromNana(member) {
       currentState = 'calling_family';
@@ -491,6 +547,8 @@
       outboundTimeout = setTimeout(async () => {
         if (currentState === 'calling_family') {
           speakOutLoud(`Sorry, ${member.spokenName} could not answer right now.`);
+          // Mark as missed call on timeout
+          await set(missedCallRef, { callerId: member.id, timestamp: Date.now() });
           await endCall();
         }
       }, 45000);
@@ -539,3 +597,131 @@
     window.startCallFromFamily = async () => {
       await set(callStateRef, {
         status: 'ringing_nana',
+        callerId: activeFamilyMember.id,
+        callerName: activeFamilyMember.name,
+        timestamp: Date.now()
+      });
+      await joinDailyRoom(true);
+    };
+
+    window.answerCallAsNana = async () => {
+      stopRingingUI();
+      await set(callStateRef, {
+        status: 'connected',
+        callerName: 'Nana',
+        timestamp: Date.now()
+      });
+      await joinDailyRoom(false);
+    };
+
+    window.endCall = async () => {
+      clearTimeout(outboundTimeout);
+      stopRingingUI();
+      // If Nana hung up while someone was calling her and she didn't answer, record it as a missed call!
+      if (role === 'nana' && currentState === 'ringing_nana') {
+        const lastCallerId = document.getElementById('ringing-screen').dataset.callerId;
+        if (lastCallerId) {
+          await set(missedCallRef, { callerId: lastCallerId, timestamp: Date.now() });
+        }
+      }
+      await set(callStateRef, { status: 'idle', timestamp: Date.now() });
+      if (role === 'family' && autoAnswerFromTelegram) {
+        window.history.replaceState({}, document.title, `?role=family&id=${encodeURIComponent(activeFamilyMember.id)}&key=${encodeURIComponent(FAMILY_SECRET)}`);
+      }
+    };
+
+    onValue(callStateRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data) return;
+      currentState = data.status;
+
+      if (role === 'nana') {
+        document.getElementById('night-dimmer').style.display = 'none';
+        if (data.status === 'ringing_nana' && !callFrame) {
+          const callerObj = CONFIG.familyMembers.find(m => m.id === data.callerId) || CONFIG.familyMembers[4];
+          document.getElementById('ringing-screen').dataset.callerId = callerObj.id;
+          startRingingUI(callerObj);
+        } else if (data.status === 'connected') {
+          clearTimeout(outboundTimeout);
+          stopRingingUI();
+          showScreen('call-screen');
+        } else if (data.status === 'idle') {
+          clearTimeout(outboundTimeout);
+          stopRingingUI();
+          destroyVideoFrame();
+          showScreen('grid-screen');
+        }
+      } else if (role === 'family') {
+        if (data.status === 'idle' && callFrame) {
+          destroyVideoFrame();
+          showScreen('family-screen');
+        }
+      }
+    });
+
+    onValue(versionRef, (snapshot) => {
+      const remoteVer = snapshot.val();
+      if (remoteVer && remoteVer !== CONFIG.appVersion) {
+        window.location.reload(true);
+      }
+    });
+
+    async function joinDailyRoom(isFamily) {
+      showScreen('call-screen');
+      const container = document.getElementById('video-container');
+      container.innerHTML = '';
+
+      callFrame = window.DailyIframe.createFrame(container, {
+        showLeaveButton: false,
+        showFullscreenButton: false,
+        showLocalVideo: isFamily,
+        iframeStyle: { width: '100%', height: '100%', border: '0' }
+      });
+
+      await callFrame.join({
+        url: CONFIG.dailyRoomUrl,
+        userName: role === 'nana' ? 'Nana' : activeFamilyMember.name
+      });
+    }
+
+    function destroyVideoFrame() {
+      if (callFrame) {
+        callFrame.leave();
+        callFrame.destroy();
+        callFrame = null;
+      }
+    }
+
+    function speakOutLoud(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const msg = new SpeechSynthesisUtterance(text);
+        msg.rate = 0.9;
+        window.speechSynthesis.speak(msg);
+      }
+    }
+
+    function playChimeAndAnnounce(spokenName) {
+      playSelectedRingtoneAudio(selectedRingtone);
+      setTimeout(() => {
+        speakOutLoud(`Incoming video call from ${spokenName}. Tap the big green button to answer.`);
+      }, 1600);
+    }
+
+    function startRingingUI(callerObj) {
+      setPhotoWithFallback(document.getElementById('caller-photo'), callerObj);
+      document.getElementById('caller-title').innerText = `${callerObj.name} is calling!`;
+      showScreen('ringing-screen');
+      playChimeAndAnnounce(callerObj.spokenName);
+      if (ringInterval) clearInterval(ringInterval);
+      ringInterval = setInterval(() => playChimeAndAnnounce(callerObj.spokenName), 6500);
+    }
+
+    function stopRingingUI() {
+      if (ringInterval) clearInterval(ringInterval);
+      ringInterval = null;
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    }
+  </script>
+</body>
+</html>
