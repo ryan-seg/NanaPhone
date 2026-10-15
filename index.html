@@ -28,13 +28,15 @@
       padding: 0 10px; height: 7vh;
     }
     .header-title { font-size: 2.1rem; font-weight: 900; color: #ffffff; }
-    .clock-pill {
-      font-size: 1.9rem; font-weight: 800; color: #e2e8f0;
+    .header-pills { display: flex; gap: 10px; align-items: center; }
+    .pill {
+      font-size: 1.8rem; font-weight: 800; color: #e2e8f0;
       background: #1e293b; padding: 6px 18px; border-radius: 16px;
       border: 2px solid #475569; cursor: pointer;
     }
+    .pill.warning { background: #78350f; border-color: #d97706; color: #fef08a; }
 
-    /* Missed Call Banner (Appears at top if she missed a call) */
+    /* Missed Call Banner */
     #missed-call-banner {
       display: none; width: 100%; background: #7f1d1d; border: 4px solid #f87171;
       border-radius: 20px; padding: 12px 20px; align-items: center; justify-content: space-between;
@@ -120,6 +122,30 @@
     /* Active Video Call Screen */
     #call-screen { padding: 0; position: relative; background: #000; }
     #video-container { width: 100vw; height: 100vh; }
+    
+    #call-timer-overlay {
+      position: absolute; top: 20px; left: 20px; z-index: 50;
+      background: rgba(15, 23, 42, 0.85); border: 2px solid #475569;
+      padding: 10px 20px; border-radius: 16px; font-size: 1.6rem; font-weight: 800; color: #fef08a;
+    }
+
+    /* "Still There?" Safety Prompt Modal */
+    #idle-safety-modal {
+      display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.95);
+      z-index: 150; flex-direction: column; align-items: center; justify-content: center;
+      padding: 30px; text-align: center;
+    }
+    .safety-pulse-btn {
+      width: 80vw; height: 45vh; background: #eab308; color: #000;
+      border: 10px solid #ffffff; border-radius: 40px; font-size: 3.8rem; font-weight: 900;
+      cursor: pointer; box-shadow: 0 0 50px rgba(234, 179, 8, 0.8);
+      animation: pulseSafety 1s infinite alternate;
+    }
+    @keyframes pulseSafety {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.03); }
+    }
+
     .hangup-btn {
       position: absolute; bottom: 24px; right: 24px; z-index: 50;
       background: #ef4444; color: white; border: 5px solid white;
@@ -145,7 +171,7 @@
     .tone-btn.selected { border-color: #22c55e; background: #064e3b; color: #fef08a; }
 
     /* Auth & Error Screens */
-    #auth-error-screen, #error-screen {
+    #auth-error-screen, #error-screen, #quota-exceeded-screen {
       background: #450a0a; justify-content: center; gap: 20px; padding: 40px;
     }
 
@@ -166,13 +192,28 @@
     <p>Tap screen anywhere to wake up</p>
   </div>
 
+  <!-- "Still There?" Safety Check Modal -->
+  <div id="idle-safety-modal">
+    <h1 style="font-size: 3.5rem; color: #fef08a; margin: 0 0 10px 0;">⚠️ Are you still there?</h1>
+    <p style="font-size: 1.8rem; color: #cbd5e1; margin-bottom: 30px;">This call will automatically end in <span id="safety-countdown" style="color:#f87171; font-weight:bold;">60</span> seconds if no one responds.</p>
+    <button class="safety-pulse-btn" onclick="acknowledgeSafetyCheck()">
+      👍 YES, WE ARE HERE!
+    </button>
+  </div>
+
   <!-- Missing Key Screen -->
   <div id="auth-error-screen" class="screen">
     <h1 style="font-size: 3rem;">🔒 Private Family Portal</h1>
     <p style="font-size: 1.6rem; color: #fca5a5;">Please open this page using your full family link containing <code style="background:#000; padding:4px 10px; border-radius:8px;">?key=YOUR_SECRET</code></p>
   </div>
 
-  <!-- JS Error Catch Screen (Shows exact error if setup fails) -->
+  <!-- Daily Quota Exceeded Screen -->
+  <div id="quota-exceeded-screen" class="screen">
+    <h1 style="font-size: 3.2rem; color: #f87171;">⏳ Daily Call Limit Reached</h1>
+    <p style="font-size: 1.8rem; color: #fef08a; max-width: 800px;">To keep within our free monthly limit, video calls are paused until tomorrow. The daily 300-minute timer resets at midnight UTC.</p>
+  </div>
+
+  <!-- JS Error Catch Screen -->
   <div id="error-screen" class="screen">
     <h1 style="font-size: 2.8rem; color: #f87171;">⚠️ Setup Error</h1>
     <p id="error-message" style="font-size: 1.4rem; color: #fef08a; word-break: break-all; max-width: 900px;"></p>
@@ -195,7 +236,10 @@
   <div id="grid-screen" class="screen">
     <div class="header-bar">
       <div class="header-title">Tap a photo to start a video call</div>
-      <div id="clock" class="clock-pill" onclick="handleClockTap()">12:00</div>
+      <div class="header-pills">
+        <div id="quota-pill" class="pill">300m left</div>
+        <div id="clock" class="clock-pill" onclick="handleClockTap()">12:00</div>
+      </div>
     </div>
     
     <!-- Missed Call Banner -->
@@ -226,7 +270,8 @@
 
   <!-- 4. ACTIVE VIDEO CALL SCREEN -->
   <div id="call-screen" class="screen">
-    <div id="video-container"></div>
+    <div id="call-timer-overlay">⏱️ Remaining today: 300m</div>
+    <div id="video-container" onclick="resetIdleTimer()"></div>
     <button class="hangup-btn" onclick="endCall()">End Call</button>
   </div>
 
@@ -250,7 +295,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+    import { getDatabase, ref, set, onValue, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
     window.addEventListener('error', (event) => {
       document.getElementById('error-message').innerText = event.message + " (At line " + event.lineno + ")";
@@ -261,13 +306,14 @@
     // 👇 FILL IN YOUR 4 PUBLIC URLS BELOW 👇
     // =========================================================================
     const CONFIG = {
-      appVersion: "1.0.5",
+      appVersion: "1.0.8",
       dailyRoomUrl: "https://nanaphone.daily.co/NanaPhone",               // <-- 1. Your Daily.co Room URL
       telegramBotUsername: "Nanaphone_bot",                            // <-- 2. Your Bot Username (no @)
       googleScriptUrl: "https://script.google.com/macros/s/AKfycbwsFHE8oyj1RBGxLJT79bbPsvJ2hTkVrF9dCoj369ApEREXyrdQKE_vA0QrobBOeLE2/exec", // <-- 3. Your Google Apps Script URL
       firebase: {
         databaseURL: "https://nanaphone-f644b-default-rtdb.europe-west1.firebasedatabase.app" // <-- 4. Your Firebase DB URL
       },
+      dailyMinuteQuota: 300,
       familyMembers: [
         { id: "phil",     name: "Phil",     spokenName: "Phil",   photo: "photos/phil.jpg",     fallback: "https://ui-avatars.com/api/?name=Phil&size=256&background=1d4ed8&color=fff&bold=true&font-size=0.45" },
         { id: "nicky-s",  name: "Nicky S",  spokenName: "Nicky",  photo: "photos/nicky-s.jpg",  fallback: "https://ui-avatars.com/api/?name=NS&size=256&background=be185d&color=fff&bold=true&font-size=0.45" },
@@ -280,7 +326,6 @@
     };
 
     const params = new URLSearchParams(window.location.search);
-
     if (params.get('key')) {
       localStorage.setItem('nana_family_secret', params.get('key'));
     }
@@ -289,15 +334,18 @@
     const role = params.get('role') || 'nana';
     const callerId = params.get('id') || 'ryan';
     const autoAnswerFromTelegram = params.get('answer') === 'true';
-
     const activeFamilyMember = CONFIG.familyMembers.find(m => m.id === callerId) || CONFIG.familyMembers[4];
 
     let callFrame = null;
     let ringInterval = null;
     let outboundTimeout = null;
+    let callTimerInterval = null;
+    let idleCheckTimer = null;
+    let safetyCountdownInterval = null;
     let currentState = 'idle';
     let connectedTelegramMembers = [];
     let missedCallerObj = null;
+    let todayMinutesUsed = 0;
     let selectedRingtone = localStorage.getItem('nana_ringtone') || 'uk-phone';
     let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -323,6 +371,27 @@
     const versionRef = ref(db, `${basePath}/version`);
     const ringtoneRef = ref(db, `${basePath}/ringtone`);
     const missedCallRef = ref(db, `${basePath}/missedCall`);
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    const dailyUsageRef = ref(db, `${basePath}/usage/${todayStr}`);
+
+    onValue(dailyUsageRef, (snapshot) => {
+      todayMinutesUsed = snapshot.val() || 0;
+      const remaining = Math.max(0, CONFIG.dailyMinuteQuota - todayMinutesUsed);
+      const pill = document.getElementById('quota-pill');
+      if (pill) {
+        pill.innerText = `${remaining}m left`;
+        if (remaining < 30) {
+          pill.classList.add('warning');
+        } else {
+          pill.classList.remove('warning');
+        }
+      }
+
+      if (remaining <= 0 && currentState === 'idle') {
+        showScreen('quota-exceeded-screen');
+      }
+    });
 
     // Build 7-person grid
     const gridEl = document.getElementById('family-grid');
@@ -336,6 +405,10 @@
         <div class="contact-nameplate">${member.name}</div>
       `;
       card.onclick = () => {
+        if (CONFIG.dailyMinuteQuota - todayMinutesUsed <= 0) {
+          showScreen('quota-exceeded-screen');
+          return;
+        }
         clearMissedCallBanner();
         startCallFromNana(member);
       };
@@ -492,7 +565,7 @@
     });
 
     // =========================================================================
-    // MISSED CALL LISTENER & CALL BACK
+    // MISSED CALLS
     // =========================================================================
     onValue(missedCallRef, (snapshot) => {
       const data = snapshot.val();
@@ -522,9 +595,13 @@
     }
 
     // =========================================================================
-    // CALL STATE & ROUTING
+    // CALL STATE, QUOTA & 60-MINUTE IDLE SAFETY CHECK
     // =========================================================================
     async function startCallFromNana(member) {
+      if (CONFIG.dailyMinuteQuota - todayMinutesUsed <= 0) {
+        showScreen('quota-exceeded-screen');
+        return;
+      }
       currentState = 'calling_family';
       setPhotoWithFallback(document.getElementById('outbound-photo'), member);
       document.getElementById('outbound-title').innerText = `Calling ${member.name}...`;
@@ -547,7 +624,6 @@
       outboundTimeout = setTimeout(async () => {
         if (currentState === 'calling_family') {
           speakOutLoud(`Sorry, ${member.spokenName} could not answer right now.`);
-          // Mark as missed call on timeout
           await set(missedCallRef, { callerId: member.id, timestamp: Date.now() });
           await endCall();
         }
@@ -585,6 +661,7 @@
     }
 
     async function answerNanaFromFamilyPhone() {
+      if (CONFIG.dailyMinuteQuota - todayMinutesUsed <= 0) return;
       await set(callStateRef, {
         status: 'connected',
         callerId: activeFamilyMember.id,
@@ -595,6 +672,10 @@
     }
 
     window.startCallFromFamily = async () => {
+      if (CONFIG.dailyMinuteQuota - todayMinutesUsed <= 0) {
+        alert("Daily video call quota reached for today.");
+        return;
+      }
       await set(callStateRef, {
         status: 'ringing_nana',
         callerId: activeFamilyMember.id,
@@ -617,7 +698,8 @@
     window.endCall = async () => {
       clearTimeout(outboundTimeout);
       stopRingingUI();
-      // If Nana hung up while someone was calling her and she didn't answer, record it as a missed call!
+      stopCallDurationTracker();
+      stopIdleSafetyChecker();
       if (role === 'nana' && currentState === 'ringing_nana') {
         const lastCallerId = document.getElementById('ringing-screen').dataset.callerId;
         if (lastCallerId) {
@@ -645,19 +727,100 @@
           clearTimeout(outboundTimeout);
           stopRingingUI();
           showScreen('call-screen');
+          startCallDurationTracker();
+          startIdleSafetyChecker();
         } else if (data.status === 'idle') {
           clearTimeout(outboundTimeout);
           stopRingingUI();
+          stopCallDurationTracker();
+          stopIdleSafetyChecker();
           destroyVideoFrame();
           showScreen('grid-screen');
         }
       } else if (role === 'family') {
-        if (data.status === 'idle' && callFrame) {
+        if (data.status === 'connected') {
+          showScreen('call-screen');
+          startCallDurationTracker();
+          startIdleSafetyChecker();
+        } else if (data.status === 'idle' && callFrame) {
+          stopCallDurationTracker();
+          stopIdleSafetyChecker();
           destroyVideoFrame();
           showScreen('family-screen');
         }
       }
     });
+
+    function startCallDurationTracker() {
+      stopCallDurationTracker();
+      callTimerInterval = setInterval(async () => {
+        await runTransaction(dailyUsageRef, (currentVal) => {
+          return (currentVal || 0) + 1;
+        });
+
+        const remaining = Math.max(0, CONFIG.dailyMinuteQuota - (todayMinutesUsed + 1));
+        const timerEl = document.getElementById('call-timer-overlay');
+        if (timerEl) timerEl.innerText = `⏱️ Remaining today: ${remaining}m`;
+
+        if (remaining <= 0) {
+          endCall();
+        }
+      }, 60000);
+    }
+
+    function stopCallDurationTracker() {
+      if (callTimerInterval) clearInterval(callTimerInterval);
+      callTimerInterval = null;
+    }
+
+    // =========================================================================
+    // 60-MINUTE "STILL THERE?" SAFETY CHECKER
+    // =========================================================================
+    function startIdleSafetyChecker() {
+      stopIdleSafetyChecker();
+      // Triggers every 60 minutes (3,600,000 ms) of active call
+      idleCheckTimer = setTimeout(() => {
+        triggerSafetyCheckModal();
+      }, 3600000);
+    }
+
+    function stopIdleSafetyChecker() {
+      if (idleCheckTimer) clearTimeout(idleCheckTimer);
+      if (safetyCountdownInterval) clearInterval(safetyCountdownInterval);
+      idleCheckTimer = null;
+      safetyCountdownInterval = null;
+      document.getElementById('idle-safety-modal').style.display = 'none';
+    }
+
+    function triggerSafetyCheckModal() {
+      speakOutLoud("Are you still there? Please touch the screen to stay connected.");
+      document.getElementById('idle-safety-modal').style.display = 'flex';
+      let secondsLeft = 60;
+      document.getElementById('safety-countdown').innerText = secondsLeft;
+
+      safetyCountdownInterval = setInterval(() => {
+        secondsLeft--;
+        document.getElementById('safety-countdown').innerText = secondsLeft;
+        if (secondsLeft <= 0) {
+          stopIdleSafetyChecker();
+          speakOutLoud("Call ending due to inactivity.");
+          endCall(); // Auto-hang up if no one touches the screen for 60 seconds
+        }
+      }, 1000);
+    }
+
+    window.resetIdleTimer = () => {
+      // If modal is showing, acknowledging it resets the 60-minute timer
+      stopIdleSafetyChecker();
+      if (currentState === 'connected') {
+        startIdleSafetyChecker();
+      }
+    };
+
+    window.acknowledgeSafetyCheck = () => {
+      stopIdleSafetyChecker();
+      startIdleSafetyChecker();
+    };
 
     onValue(versionRef, (snapshot) => {
       const remoteVer = snapshot.val();
