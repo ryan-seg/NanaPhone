@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>NanaPhone Portal</title>
+  <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    body, html {
+      margin: 0; padding: 0; width: 100vw; height: 100vh;
+      background: #090d16; color: #ffffff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+    }
+    .screen {
+      display: none; width: 100vw; height: 100vh;
+      flex-direction: column; align-items: center; justify-content: space-between;
+      padding: 14px 20px; text-align: center;
+    }
+    .active { display: flex; }
+
+    /* Top Header on Nana's Tablet */
+    .header-bar {
+      width: 100%; display: flex; justify-content: space-between; align-items: center;
+      padding: 0 10px; height: 8vh;
+    }
+    .header-title { font-size: 2.3rem; font-weight: 900; color: #ffffff; }
+    .clock-pill {
+      font-size: 2rem; font-weight: 800; color: #e2e8f0;
+      background: #1e293b; padding: 8px 20px; border-radius: 16px;
+      border: 2px solid #475569; cursor: pointer;
+    }
+
+    /* 7-Contact Grid: 4 Top + 3 Bottom Centered */
+    .family-grid {
+      display: flex; flex-wrap: wrap; justify-content: center;
+      align-content: space-between; gap: 16px;
+      width: 100%; height: 88vh;
+    }
+    .family-card {
+      width: calc(25% - 14px);
+      height: calc(50% - 10px);
+      background: #1e293b; border: 5px solid #64748b; border-radius: 28px;
+      display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+      cursor: pointer; padding: 14px 10px 10px 10px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.6);
+      transition: transform 0.1s, border-color 0.1s;
+    }
+    .family-card:active {
+      transform: scale(0.96);
+      background: #334155;
+      border-color: #22c55e;
+    }
+    .photo-wrapper {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      width: 100%; overflow: hidden;
+    }
+    .family-card img {
+      width: 135px; height: 135px; border-radius: 50%;
+      object-fit: cover; border: 5px solid #ffffff;
+      background: #0f172a; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    /* High-Visibility Nameplate Underneath Each Photo */
+    .contact-nameplate {
+      width: 100%; background: #0f172a;
+      border: 3px solid #facc15; border-radius: 18px;
+      padding: 8px 6px; margin-top: 8px;
+      font-size: 2.5rem; font-weight: 900; color: #fef08a;
+      letter-spacing: 0.5px; line-height: 1.1;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* Outbound Calling Screen */
+    #outbound-screen { background: #1e1b4b; justify-content: center; }
+    #outbound-photo {
+      width: 220px; height: 220px; border-radius: 50%;
+      object-fit: cover; border: 7px solid #ffffff; margin-bottom: 20px;
+    }
+
+    /* Incoming Ring Screen */
+    #ringing-screen { background: #064e3b; justify-content: center; animation: pulseBg 1.8s infinite; }
+    @keyframes pulseBg {
+      0%, 100% { background: #064e3b; }
+      50% { background: #047857; }
+    }
+    #caller-photo {
+      width: 180px; height: 180px; border-radius: 50%;
+      object-fit: cover; border: 7px solid #ffffff; margin-bottom: 14px;
+    }
+    .giant-btn {
+      width: 88vw; height: 48vh;
+      background: #22c55e; color: #000000;
+      border: 12px solid #ffffff; border-radius: 44px;
+      font-size: 4.2rem; font-weight: 900;
+      cursor: pointer; box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .cancel-btn {
+      margin-top: 28px; background: #ef4444; color: #fff;
+      border: 6px solid #fff; border-radius: 30px;
+      padding: 22px 64px; font-size: 2.8rem; font-weight: 900; cursor: pointer;
+    }
+
+    /* Active Video Call Screen */
+    #call-screen { padding: 0; position: relative; background: #000; }
+    #video-container { width: 100vw; height: 100vh; }
+    .hangup-btn {
+      position: absolute; bottom: 24px; right: 24px; z-index: 50;
+      background: #ef4444; color: white; border: 5px solid white;
+      border-radius: 24px; padding: 22px 48px; font-size: 2.4rem; font-weight: 900;
+      cursor: pointer; box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+    }
+
+    /* Ringtone Selector Modal */
+    #ringtone-modal {
+      display: none; position: fixed; inset: 0; background: rgba(9, 13, 22, 0.96);
+      z-index: 120; flex-direction: column; align-items: center; justify-content: center;
+      padding: 30px;
+    }
+    .tone-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+      width: 85%; max-width: 800px; margin: 24px 0;
+    }
+    .tone-btn {
+      background: #1e293b; color: #fff; border: 4px solid #475569;
+      border-radius: 24px; padding: 22px; font-size: 1.8rem; font-weight: 800;
+      cursor: pointer; text-decoration: none; display: inline-block;
+    }
+    .tone-btn.selected { border-color: #22c55e; background: #064e3b; color: #fef08a; }
+
+    /* Software Night Mode Overlay */
+    #night-dimmer {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.93); z-index: 90;
+      flex-direction: column; align-items: center; justify-content: center;
+      color: #334155; font-size: 2.2rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Night Dimmer -->
+  <div id="night-dimmer" onclick="wakeFromNightMode()">
+    <div id="night-clock" style="font-size: 5.5rem; font-weight: bold;"></div>
+    <p>Tap screen anywhere to wake up</p>
+  </div>
+
+  <!-- Ringtone Picker Modal (Open by tapping clock 3 times or from Family screen) -->
+  <div id="ringtone-modal">
+    <h1 style="font-size: 2.8rem; margin: 0;">Choose Nana's Ringtone</h1>
+    <p style="font-size: 1.4rem; color: #94a3b8;">Tap any sound below to preview and save it:</p>
+    <div class="tone-grid">
+      <button class="tone-btn" id="tone-uk-phone" onclick="selectRingtone('uk-phone')">☎️ Classic UK Telephone</button>
+      <button class="tone-btn" id="tone-westminster" onclick="selectRingtone('westminster')">🕰️ Grandfather Chime</button>
+      <button class="tone-btn" id="tone-marimba" onclick="selectRingtone('marimba')">🎵 Warm Marimba</button>
+      <button class="tone-btn" id="tone-bell" onclick="selectRingtone('bell')">🔔 High-Clarity Bell</button>
+    </div>
+    <button class="cancel-btn" style="background: #2563eb; margin-top: 10px; font-size: 2rem; padding: 16px 48px;" onclick="closeRingtoneModal()">✔ Done</button>
+  </div>
+
+  <!-- 1. NANA'S 7-PERSON PHOTO GRID -->
+  <div id="grid-screen" class="screen">
+    <div class="header-bar">
+      <div class="header-title">Tap a photo to start a video call</div>
+      <div id="clock" class="clock-pill" onclick="handleClockTap()">12:00</div>
+    </div>
+    <div id="family-grid" class="family-grid"></div>
+  </div>
+
+  <!-- 2. NANA OUTBOUND CALLING SCREEN -->
+  <div id="outbound-screen" class="screen">
+    <img id="outbound-photo" src="" alt="Family Member">
+    <h1 id="outbound-title" style="font-size: 4.2rem; margin: 0 0 10px 0; color: #fef08a;">Calling...</h1>
+    <p style="font-size: 2.2rem; color: #cbd5e1;">Ringing their phone now, please wait...</p>
+    <button class="cancel-btn" onclick="endCall()">✖ Cancel Call</button>
+  </div>
+
+  <!-- 3. NANA INCOMING RING SCREEN -->
+  <div id="ringing-screen" class="screen">
+    <img id="caller-photo" src="" alt="Caller">
+    <h1 id="caller-title" style="font-size: 4.5rem; margin: 0 0 20px 0; color: #fef08a;">Incoming Call!</h1>
+    <button class="giant-btn" onclick="answerCallAsNana()">
+      📞 TAP HERE<br>TO ANSWER
+    </button>
+  </div>
+
+  <!-- 4. ACTIVE VIDEO CALL SCREEN -->
+  <div id="call-screen" class="screen">
+    <div id="video-container"></div>
+    <button class="hangup-btn" onclick="endCall()">End Call</button>
+  </div>
+
+  <!-- 5. FAMILY MEMBER PHONE DIALER -->
+  <div id="family-screen" class="screen" style="justify-content: center; gap: 16px;">
+    <img id="family-self-photo" src="" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid #fff;">
+    <h1 id="family-greeting" style="font-size: 2.2rem; margin: 0;">Call Nana</h1>
+    
+    <button class="giant-btn" style="height: 30vh; font-size: 2.6rem;" onclick="startCallFromFamily()">
+      📹 Ring Nana Now
+    </button>
+
+    <!-- 1-Tap Auto-Linker for Telegram Alerts -->
+    <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="font-size: 1.2rem; padding: 14px 20px; width: 88vw; background: #0284c7; border-color: #38bdf8;">
+      🔔 1-Tap Setup: Connect My Telegram Alerts
+    </a>
+
+    <button class="tone-btn" style="font-size: 1.2rem; padding: 14px 20px; width: 88vw;" onclick="openRingtoneModal()">
+      🔊 Change Nana's Tablet Ringtone
+    </button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, set, update, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    // =========================================================================
+    // 👇 ONLY FILL IN THESE 4 LINES BELOW! (NO CHAT IDs NEEDED!) 👇
+    // =========================================================================
+    const CONFIG = {
+      appVersion: "1.0.3",
+      dailyRoomUrl: "https://nanaphone.daily.co/YOUR-ROOM-NAME", // <-- 1. Check room name after slash!
+      telegramBotUsername: "MyraNanaPhone_bot",                  // <-- 2. Your Bot's username (without @)
+      telegramBotToken: "PASTE_YOUR_BOTFATHER_TOKEN_HERE",       // <-- 3. Token from @BotFather
+      firebase: {
+        databaseURL: "https://nanaphone-XXXX-default-rtdb.europe-west1.firebasedatabase.app" // <-- 4. Your Firebase URL
+      },
+      familyMembers: [
+        { id: "phil",     name: "Phil",     spokenName: "Phil",   photo: "photos/phil.jpg",     fallback: "https://ui-avatars.com/api/?name=Phil&size=256&background=1d4ed8&color=fff&bold=true&font-size=0.45" },
+        { id: "nicky-s",  name: "Nicky S",  spokenName: "Nicky",  photo: "photos/nicky-s.jpg",  fallback: "https://ui-avatars.com/api/?name=NS&size=256&background=be185d&color=fff&bold=true&font-size=0.45" },
+        { id: "denise",   name: "Denise",   spokenName: "Denise", photo: "photos/denise.jpg",   fallback: "https://ui-avatars.com/api/?name=Denise&size=256&background=047857&color=fff&bold=true&font-size=0.4" },
+        { id: "gill",     name: "Gill",     spokenName: "Gill",   photo: "photos/gill.jpg",     fallback: "https://ui-avatars.com/api/?name=Gill&size=256&background=b45309&color=fff&bold=true&font-size=0.45" },
+        { id: "ryan",     name: "Ryan",     spokenName: "Ryan",   photo: "photos/ryan.jpg",     fallback: "https://ui-avatars.com/api/?name=Ryan&size=256&background=4338ca&color=fff&bold=true&font-size=0.45" },
+        { id: "nicola-p", name: "Nicola P", spokenName: "Nicola", photo: "photos/nicola-p.jpg", fallback: "https://ui-avatars.com/api/?name=NP&size=256&background=0e7490&color=fff&bold=true&font-size=0.45" },
+        { id: "zara",     name: "Zara",     spokenName: "Zara",   photo: "photos/zara.jpg",     fallback: "https://ui-avatars.com/api/?name=Zara&size=256&background=6d28d9&color=fff&bold=true&font-size=0.45" }
+      ]
+    };
+
+    const app = initializeApp(CONFIG.firebase);
+    const db = getDatabase(app);
+    const callStateRef = ref(db, 'portal/callState');
+    const versionRef = ref(db, 'portal/version');
+    const ringtoneRef = ref(db, 'portal/ringtone');
+    const chatIdsRef = ref(db, 'portal/chatIds');
+
+    const params = new URLSearchParams(window.location.search);
+    const role = params.get('role') || 'nana';
+    const callerId = params.get('id') || 'ryan';
+    const autoAnswerFromTelegram = params.get('answer') === 'true';
+
+    const activeFamilyMember = CONFIG.familyMembers.find(m => m.id === callerId) || CONFIG.familyMembers[4];
+
+    let callFrame = null;
+    let ringInterval = null;
+    let outboundTimeout = null;
+    let currentState = 'idle';
+    let savedChatIds = {};
+    let selectedRingtone = localStorage.getItem('nana_ringtone') || 'uk-phone';
+    let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Listen to saved Telegram Chat IDs in Firebase
+    onValue(chatIdsRef, (snap) => {
+      savedChatIds = snap.val() || {};
+      updateFamilyTelegramButtonUI();
+    });
+
+    // Automatically check Telegram Bot for new "/start <id>" clicks and save their Chat ID to Firebase!
+    async function syncTelegramChatIds() {
+      if (!CONFIG.telegramBotToken || CONFIG.telegramBotToken.includes("PASTE_")) return;
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${CONFIG.telegramBotToken}/getUpdates`);
+        const data = await res.json();
+        if (!data.ok || !data.result) return;
+
+        const updatesToSave = {};
+        data.result.forEach(item => {
+          const msg = item.message;
+          if (msg && msg.text && msg.chat && msg.chat.id) {
+            // If they clicked "?start=phil", msg.text is "/start phil"
+            const parts = msg.text.trim().split(' ');
+            if (parts[0] === '/start' && parts[1]) {
+              const memberId = parts[1].toLowerCase();
+              updatesToSave[memberId] = String(msg.chat.id);
+            }
+          }
+        });
+
+        if (Object.keys(updatesToSave).length > 0) {
+          await update(chatIdsRef, updatesToSave);
+        }
+      } catch (e) {}
+    }
+
+    function updateFamilyTelegramButtonUI() {
+      const btn = document.getElementById('telegram-link-btn');
+      if (!btn) return;
+      if (savedChatIds[activeFamilyMember.id]) {
+        btn.innerText = "✅ Telegram Alerts Connected!";
+        btn.style.background = "#065f46";
+        btn.style.borderColor = "#22c55e";
+      } else {
+        btn.href = `https://t.me/${CONFIG.telegramBotUsername}?start=${activeFamilyMember.id}`;
+      }
+    }
+
+    // Build the 7-person photo grid with oversized clear nameplates underneath
+    const gridEl = document.getElementById('family-grid');
+    CONFIG.familyMembers.forEach(member => {
+      const card = document.createElement('div');
+      card.className = 'family-card';
+      card.innerHTML = `
+        <div class="photo-wrapper">
+          <img src="${member.photo}" onerror="this.onerror=null;this.src='${member.fallback}';" alt="${member.name}">
+        </div>
+        <div class="contact-nameplate">${member.name}</div>
+      `;
+      card.onclick = () => startCallFromNana(member);
+      gridEl.appendChild(card);
+    });
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    function setPhotoWithFallback(imgEl, member) {
+      imgEl.onerror = () => { imgEl.onerror = null; imgEl.src = member.fallback; };
+      imgEl.src = member.photo;
+    }
+
+    if (role === 'family') {
+      document.getElementById('family-greeting').innerText = `Call Nana (as ${activeFamilyMember.name})`;
+      setPhotoWithFallback(document.getElementById('family-self-photo'), activeFamilyMember);
+      updateFamilyTelegramButtonUI();
+      syncTelegramChatIds();
+      setInterval(syncTelegramChatIds, 8000); // Auto-detects as soon as they tap Start in Telegram
+      showScreen('family-screen');
+      if (autoAnswerFromTelegram) answerNanaFromFamilyPhone();
+    } else {
+      showScreen('grid-screen');
+      syncTelegramChatIds();
+      setInterval(syncTelegramChatIds, 15000);
+      setInterval(updateClockAndNightMode, 10000);
+      updateClockAndNightMode();
+    }
+
+    function updateClockAndNightMode() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('clock').innerText = timeStr;
+      document.getElementById('night-clock').innerText = timeStr;
+
+      const hour = now.getHours();
+      const isNight = (hour >= 21 || hour < 8);
+      document.getElementById('night-dimmer').style.display = (isNight && currentState === 'idle') ? 'flex' : 'none';
+    }
+
+    window.wakeFromNightMode = () => {
+      document.getElementById('night-dimmer').style.display = 'none';
+    };
+
+    // =========================================================================
+    // 2. MULTI-RINGTONE SYNTHESIZER (4 DISTINCT RINGTONES FOR NANA)
+    // =========================================================================
+    function playNote(freq, startTime, duration, type = 'sine', peakGain = 0.6) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, startTime);
+      gain.gain.setValueAtTime(peakGain, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.008, startTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    }
+
+    function playSelectedRingtoneAudio(toneName) {
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const now = audioCtx.currentTime;
+
+        if (toneName === 'uk-phone') {
+          [0, 0.55].forEach(offset => {
+            playNote(400, now + offset, 0.35, 'square', 0.35);
+            playNote(450, now + offset, 0.35, 'square', 0.35);
+          });
+        } else if (toneName === 'westminster') {
+          playNote(329.63, now, 0.35, 'triangle', 0.7);
+          playNote(415.30, now + 0.35, 0.35, 'triangle', 0.7);
+          playNote(369.99, now + 0.70, 0.35, 'triangle', 0.7);
+          playNote(246.94, now + 1.05, 0.65, 'triangle', 0.7);
+        } else if (toneName === 'marimba') {
+          playNote(523.25, now, 0.25, 'sine', 0.7);
+          playNote(659.25, now + 0.22, 0.25, 'sine', 0.7);
+          playNote(783.99, now + 0.44, 0.25, 'sine', 0.7);
+          playNote(1046.50, now + 0.66, 0.55, 'sine', 0.7);
+        } else if (toneName === 'bell') {
+          [0, 0.35, 0.70].forEach(offset => {
+            playNote(880, now + offset, 0.28, 'sine', 0.65);
+            playNote(1760, now + offset, 0.28, 'triangle', 0.4);
+          });
+        }
+      } catch (e) {}
+    }
+
+    let clockTapCount = 0;
+    let clockTapTimer = null;
+    window.handleClockTap = () => {
+      clockTapCount++;
+      clearTimeout(clockTapTimer);
+      if (clockTapCount >= 3) {
+        clockTapCount = 0;
+        openRingtoneModal();
+      } else {
+        clockTapTimer = setTimeout(() => { clockTapCount = 0; }, 1200);
+      }
+    };
+
+    window.openRingtoneModal = () => {
+      highlightSelectedToneButton();
+      document.getElementById('ringtone-modal').style.display = 'flex';
+    };
+
+    window.closeRingtoneModal = () => {
+      document.getElementById('ringtone-modal').style.display = 'none';
+    };
+
+    window.selectRingtone = async (toneName) => {
+      selectedRingtone = toneName;
+      localStorage.setItem('nana_ringtone', toneName);
+      highlightSelectedToneButton();
+      playSelectedRingtoneAudio(toneName);
+      await set(ringtoneRef, toneName);
+    };
+
+    function highlightSelectedToneButton() {
+      document.querySelectorAll('.tone-btn').forEach(b => b.classList.remove('selected'));
+      const activeBtn = document.getElementById(`tone-${selectedRingtone}`);
+      if (activeBtn) activeBtn.classList.add('selected');
+    }
+
+    onValue(ringtoneRef, (snapshot) => {
+      const tone = snapshot.val();
+      if (tone) {
+        selectedRingtone = tone;
+        localStorage.setItem('nana_ringtone', tone);
+        highlightSelectedToneButton();
+      }
+    });
+
+    // =========================================================================
+    // 3. NANA CALLS FAMILY & FAMILY CALLS NANA
+    // =========================================================================
+    async function startCallFromNana(member) {
+      await syncTelegramChatIds(); // Ensure latest Chat IDs are loaded
+      currentState = 'calling_family';
+      setPhotoWithFallback(document.getElementById('outbound-photo'), member);
+      document.getElementById('outbound-title').innerText = `Calling ${member.name}...`;
+      showScreen('outbound-screen');
+
+      speakOutLoud(`Calling ${member.spokenName} now. Please wait while their phone rings.`);
+
+      await set(callStateRef, {
+        status: 'calling_family',
+        targetId: member.id,
+        targetName: member.name,
+        timestamp: Date.now()
+      });
+
+      await joinDailyRoom(false);
+      showScreen('outbound-screen');
+      ringFamilyOnTelegramLoop(member);
+
+      clearTimeout(outboundTimeout);
+      outboundTimeout = setTimeout(async () => {
+        if (currentState === 'calling_family') {
+          speakOutLoud(`Sorry, ${member.spokenName} could not answer right now.`);
+          await endCall();
+        }
+      }, 45000);
+    }
+
+    async function ringFamilyOnTelegramLoop(member) {
+      const targetChatId = savedChatIds[member.id];
+      if (!targetChatId) {
+        console.warn(`No Telegram Chat ID registered yet for ${member.name}`);
+        return;
+      }
+
+      let lastMessageId = null;
+      const baseApi = `https://api.telegram.org/bot${CONFIG.telegramBotToken}`;
+      const originUrl = window.location.origin + window.location.pathname;
+      const answerUrl = `${originUrl}?role=family&id=${encodeURIComponent(member.id)}&answer=true`;
+
+      for (let i = 1; i <= 6; i++) {
+        const snap = await get(callStateRef);
+        if (!snap.exists() || snap.val().status !== 'calling_family') break;
+
+        if (lastMessageId) {
+          fetch(`${baseApi}/deleteMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: targetChatId, message_id: lastMessageId })
+          }).catch(() => {});
+        }
+
+        try {
+          const res = await fetch(`${baseApi}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: targetChatId,
+              text: `📞 *NANA IS CALLING YOU!* (Ring ${i}/6)\nTap the green button below to answer her video call:`,
+              parse_mode: 'Markdown',
+              reply_markup: {
+                inline_keyboard: [[{ text: "🟢 ANSWER NANA'S CALL", url: answerUrl }]]
+              }
+            })
+          });
+          const json = await res.json();
+          if (json.ok && json.result) lastMessageId = json.result.message_id;
+        } catch (e) {}
+
+        await new Promise(r => setTimeout(r, 5000));
+      }
+    }
+
+    async function answerNanaFromFamilyPhone() {
+      await set(callStateRef, {
+        status: 'connected',
+        callerId: activeFamilyMember.id,
+        callerName: activeFamilyMember.name,
+        timestamp: Date.now()
+      });
+      await joinDailyRoom(true);
+    }
+
+    window.startCallFromFamily = async () => {
+      await set(callStateRef, {
+        status: 'ringing_nana',
+        callerId: activeFamilyMember.id,
+        callerName: activeFamilyMember.name,
+        timestamp: Date.now()
+      });
+      await joinDailyRoom(true);
+    };
+
+    window.answerCallAsNana = async () => {
+      stopRingingUI();
+      await set(callStateRef, {
+        status: 'connected',
+        callerName: 'Nana',
+        timestamp: Date.now()
+      });
+      await joinDailyRoom(false);
+    };
+
+    window.endCall = async () => {
+      clearTimeout(outboundTimeout);
+      stopRingingUI();
+      await set(callStateRef, { status: 'idle', timestamp: Date.now() });
+      if (role === 'family' && autoAnswerFromTelegram) {
+        window.history.replaceState({}, document.title, `/?role=family&id=${encodeURIComponent(activeFamilyMember.id)}`);
+      }
+    };
+
+    onValue(callStateRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data) return;
+      currentState = data.status;
+
+      if (role === 'nana') {
+        document.getElementById('night-dimmer').style.display = 'none';
+        if (data.status === 'ringing_nana' && !callFrame) {
+          const callerObj = CONFIG.familyMembers.find(m => m.id === data.callerId) || CONFIG.familyMembers[4];
+          startRingingUI(callerObj);
+        } else if (data.status === 'connected') {
+          clearTimeout(outboundTimeout);
+          stopRingingUI();
+          showScreen('call-screen');
+        } else if (data.status === 'idle') {
+          clearTimeout(outboundTimeout);
+          stopRingingUI();
+          destroyVideoFrame();
+          showScreen('grid-screen');
+        }
+      } else if (role === 'family') {
+        if (data.status === 'idle' && callFrame) {
+          destroyVideoFrame();
+          showScreen('family-screen');
+        }
+      }
+    });
+
+    onValue(versionRef, (snapshot) => {
+      const remoteVer = snapshot.val();
+      if (remoteVer && remoteVer !== CONFIG.appVersion) {
+        window.location.reload(true);
+      }
+    });
+
+    async function joinDailyRoom(isFamily) {
+      showScreen('call-screen');
+      const container = document.getElementById('video-container');
+      container.innerHTML = '';
+
+      callFrame = window.DailyIframe.createFrame(container, {
+        showLeaveButton: false,
+        showFullscreenButton: false,
+        showLocalVideo: isFamily,
+        iframeStyle: { width: '100%', height: '100%', border: '0' }
+      });
+
+      await callFrame.join({
+        url: CONFIG.dailyRoomUrl,
+        userName: role === 'nana' ? 'Nana' : activeFamilyMember.name
+      });
+    }
+
+    function destroyVideoFrame() {
+      if (callFrame) {
+        callFrame.leave();
+        callFrame.destroy();
+        callFrame = null;
+      }
+    }
+
+    function speakOutLoud(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const msg = new SpeechSynthesisUtterance(text);
+        msg.rate = 0.9;
+        window.speechSynthesis.speak(msg);
+      }
+    }
+
+    function playChimeAndAnnounce(spokenName) {
+      playSelectedRingtoneAudio(selectedRingtone);
+      setTimeout(() => {
+        speakOutLoud(`Incoming video call from ${spokenName}. Tap the big green button to answer.`);
+      }, 1600);
+    }
+
+    function startRingingUI(callerObj) {
+      setPhotoWithFallback(document.getElementById('caller-photo'), callerObj);
+      document.getElementById('caller-title').innerText = `${callerObj.name} is calling!`;
+      showScreen('ringing-screen');
+      playChimeAndAnnounce(callerObj.spokenName);
+      if (ringInterval) clearInterval(ringInterval);
+      ringInterval = setInterval(() => playChimeAndAnnounce(callerObj.spokenName), 6500);
+    }
+
+    function stopRingingUI() {
+      if (ringInterval) clearInterval(ringInterval);
+      ringInterval = null;
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    }
+  </script>
+</body>
+</html>
