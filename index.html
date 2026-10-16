@@ -279,7 +279,21 @@
   <div id="family-screen" class="screen" style="justify-content: center; gap: 16px;">
     <img id="family-self-photo" src="" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid #fff;">
     <h1 id="family-greeting" style="font-size: 2.2rem; margin: 0;">Call Nana</h1>
-    
+    <button class="tone-btn" style="font-size: 1.1rem; padding: 12px 20px; width: 88vw; background: #334155;" onclick="document.getElementById('guide-modal').style.display='flex'">
+  📖 iPhone & Android Loud Ringing Guide
+</button>
+
+    <!-- Help Modal -->
+    <div id="guide-modal" style="display:none; position:fixed; inset:0; background:rgba(9,13,22,0.98); z-index:160; flex-direction:column; align-items:center; justify-content:flex-start; padding:24px; overflow-y:auto; text-align:left;">
+      <h2 style="font-size:1.8rem; color:#fef08a; margin-top:0;">🔔 Make Your Phone Ring When Nana Calls</h2>
+      <div style="max-width:600px; font-size:1.05rem; line-height:1.5; color:#e2e8f0;">
+        <p><strong style="color:#38bdf8;">Step 1 (Both):</strong> Tap the blue <em>"Connect My Telegram Alerts"</em> button on the previous screen and tap <strong>Start</strong> in Telegram.</p>
+        <p><strong style="color:#38bdf8;">Step 2 (Save Sound):</strong> In the Telegram bot chat, press and hold (iPhone) or tap the 3 dots (Android) on the ringtone audio file and tap <strong>Save for Notifications</strong>.</p>
+        <p><strong style="color:#38bdf8;">Step 3 (iPhone):</strong> Tap the Bot's name at the top of Telegram &rarr; <strong>Mute &rarr; Customize &rarr; Sound</strong> and pick the ringtone. Then go to <em>iPhone Settings &rarr; Focus &rarr; Do Not Disturb &rarr; Apps</em> and add <strong>Telegram</strong>.</p>
+        <p><strong style="color:#38bdf8;">Step 4 (Android):</strong> Tap the Bot's name at the top of Telegram &rarr; <strong>Notifications &rarr; Customize</strong> &rarr; set <strong>Sound</strong> to the ringtone, <strong>Vibrate</strong> to <em>Long</em>, and enable <strong>Override Do Not Disturb</strong> in system settings.</p>
+      </div>
+      <button class="cancel-btn" style="background:#2563eb; font-size:1.5rem; padding:14px 40px; margin-top:20px;" onclick="document.getElementById('guide-modal').style.display='none'">Got It</button>
+    </div>    
     <button class="giant-btn" style="height: 30vh; font-size: 2.6rem;" onclick="startCallFromFamily()">
       📹 Ring Nana Now
     </button>
