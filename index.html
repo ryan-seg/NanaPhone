@@ -61,7 +61,7 @@
       border: 3px solid #fff; border-radius: 14px; padding: 8px 22px; cursor: pointer;
     }
 
-    /* 7-Contact Grid */
+    /* Dynamic Contact Grid */
     .family-grid {
       display: flex; flex-wrap: wrap; justify-content: center;
       align-content: space-between; gap: 12px;
@@ -97,7 +97,7 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    /* Confirm Call Modal */
+    /* Confirm Call Modal (Feature 2) */
     #confirm-modal {
       display: none; position: fixed; inset: 0; background: rgba(9, 13, 22, 0.96);
       z-index: 130; flex-direction: column; align-items: center; justify-content: center;
@@ -113,7 +113,37 @@
       border-radius: 22px; cursor: pointer; border: 4px solid #ffffff;
     }
 
-    /* Family Bulletin Modal */
+    /* Giant On-Screen PIN Keypad Modal (Feature 1) */
+    #admin-pin-modal {
+      display: none; position: fixed; inset: 0; background: rgba(9, 13, 22, 0.98);
+      z-index: 160; flex-direction: column; align-items: center; justify-content: center;
+      padding: 20px; text-align: center;
+    }
+    .pin-dots {
+      font-size: 3rem; letter-spacing: 14px; color: #fef08a;
+      background: #1e293b; border: 3px solid #475569; border-radius: 16px;
+      padding: 8px 28px; min-width: 240px; min-height: 70px; margin: 12px 0 18px 0;
+      display: flex; align-items: center; justify-content: center; font-weight: 900;
+    }
+    .keypad-grid {
+      display: grid; grid-template-columns: repeat(3, 110px); gap: 12px;
+      justify-content: center; margin-bottom: 18px;
+    }
+    .key-btn {
+      height: 72px; font-size: 2rem; font-weight: 900; color: #fff;
+      background: #1e293b; border: 3px solid #64748b; border-radius: 18px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .key-btn:active { background: #3b82f6; border-color: #fff; transform: scale(0.95); }
+    .admin-actions-box {
+      display: none; flex-direction: column; gap: 14px; width: 88vw; max-width: 560px;
+    }
+    .admin-action-btn {
+      padding: 18px 24px; font-size: 1.6rem; font-weight: 900;
+      border-radius: 20px; border: 4px solid #fff; cursor: pointer;
+    }
+
+    /* Family Bulletin Modal (Feature 6) */
     #bulletin-modal {
       display: none; position: fixed; inset: 0; background: rgba(9, 13, 22, 0.98);
       z-index: 135; flex-direction: column; align-items: center; justify-content: flex-start;
@@ -157,7 +187,6 @@
       font-size: 1.1rem; font-weight: 900; color: #fef08a; margin-bottom: 4px;
       display: flex; justify-content: space-between; align-items: center;
     }
-    .settings-sub { font-size: 0.9rem; color: #cbd5e1; margin-bottom: 10px; }
     .opt-row { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
     .opt-btn {
       flex: 1; min-width: 70px; background: #0f172a; color: #e2e8f0;
@@ -172,6 +201,9 @@
       border: 12px solid #ffffff; border-radius: 44px; font-size: 3.8rem;
       font-weight: 900; cursor: pointer; display: flex; flex-direction: column;
       align-items: center; justify-content: center;
+    }
+    .giant-btn:disabled {
+      background: #475569; color: #94a3b8; border-color: #64748b; cursor: not-allowed;
     }
     .cancel-btn {
       background: #ef4444; color: #fff; border: 5px solid #fff;
@@ -191,7 +223,7 @@
     #night-dimmer {
       display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.94);
       z-index: 90; flex-direction: column; align-items: center; justify-content: center;
-      color: #334155; font-size: 2.2rem;
+      color: #475569; font-size: 2.2rem;
     }
   </style>
 </head>
@@ -203,7 +235,39 @@
     <p>Tap anywhere to wake up</p>
   </div>
 
-  <!-- Confirm Call Screen -->
+  <!-- Feature 1: Giant On-Screen PIN Keypad & Admin Modal (Default PIN: 1929) -->
+  <div id="admin-pin-modal">
+    <h1 id="admin-modal-title" style="font-size: 2.3rem; color: #fef08a; margin: 0;">⚙️ Admin Access</h1>
+    <p id="admin-modal-sub" style="font-size: 1.15rem; color: #cbd5e1; margin: 4px 0 0 0;">Enter 4-digit PIN to pause Kiosk Lock for 5 minutes</p>
+
+    <div id="pin-keypad-section" style="display:flex; flex-direction:column; align-items:center;">
+      <div id="pin-dots-display" class="pin-dots"></div>
+      <div class="keypad-grid">
+        <button class="key-btn" onclick="pressPinDigit('1')">1</button>
+        <button class="key-btn" onclick="pressPinDigit('2')">2</button>
+        <button class="key-btn" onclick="pressPinDigit('3')">3</button>
+        <button class="key-btn" onclick="pressPinDigit('4')">4</button>
+        <button class="key-btn" onclick="pressPinDigit('5')">5</button>
+        <button class="key-btn" onclick="pressPinDigit('6')">6</button>
+        <button class="key-btn" onclick="pressPinDigit('7')">7</button>
+        <button class="key-btn" onclick="pressPinDigit('8')">8</button>
+        <button class="key-btn" onclick="pressPinDigit('9')">9</button>
+        <button class="key-btn" style="background:#7f1d1d;" onclick="clearPinDigits()">CLR</button>
+        <button class="key-btn" onclick="pressPinDigit('0')">0</button>
+        <button class="key-btn" style="background:#334155;" onclick="closeAdminPinModal()">✖</button>
+      </div>
+    </div>
+
+    <div id="admin-actions-section" class="admin-actions-box">
+      <button class="admin-action-btn" style="background:#2563eb; color:#fff;" onclick="adminExecuteAction('settings')">⚙️ Open Android Settings</button>
+      <button class="admin-action-btn" style="background:#0284c7; color:#fff;" onclick="adminExecuteAction('wifi')">📶 Open Wi-Fi Settings</button>
+      <button class="admin-action-btn" style="background:#d97706; color:#000;" onclick="adminExecuteAction('launcher')">🏠 Go to Lenovo Launcher</button>
+      <button class="admin-action-btn" style="background:#334155; color:#fff;" onclick="location.reload()">🔄 Reload NanaPhone App</button>
+      <button class="admin-action-btn" style="background:#22c55e; color:#000;" onclick="adminExecuteAction('relock')">🔒 Re-Lock Kiosk & Close</button>
+    </div>
+  </div>
+
+  <!-- Feature 2: Confirm Call Screen (15s Auto-Cancel) -->
   <div id="confirm-modal">
     <h1 id="confirm-prompt-title" style="font-size: 3.4rem; color: #fef08a; margin: 0 0 16px 0;">Call Phil?</h1>
     <img id="confirm-photo" src="" alt="Family Member">
@@ -214,10 +278,10 @@
     </div>
   </div>
 
-  <!-- Family Messages & Photo Bulletin Modal -->
+  <!-- Feature 6: Built-In Read-Only Family Message & Photo Board -->
   <div id="bulletin-modal">
-    <h1 style="font-size: 2.4rem; color: #fef08a; margin: 0 0 6px 0;">💬 Family Bulletin</h1>
-    <p style="font-size: 1.1rem; color: #94a3b8; margin: 0 0 16px 0;">Recent updates from the family Telegram group</p>
+    <h1 style="font-size: 2.4rem; color: #fef08a; margin: 0 0 6px 0;">💬 Family Messages</h1>
+    <p style="font-size: 1.1rem; color: #94a3b8; margin: 0 0 16px 0;">Messages & photos from the Family Telegram Group</p>
     <div id="bulletin-posts-container" style="width:100%; display:flex; flex-direction:column; align-items:center;"></div>
     <button class="cancel-btn" style="background:#2563eb; padding: 12px 36px; font-size: 1.5rem;" onclick="closeFamilyBulletin()">Close</button>
   </div>
@@ -229,15 +293,15 @@
       <div class="header-pills">
         <div id="quota-pill" class="pill">300m left</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <!-- ⚙️ Native APK Maintenance Trigger -->
-        <div class="pill" style="padding: 6px 14px; font-size: 1.5rem;" onclick="triggerMaintenanceUnlock()">⚙️</div>
+        <!-- Feature 1 Trigger -->
+        <div class="pill" style="padding: 6px 14px; font-size: 1.5rem;" onclick="openAdminPinModal()">⚙️</div>
       </div>
     </div>
 
-    <!-- Ticker Message Banner -->
+    <!-- Feature 6 Ticker -->
     <div class="message-ticker-bar" onclick="openFamilyBulletin()">
       <span id="ticker-preview-text">💬 Tap to view latest family notes & photos</span>
-      <span style="font-weight:900; color:#38bdf8;">View ➔</span>
+      <span style="font-weight:900; color:#38bdf8;">💬 Family Messages ➔</span>
     </div>
     
     <div id="missed-call-banner" onclick="callBackMissedCall()">
@@ -245,12 +309,13 @@
       <button class="missed-btn">📞 CALL BACK</button>
     </div>
 
+    <!-- Feature 4: Dynamic Contact Grid -->
     <div id="family-grid" class="family-grid"></div>
   </div>
 
   <!-- 2. OUTBOUND CALL SCREEN -->
   <div id="outbound-screen" class="screen" style="background:#1e1b4b; justify-content:center;">
-    <img id="outbound-photo" src="" style="width:200px; height:200px; border-radius:50%; border:7px solid #fff; margin-bottom:16px;">
+    <img id="outbound-photo" src="" style="width:200px; height:200px; border-radius:50%; border:7px solid #fff; margin-bottom:16px; object-fit:cover;">
     <h1 id="outbound-title" style="font-size: 3.8rem; margin: 0 0 10px 0; color: #fef08a;">Calling...</h1>
     <p style="font-size: 2rem; color: #cbd5e1;">Ringing their mobile now...</p>
     <button class="cancel-btn" onclick="endCall()">✖ Cancel Call</button>
@@ -258,7 +323,7 @@
 
   <!-- 3. INCOMING RING SCREEN -->
   <div id="ringing-screen" class="screen" style="background:#064e3b; justify-content:center;">
-    <img id="caller-photo" src="" style="width:170px; height:170px; border-radius:50%; border:6px solid #fff; margin-bottom:12px;">
+    <img id="caller-photo" src="" style="width:170px; height:170px; border-radius:50%; border:6px solid #fff; margin-bottom:12px; object-fit:cover;">
     <h1 id="caller-title" style="font-size: 4rem; color: #fef08a; margin: 0 0 16px 0;">Incoming Call!</h1>
     <button class="giant-btn" onclick="answerCallAsNana()">📞 TAP HERE<br>TO ANSWER</button>
   </div>
@@ -280,14 +345,15 @@
   <div id="family-screen" class="screen" style="justify-content: center; gap: 10px;">
     <img id="family-self-photo" src="" style="width: 95px; height: 95px; border-radius: 50%; object-fit: cover; border: 4px solid #fff;">
     <h1 id="family-greeting" style="font-size: 1.8rem; margin: 0;">Call Nana</h1>
-    <div id="nana-presence-card" style="background:#1e293b; border:2px solid #38bdf8; border-radius:14px; padding:8px 18px; font-size:1.1rem;">
+    <!-- Feature 5: Live Family Status & Last Touched Card -->
+    <div id="nana-presence-card" style="background:#1e293b; border:2px solid #38bdf8; border-radius:14px; padding:10px 18px; font-size:1.1rem; line-height:1.4; width:88vw; max-width:520px;">
       Checking tablet status...
     </div>
-    <button class="giant-btn" style="height: 24vh; font-size: 2.2rem;" onclick="startCallFromFamily()">📹 Ring Nana Now</button>
+    <button id="family-ring-btn" class="giant-btn" style="height: 24vh; font-size: 2.2rem;" onclick="startCallFromFamily()">📹 Ring Nana Now</button>
     <button class="tone-btn" style="width: 88vw; background: #1e293b; border-color: #facc15; color: #fef08a;" onclick="openSettingsModal()">
       ⚙️ Nana's Tablet Settings (Vol, Ring, Display)
     </button>
-    <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="width: 88vw; background:#0284c7; border-color:#38bdf8;">🔔 Connect Telegram Alerts</a>
+    <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="width: 88vw; background:#0284c7; border-color:#38bdf8;">🔔 1-Tap Setup: Connect My Telegram Alerts</a>
   </div>
 
   <!-- REMOTE SETTINGS MODAL -->
@@ -353,7 +419,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getDatabase, ref, set, update, onValue, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+    import { getDatabase, ref, set, update, onValue, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
     function showScreen(id) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -384,7 +450,8 @@
     }
 
     const CONFIG = {
-      appVersion: "1.5.0",
+      appVersion: "1.7.0",
+      adminPin: "1929",
       dailyRoomUrl: UNLOCKED.dailyRoomUrl,
       telegramBotUsername: UNLOCKED.telegramBotUsername,
       googleScriptUrl: UNLOCKED.googleScriptUrl,
@@ -414,19 +481,27 @@
     const bulletinRef = ref(db, `${basePath}/bulletin`);
     const settingsRef = ref(db, `${basePath}/settings`);
     const missedCallRef = ref(db, `${basePath}/missedCall`);
-    const dailyUsageRef = ref(db, `${basePath}/usage/${new Date().toISOString().split('T')[0]}`);
+    const connectedMembersRef = ref(db, `${basePath}/connectedMembers`);
+
+    function getTodayUsageRef() {
+      return ref(db, `${basePath}/usage/${new Date().toISOString().split('T')[0]}`);
+    }
 
     let callFrame = null;
     let pendingCallContact = null;
+    let lastMissedCaller = null;
     let confirmTimer = null;
     let ringInterval = null;
     let outboundTimeout = null;
     let incomingRingTimeout = null;
     let callTimerInterval = null;
-    let idleCheckTimer = null;
-    let safetyCountdownInterval = null;
     let currentState = 'idle';
+    let latestCallData = { status: 'idle' };
+    let latestLastActive = null;
+    let connectedMemberIds = [];
+    let enteredPin = "";
     let todayMinutesUsed = 0;
+    let nightDismissedUntilMs = 0;
     let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
     let tabletSettings = {
@@ -440,38 +515,153 @@
       nightModeEnabled: true
     };
 
-    // Maintenance Trigger (invokes Native Android APK Dialog)
-    window.triggerMaintenanceUnlock = () => {
-      if (window.AndroidBridge && window.AndroidBridge.requestNativeUnlock) {
-        window.AndroidBridge.requestNativeUnlock();
-      } else {
-        alert("Maintenance is managed natively by the Android APK.");
+    // ========================================================================
+    // FEATURE 1: Giant On-Screen PIN Keypad (1929) & 5-Min Kiosk Bypass
+    // ========================================================================
+    window.openAdminPinModal = () => {
+      enteredPin = "";
+      document.getElementById('pin-dots-display').innerText = "";
+      document.getElementById('admin-modal-title').innerText = "⚙️ Admin Access";
+      document.getElementById('admin-modal-sub').innerText = "Enter 4-digit PIN to pause Kiosk Lock for 5 minutes";
+      document.getElementById('pin-keypad-section').style.display = 'flex';
+      document.getElementById('admin-actions-section').style.display = 'none';
+      document.getElementById('admin-pin-modal').style.display = 'flex';
+    };
+
+    window.closeAdminPinModal = () => {
+      enteredPin = "";
+      document.getElementById('admin-pin-modal').style.display = 'none';
+    };
+
+    window.clearPinDigits = () => {
+      enteredPin = "";
+      document.getElementById('pin-dots-display').innerText = "";
+    };
+
+    window.pressPinDigit = (digit) => {
+      if (enteredPin.length >= 4) return;
+      enteredPin += digit;
+      document.getElementById('pin-dots-display').innerText = "●".repeat(enteredPin.length);
+
+      if (enteredPin.length === 4) {
+        if (enteredPin === CONFIG.adminPin) {
+          // Pause native Android kiosk lock for 5 minutes
+          if (window.AndroidBridge && window.AndroidBridge.unlockAdminForFiveMinutes) {
+            window.AndroidBridge.unlockAdminForFiveMinutes();
+          }
+          document.getElementById('admin-modal-title').innerText = "🔓 Kiosk Unlocked (5 Mins)";
+          document.getElementById('admin-modal-sub').innerText = "Top notification shield & task lock are paused:";
+          document.getElementById('pin-keypad-section').style.display = 'none';
+          document.getElementById('admin-actions-section').style.display = 'flex';
+        } else {
+          document.getElementById('pin-dots-display').innerText = "❌";
+          setTimeout(() => {
+            enteredPin = "";
+            document.getElementById('pin-dots-display').innerText = "";
+          }, 700);
+        }
       }
     };
 
-    // Touch Heartbeat / Presence Logging
+    window.adminExecuteAction = (action) => {
+      if (window.AndroidBridge) {
+        if (action === 'settings' && window.AndroidBridge.openAndroidSettings) {
+          window.AndroidBridge.openAndroidSettings();
+        } else if (action === 'wifi' && window.AndroidBridge.openWifiSettings) {
+          window.AndroidBridge.openWifiSettings();
+        } else if (action === 'launcher' && window.AndroidBridge.openLenovoLauncher) {
+          window.AndroidBridge.openLenovoLauncher();
+        } else if (action === 'relock' && window.AndroidBridge.relockKioskNow) {
+          window.AndroidBridge.relockKioskNow();
+        }
+      }
+      closeAdminPinModal();
+    };
+
+    // ========================================================================
+    // FEATURE 5: Live Family Status & "Last Touched" Activity Tracker
+    // ========================================================================
+    window.resetIdleTimer = () => recordHeartbeat();
     window.addEventListener('touchstart', recordHeartbeat, { passive: true });
     window.addEventListener('click', recordHeartbeat, { passive: true });
     function recordHeartbeat() {
       if (role === 'nana') set(presenceRef, { lastActive: Date.now() });
     }
 
+    function updateFamilyPresenceBanner() {
+      if (role !== 'family') return;
+      const card = document.getElementById('nana-presence-card');
+      const ringBtn = document.getElementById('family-ring-btn');
+      if (!card) return;
+
+      let touchText = "👆 Last touched tablet: No recent activity";
+      if (latestLastActive) {
+        const diffMins = Math.max(0, Math.round((Date.now() - latestLastActive) / 60000));
+        touchText = `👆 Last touched tablet: ${diffMins <= 1 ? 'Just now' : diffMins + ' mins ago'}`;
+      }
+
+      const st = latestCallData?.status || 'idle';
+      if (st !== 'idle') {
+        const otherId = latestCallData.callerId || latestCallData.targetId;
+        const otherMember = CONFIG.familyMembers.find(m => m.id === otherId);
+        const withName = otherMember ? otherMember.name : 'Family';
+        const statusLabel = st === 'connected'
+          ? `🔴 <strong>On a video call with ${withName}</strong>`
+          : `🟡 <strong>Ringing (${withName})</strong>`;
+        card.style.borderColor = '#f87171';
+        card.innerHTML = `${statusLabel}<br><span style="color:#cbd5e1; font-size:0.98rem;">${touchText}</span>`;
+        if (ringBtn && otherId && otherId !== activeFamilyMember.id) {
+          ringBtn.disabled = true;
+        }
+      } else {
+        card.style.borderColor = '#22c55e';
+        card.innerHTML = `🟢 <strong>Nana is available</strong><br><span style="color:#cbd5e1; font-size:0.98rem;">${touchText}</span>`;
+        if (ringBtn) ringBtn.disabled = false;
+      }
+    }
+
     if (role === 'family') {
       onValue(presenceRef, (snap) => {
         const val = snap.val();
-        const card = document.getElementById('nana-presence-card');
-        if (!val || !val.lastActive) {
-          card.innerText = "⚪ Tablet idle";
-          return;
-        }
-        const diffMins = Math.round((Date.now() - val.lastActive) / 60000);
-        card.innerHTML = `🟢 <strong>Online</strong> — Last touched: ${diffMins <= 1 ? 'Just now' : diffMins + 'm ago'}`;
+        latestLastActive = val?.lastActive || null;
+        updateFamilyPresenceBanner();
       });
+      setInterval(updateFamilyPresenceBanner, 30000);
     }
 
-    // Dynamic Contact Cards Filtering
+    // ========================================================================
+    // FEATURE 4: Dynamic Contact Grid (Only Connected Family Shown)
+    // ========================================================================
+    onValue(connectedMembersRef, (snap) => {
+      const val = snap.val();
+      if (Array.isArray(val)) {
+        connectedMemberIds = val;
+      } else if (val && typeof val === 'object') {
+        connectedMemberIds = Object.values(val);
+      } else {
+        connectedMemberIds = [];
+      }
+      if (role === 'nana') renderContacts(connectedMemberIds);
+    });
+
+    async function syncConnectedFamilyFromTelegram() {
+      try {
+        const res = await fetch(CONFIG.googleScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ secret: SERVICE_TOKEN, action: "sync" })
+        });
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.connected)) {
+          connectedMemberIds = data.connected;
+          if (role === 'nana') renderContacts(connectedMemberIds);
+        }
+      } catch (e) {}
+    }
+
     function renderContacts(connectedList = []) {
       const grid = document.getElementById('family-grid');
+      if (!grid) return;
       grid.innerHTML = "";
       const displayList = CONFIG.familyMembers.filter(m => connectedList.length === 0 || connectedList.includes(m.id));
       displayList.forEach(member => {
@@ -486,11 +676,57 @@
       });
     }
 
-    // Confirm-to-Call Modal Logic
+    // Track Daily Call Quota
+    onValue(getTodayUsageRef(), (snap) => {
+      todayMinutesUsed = Number(snap.val()) || 0;
+      const remaining = Math.max(0, CONFIG.dailyMinuteQuota - todayMinutesUsed);
+      const pill = document.getElementById('quota-pill');
+      const overlay = document.getElementById('call-timer-overlay');
+      if (pill) {
+        pill.innerText = `${remaining}m left`;
+        pill.className = remaining <= 30 ? 'pill warning' : 'pill';
+      }
+      if (overlay) {
+        overlay.innerText = `⏱️ Remaining: ${remaining}m`;
+      }
+    });
+
+    // Missed Call Banner Sync
+    onValue(missedCallRef, (snap) => {
+      const data = snap.val();
+      const banner = document.getElementById('missed-call-banner');
+      if (!data || !data.callerId) {
+        banner.style.display = 'none';
+        lastMissedCaller = null;
+        return;
+      }
+      const member = CONFIG.familyMembers.find(m => m.id === data.callerId);
+      if (member) {
+        lastMissedCaller = member;
+        const timeString = data.timestamp
+          ? new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '';
+        document.getElementById('missed-call-text').innerText = `📞 Missed call from ${member.name} ${timeString ? '(' + timeString + ')' : ''}`;
+        banner.style.display = 'flex';
+      }
+    });
+
+    window.callBackMissedCall = async () => {
+      if (!lastMissedCaller) return;
+      const target = lastMissedCaller;
+      await remove(missedCallRef);
+      startCallFromNana(target);
+    };
+
+    // ========================================================================
+    // FEATURE 2: Confirm-to-Call Modal Logic (15s Auto-Cancel)
+    // ========================================================================
     window.openCallConfirmation = (member) => {
       pendingCallContact = member;
       document.getElementById('confirm-prompt-title').innerText = `Call ${member.name}?`;
-      document.getElementById('confirm-photo').src = member.photo;
+      const img = document.getElementById('confirm-photo');
+      img.onerror = () => { img.src = member.fallback; };
+      img.src = member.photo;
       document.getElementById('confirm-modal').style.display = 'flex';
 
       let seconds = 15;
@@ -515,7 +751,9 @@
       if (target) startCallFromNana(target);
     };
 
-    // Bulletin Posts Modal & Sync
+    // ========================================================================
+    // FEATURE 6: Built-In Read-Only Family Message Board
+    // ========================================================================
     window.openFamilyBulletin = () => document.getElementById('bulletin-modal').style.display = 'flex';
     window.closeFamilyBulletin = () => document.getElementById('bulletin-modal').style.display = 'none';
 
@@ -523,29 +761,54 @@
       const posts = snap.val() || {};
       const container = document.getElementById('bulletin-posts-container');
       container.innerHTML = "";
-      const keys = Object.keys(posts).reverse().slice(0, 5);
+      const keys = Object.keys(posts).reverse().slice(0, 8);
       if (keys.length > 0) {
-        document.getElementById('ticker-preview-text').innerText = `💬 "${posts[keys[0]].text || 'New family update'}"`;
+        const newest = posts[keys[0]];
+        document.getElementById('ticker-preview-text').innerText = `💬 ${newest.author || 'Family'}: "${newest.text || 'Sent a photo 📷'}"`;
       }
       keys.forEach(k => {
         const item = posts[k];
         const d = document.createElement('div');
         d.className = 'bulletin-post';
-        d.innerHTML = `
-          <strong style="color:#fef08a; font-size:1.2rem;">${item.author || 'Family'}:</strong>
-          <p style="font-size:1.3rem; margin:8px 0;">${item.text || ''}</p>
-          ${item.imageUrl ? `<img src="${item.imageUrl}" style="width:100%; border-radius:12px; margin-top:8px;">` : ''}
-          <button class="tone-btn" style="padding:6px 14px; font-size:1rem; margin-top:8px;" onclick="speakNote('${encodeURIComponent(item.text || '')}')">🔊 Read Aloud</button>
-        `;
+
+        const authorEl = document.createElement('strong');
+        authorEl.style.cssText = 'color:#fef08a; font-size:1.3rem;';
+        authorEl.textContent = `${item.author || 'Family'}:`;
+        d.appendChild(authorEl);
+
+        if (item.text) {
+          const p = document.createElement('p');
+          p.style.cssText = 'font-size:1.4rem; margin:8px 0; color:#f8fafc;';
+          p.textContent = item.text;
+          d.appendChild(p);
+        }
+
+        if (item.imageUrl) {
+          const img = document.createElement('img');
+          img.src = item.imageUrl;
+          img.style.cssText = 'width:100%; border-radius:14px; margin-top:8px;';
+          d.appendChild(img);
+        }
+
+        if (item.text) {
+          const btn = document.createElement('button');
+          btn.className = 'tone-btn';
+          btn.style.cssText = 'padding:8px 18px; font-size:1.1rem; margin-top:10px; background:#0284c7; border-color:#38bdf8;';
+          btn.textContent = '🔊 Read Out Loud';
+          btn.onclick = () => speakNote(`${item.author || 'Family'} says: ${item.text}`);
+          d.appendChild(btn);
+        }
+
         container.appendChild(d);
       });
     });
 
-    window.speakNote = (encodedText) => {
-      const text = decodeURIComponent(encodedText);
-      if ('speechSynthesis' in window && text) {
+    window.speakNote = (rawText) => {
+      if ('speechSynthesis' in window && rawText) {
         window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+        const u = new SpeechSynthesisUtterance(rawText);
+        u.rate = Number(tabletSettings.speechRate) || 0.9;
+        window.speechSynthesis.speak(u);
       }
     };
 
@@ -651,12 +914,15 @@
     // Call Engine
     async function startCallFromNana(member) {
       currentState = 'calling_family';
-      document.getElementById('outbound-photo').src = member.photo;
+      const outImg = document.getElementById('outbound-photo');
+      outImg.onerror = () => { outImg.src = member.fallback; };
+      outImg.src = member.photo;
       document.getElementById('outbound-title').innerText = `Calling ${member.name}...`;
       showScreen('outbound-screen');
       speakMsg(`Calling ${member.spokenName} now. Please wait.`);
 
-      await set(callStateRef, { status: 'calling_family', targetId: member.id, timestamp: Date.now() });
+      await remove(missedCallRef);
+      await set(callStateRef, { status: 'calling_family', callerId: 'nana', targetId: member.id, timestamp: Date.now() });
       await joinDailyRoom();
       ringTelegramAlert(member);
 
@@ -683,27 +949,37 @@
     }
 
     window.startCallFromFamily = async () => {
-      await set(callStateRef, { status: 'ringing_nana', callerId: activeFamilyMember.id, timestamp: Date.now() });
+      await set(callStateRef, { status: 'ringing_nana', callerId: activeFamilyMember.id, targetId: 'nana', timestamp: Date.now() });
       await joinDailyRoom();
     };
 
     window.answerCallAsNana = async () => {
       stopRingingUI();
-      await set(callStateRef, { status: 'connected', timestamp: Date.now() });
+      await remove(missedCallRef);
+      await set(callStateRef, {
+        status: 'connected',
+        callerId: latestCallData?.callerId || 'family',
+        targetId: 'nana',
+        timestamp: Date.now()
+      });
       await joinDailyRoom();
     };
 
     window.endCall = async () => {
       clearTimeout(outboundTimeout);
       clearTimeout(incomingRingTimeout);
+      stopCallUsageTimer();
       stopRingingUI();
       await set(callStateRef, { status: 'idle', timestamp: Date.now() });
-      if (callFrame) { callFrame.leave(); callFrame.destroy(); callFrame = null; }
+      if (callFrame) {
+        try { callFrame.leave(); callFrame.destroy(); } catch (e) {}
+        callFrame = null;
+      }
       showScreen(role === 'family' ? 'family-screen' : 'grid-screen');
     };
 
     async function joinDailyRoom() {
-      showScreen('call-screen');
+      if (callFrame) return;
       const container = document.getElementById('video-container');
       container.innerHTML = '';
       callFrame = window.DailyIframe.createFrame(container, {
@@ -713,32 +989,82 @@
       await callFrame.join({ url: CONFIG.dailyRoomUrl });
     }
 
+    function startCallUsageTimer() {
+      if (role !== 'nana' || callTimerInterval) return;
+      callTimerInterval = setInterval(() => {
+        runTransaction(getTodayUsageRef(), (current) => (Number(current) || 0) + 1);
+      }, 60000);
+    }
+
+    function stopCallUsageTimer() {
+      if (callTimerInterval) {
+        clearInterval(callTimerInterval);
+        callTimerInterval = null;
+      }
+    }
+
     onValue(callStateRef, (snap) => {
       const data = snap.val();
       if (!data) return;
+      latestCallData = data;
       currentState = data.status;
+
+      if (role === 'family') updateFamilyPresenceBanner();
+
+      if (data.status !== 'idle') {
+        document.getElementById('night-dimmer').style.display = 'none';
+      }
 
       if (role === 'nana') {
         if (data.status === 'ringing_nana') {
           const caller = CONFIG.familyMembers.find(m => m.id === data.callerId) || CONFIG.familyMembers[0];
-          document.getElementById('caller-photo').src = caller.photo;
+          const callerImg = document.getElementById('caller-photo');
+          callerImg.onerror = () => { callerImg.src = caller.fallback; };
+          callerImg.src = caller.photo;
           document.getElementById('caller-title').innerText = `${caller.name} is calling!`;
           showScreen('ringing-screen');
+
+          stopRingingUI();
           playSelectedRingtoneAudio(tabletSettings.ringtone);
-          ringInterval = setInterval(() => playSelectedRingtoneAudio(tabletSettings.ringtone), 6000);
+          speakMsg(`${caller.spokenName} is calling you. Tap the green button to answer.`);
+          ringInterval = setInterval(() => {
+            playSelectedRingtoneAudio(tabletSettings.ringtone);
+            speakMsg(`${caller.spokenName} is calling you.`);
+          }, 6000);
+
+          const ringTimeoutMs = (Number(tabletSettings.ringDurationSec) || 60) * 1000;
+          clearTimeout(incomingRingTimeout);
+          incomingRingTimeout = setTimeout(async () => {
+            if (currentState === 'ringing_nana') {
+              await set(missedCallRef, { callerId: caller.id, timestamp: Date.now() });
+              await endCall();
+            }
+          }, ringTimeoutMs);
+
         } else if (data.status === 'connected') {
+          clearTimeout(outboundTimeout);
+          clearTimeout(incomingRingTimeout);
           stopRingingUI();
           showScreen('call-screen');
+          startCallUsageTimer();
         } else if (data.status === 'idle') {
+          clearTimeout(outboundTimeout);
+          clearTimeout(incomingRingTimeout);
+          stopCallUsageTimer();
           stopRingingUI();
-          if (callFrame) { callFrame.leave(); callFrame.destroy(); callFrame = null; }
+          if (callFrame) {
+            try { callFrame.leave(); callFrame.destroy(); } catch (e) {}
+            callFrame = null;
+          }
           showScreen('grid-screen');
         }
       } else if (role === 'family') {
         if (data.status === 'connected') {
           showScreen('call-screen');
+          joinDailyRoom();
         } else if (data.status === 'idle' && callFrame) {
-          if (callFrame) { callFrame.leave(); callFrame.destroy(); callFrame = null; }
+          try { callFrame.leave(); callFrame.destroy(); } catch (e) {}
+          callFrame = null;
           showScreen('family-screen');
         }
       }
@@ -747,24 +1073,38 @@
     function stopRingingUI() {
       if (ringInterval) clearInterval(ringInterval);
       ringInterval = null;
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     }
 
     function speakMsg(text) {
+      if (!tabletSettings.voicePrompts) return;
       if ('speechSynthesis' in window && text) {
         window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = Number(tabletSettings.speechRate) || 0.9;
+        window.speechSynthesis.speak(u);
       }
     }
 
     // Role Router
     if (role === 'family') {
       document.getElementById('family-greeting').innerText = `Call Nana (as ${activeFamilyMember.name})`;
-      document.getElementById('family-self-photo').src = activeFamilyMember.photo;
+      const selfImg = document.getElementById('family-self-photo');
+      selfImg.onerror = () => { selfImg.src = activeFamilyMember.fallback; };
+      selfImg.src = activeFamilyMember.photo;
       document.getElementById('in-call-volume-bar').style.display = 'flex';
       document.getElementById('telegram-link-btn').href = `https://t.me/${CONFIG.telegramBotUsername}?start=${activeFamilyMember.id}`;
       showScreen('family-screen');
+
+      if (autoAnswerFromTelegram) {
+        window.history.replaceState({}, document.title, `${window.location.pathname}?role=family&id=${encodeURIComponent(activeFamilyMember.id)}&key=${encodeURIComponent(SERVICE_TOKEN)}`);
+        set(callStateRef, { status: 'connected', callerId: 'nana', targetId: activeFamilyMember.id, timestamp: Date.now() });
+        showScreen('call-screen');
+        joinDailyRoom();
+      }
     } else {
-      renderContacts([]);
+      renderContacts(connectedMemberIds);
+      syncConnectedFamilyFromTelegram();
       showScreen('grid-screen');
       setInterval(updateClock, 10000);
       updateClock();
@@ -775,9 +1115,15 @@
       document.getElementById('clock').innerText = timeStr;
       document.getElementById('night-clock').innerText = timeStr;
       const hour = new Date().getHours();
-      document.getElementById('night-dimmer').style.display = (tabletSettings.nightModeEnabled && (hour >= 21 || hour < 8) && currentState === 'idle') ? 'flex' : 'none';
+      const isNightWindow = tabletSettings.nightModeEnabled && (hour >= 21 || hour < 8);
+      const canShowDimmer = isNightWindow && currentState === 'idle' && Date.now() > nightDismissedUntilMs;
+      document.getElementById('night-dimmer').style.display = canShowDimmer ? 'flex' : 'none';
     }
-    window.wakeFromNightMode = () => document.getElementById('night-dimmer').style.display = 'none';
+
+    window.wakeFromNightMode = () => {
+      nightDismissedUntilMs = Date.now() + 15 * 60 * 1000;
+      document.getElementById('night-dimmer').style.display = 'none';
+    };
   </script>
 </body>
 </html>
