@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <!-- Blocks search engines and scrapers from indexing this page -->
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -126,9 +125,47 @@
     #video-container { width: 100vw; height: 100vh; }
     
     #call-timer-overlay {
-      position: absolute; top: 20px; left: 20px; z-index: 50;
+      position: absolute; top: 16px; left: 16px; z-index: 50;
       background: rgba(15, 23, 42, 0.85); border: 2px solid #475569;
-      padding: 10px 20px; border-radius: 16px; font-size: 1.6rem; font-weight: 800; color: #fef08a;
+      padding: 8px 16px; border-radius: 14px; font-size: 1.2rem; font-weight: 800; color: #fef08a;
+    }
+
+    #in-call-volume-bar {
+      display: none; position: absolute; top: 16px; right: 16px; z-index: 50;
+      background: rgba(15, 23, 42, 0.9); border: 2px solid #38bdf8;
+      padding: 6px 12px; border-radius: 14px; align-items: center; gap: 8px;
+      font-size: 1.05rem; font-weight: 800; color: #ffffff;
+    }
+    .vol-step-btn {
+      background: #0284c7; color: #fff; border: 2px solid #fff;
+      border-radius: 10px; padding: 5px 12px; font-size: 1.15rem; font-weight: 900; cursor: pointer;
+    }
+
+    /* Full Remote Settings Modal */
+    #settings-modal {
+      display: none; position: fixed; inset: 0; background: rgba(9, 13, 22, 0.98);
+      z-index: 140; flex-direction: column; align-items: center; justify-content: flex-start;
+      padding: 20px 16px 40px 16px; overflow-y: auto;
+    }
+    .settings-card {
+      width: 92vw; max-width: 680px; background: #1e293b; border: 2px solid #475569;
+      border-radius: 20px; padding: 14px 16px; margin-bottom: 12px; text-align: left;
+    }
+    .settings-label {
+      font-size: 1.1rem; font-weight: 900; color: #fef08a; margin-bottom: 4px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .settings-sub { font-size: 0.9rem; color: #cbd5e1; margin-bottom: 10px; }
+    .opt-row {
+      display: flex; flex-wrap: wrap; gap: 8px; width: 100%;
+    }
+    .opt-btn {
+      flex: 1; min-width: 70px; background: #0f172a; color: #e2e8f0;
+      border: 3px solid #475569; border-radius: 12px; padding: 10px 6px;
+      font-size: 0.98rem; font-weight: 800; cursor: pointer; text-align: center;
+    }
+    .opt-btn.selected {
+      background: #064e3b; border-color: #22c55e; color: #fef08a;
     }
 
     /* "Still There?" Safety Prompt Modal */
@@ -155,22 +192,11 @@
       cursor: pointer; box-shadow: 0 10px 25px rgba(0,0,0,0.7);
     }
 
-    /* Ringtone Selector Modal */
-    #ringtone-modal {
-      display: none; position: fixed; inset: 0; background: rgba(9, 13, 22, 0.96);
-      z-index: 120; flex-direction: column; align-items: center; justify-content: center;
-      padding: 30px;
-    }
-    .tone-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
-      width: 85%; max-width: 800px; margin: 24px 0;
-    }
     .tone-btn {
       background: #1e293b; color: #fff; border: 4px solid #475569;
-      border-radius: 24px; padding: 22px; font-size: 1.8rem; font-weight: 800;
+      border-radius: 24px; padding: 16px 20px; font-size: 1.2rem; font-weight: 800;
       cursor: pointer; text-decoration: none; display: inline-block;
     }
-    .tone-btn.selected { border-color: #22c55e; background: #064e3b; color: #fef08a; }
 
     /* Auth & Error Screens */
     #auth-error-screen, #error-screen, #quota-exceeded-screen {
@@ -212,7 +238,7 @@
   <!-- Daily Quota Exceeded Screen -->
   <div id="quota-exceeded-screen" class="screen">
     <h1 style="font-size: 3.2rem; color: #f87171;">⏳ Daily Call Limit Reached</h1>
-    <p style="font-size: 1.8rem; color: #fef08a; max-width: 800px;">To keep within our free monthly limit, video calls are paused until tomorrow. The daily 300 minute timer resets at midnight UTC.</p>
+    <p style="font-size: 1.8rem; color: #fef08a; max-width: 800px;">To keep within our free monthly limit, video calls are paused until tomorrow. The daily 300-minute timer resets at midnight UTC.</p>
   </div>
 
   <!-- JS Error Catch Screen -->
@@ -221,17 +247,97 @@
     <p id="error-message" style="font-size: 1.4rem; color: #fef08a; word-break: break-all; max-width: 900px;"></p>
   </div>
 
-  <!-- Ringtone Picker Modal -->
-  <div id="ringtone-modal">
-    <h1 style="font-size: 2.8rem; margin: 0;">Choose Nana's Ringtone</h1>
-    <p style="font-size: 1.4rem; color: #94a3b8;">Tap any sound below to preview and save it:</p>
-    <div class="tone-grid">
-      <button class="tone-btn" id="tone-uk-phone" onclick="selectRingtone('uk-phone')">☎️ Classic UK Telephone</button>
-      <button class="tone-btn" id="tone-westminster" onclick="selectRingtone('westminster')">🕰️ Grandfather Chime</button>
-      <button class="tone-btn" id="tone-marimba" onclick="selectRingtone('marimba')">🎵 Warm Marimba</button>
-      <button class="tone-btn" id="tone-bell" onclick="selectRingtone('bell')">🔔 High-Clarity Bell</button>
+  <!-- ==================================================================== -->
+  <!-- COMPREHENSIVE REMOTE TABLET SETTINGS MODAL (CONTROLLED BY FAMILY)    -->
+  <!-- ==================================================================== -->
+  <div id="settings-modal">
+    <h2 style="font-size: 1.7rem; color: #fef08a; margin: 0 0 4px 0;">⚙️ Nana's Tablet Settings</h2>
+    <p style="font-size: 0.95rem; color: #94a3b8; margin: 0 0 14px 0;">Changes sync live to Nana's Lenovo tablet immediately.</p>
+
+    <!-- 1. Speaker Volume -->
+    <div class="settings-card">
+      <div class="settings-label"><span>🔊 Tablet Speaker & Ring Volume</span><span id="lbl-vol">85%</span></div>
+      <div class="settings-sub">Controls physical call audio and ringtone loudness on her tablet.</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-vol-50" onclick="updateSetting('volume', 50)">🔉 50%</button>
+        <button class="opt-btn" id="set-vol-70" onclick="updateSetting('volume', 70)">🔊 70%</button>
+        <button class="opt-btn" id="set-vol-85" onclick="updateSetting('volume', 85)">🔊 85%</button>
+        <button class="opt-btn" id="set-vol-100" onclick="updateSetting('volume', 100)">📢 100% Max</button>
+      </div>
     </div>
-    <button class="cancel-btn" style="background: #2563eb; margin-top: 10px; font-size: 2rem; padding: 16px 48px;" onclick="closeRingtoneModal()">✔ Done</button>
+
+    <!-- 2. Ringing Duration / Timeout -->
+    <div class="settings-card">
+      <div class="settings-label"><span>⏳ Ringing Time Before Missed Call</span><span id="lbl-ringtime">60s</span></div>
+      <div class="settings-sub">Give Nana plenty of time to walk over or hear the tablet ringing.</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-ring-30" onclick="updateSetting('ringDurationSec', 30)">30 sec</button>
+        <button class="opt-btn" id="set-ring-45" onclick="updateSetting('ringDurationSec', 45)">45 sec</button>
+        <button class="opt-btn" id="set-ring-60" onclick="updateSetting('ringDurationSec', 60)">60 sec</button>
+        <button class="opt-btn" id="set-ring-90" onclick="updateSetting('ringDurationSec', 90)">90 sec</button>
+        <button class="opt-btn" id="set-ring-120" onclick="updateSetting('ringDurationSec', 120)">2 mins</button>
+      </div>
+    </div>
+
+    <!-- 3. Ringtone Melody -->
+    <div class="settings-card">
+      <div class="settings-label"><span>🎵 Tablet Ringtone Sound</span></div>
+      <div class="settings-sub">Tap a sound to preview it and set it as Nana's ringtone.</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-tone-uk-phone" onclick="previewAndSetTone('uk-phone')">☎️ UK Phone</button>
+        <button class="opt-btn" id="set-tone-westminster" onclick="previewAndSetTone('westminster')">🕰️ Chime</button>
+        <button class="opt-btn" id="set-tone-marimba" onclick="previewAndSetTone('marimba')">🎵 Marimba</button>
+        <button class="opt-btn" id="set-tone-bell" onclick="previewAndSetTone('bell')">🔔 Clear Bell</button>
+      </div>
+    </div>
+
+    <!-- 4. Spoken Voice Caller-ID & Speed -->
+    <div class="settings-card">
+      <div class="settings-label"><span>🗣️ Spoken Voice Prompts & Speed</span></div>
+      <div class="settings-sub">Speaks caller names out loud ("Incoming video call from...").</div>
+      <div class="opt-row" style="margin-bottom: 8px;">
+        <button class="opt-btn" id="set-voice-on" onclick="updateSetting('voicePrompts', true)">✅ Voice On</button>
+        <button class="opt-btn" id="set-voice-off" onclick="updateSetting('voicePrompts', false)">🔇 Ring Only (No Voice)</button>
+      </div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-rate-0.75" onclick="updateSetting('speechRate', 0.75)">🐢 Slow & Clear</button>
+        <button class="opt-btn" id="set-rate-0.9" onclick="updateSetting('speechRate', 0.9)">🚶 Normal</button>
+        <button class="opt-btn" id="set-rate-1" onclick="updateSetting('speechRate', 1.0)">⚡ Crisp</button>
+      </div>
+    </div>
+
+    <!-- 5. Screen Brightness & Idle Dimming -->
+    <div class="settings-card">
+      <div class="settings-label"><span>🔆 Screen Brightness & Auto-Dimming</span></div>
+      <div class="settings-sub">Controls how bright her tablet is when awake and when it dims.</div>
+      <div class="opt-row" style="margin-bottom: 8px;">
+        <button class="opt-btn" id="set-bright-60" onclick="updateSetting('awakeBrightness', 60)">🔅 60% Gentle</button>
+        <button class="opt-btn" id="set-bright-85" onclick="updateSetting('awakeBrightness', 85)">🔆 85% Crisp</button>
+        <button class="opt-btn" id="set-bright-100" onclick="updateSetting('awakeBrightness', 100)">☀️ 100% Max</button>
+      </div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-dim-60" onclick="updateSetting('dimDelaySec', 60)">Dim: 1m</button>
+        <button class="opt-btn" id="set-dim-120" onclick="updateSetting('dimDelaySec', 120)">Dim: 2m</button>
+        <button class="opt-btn" id="set-dim-300" onclick="updateSetting('dimDelaySec', 300)">Dim: 5m</button>
+        <button class="opt-btn" id="set-dim-0" onclick="updateSetting('dimDelaySec', 0)">Never Dim</button>
+      </div>
+    </div>
+
+    <!-- 6. Night Mode & Remote Troubleshooting -->
+    <div class="settings-card">
+      <div class="settings-label"><span>🌙 Night Mode & Remote Help</span></div>
+      <div class="settings-sub">Darkens screen from 9 PM to 8 AM, or remotely refreshes her screen.</div>
+      <div class="opt-row" style="margin-bottom: 10px;">
+        <button class="opt-btn" id="set-night-on" onclick="updateSetting('nightModeEnabled', true)">🌙 Night Dimmer ON</button>
+        <button class="opt-btn" id="set-night-off" onclick="updateSetting('nightModeEnabled', false)">☀️ Keep Grid Visible 24/7</button>
+      </div>
+      <div class="opt-row">
+        <button class="opt-btn" style="background:#334155; border-color:#64748b;" onclick="clearMissedCallRemotely()">🧹 Clear Missed Call Banner</button>
+        <button class="opt-btn" style="background:#7c2d12; border-color:#f97316;" onclick="forceReloadNanaTablet()">🔄 Refresh Nana's Tablet</button>
+      </div>
+    </div>
+
+    <button class="cancel-btn" style="background: #22c55e; color: #000; margin-top: 8px; font-size: 1.5rem; padding: 14px 48px;" onclick="closeSettingsModal()">✔ Done</button>
   </div>
 
   <!-- iPhone & Android Loud Ringing Setup Guide Modal -->
@@ -284,36 +390,43 @@
 
   <!-- 4. ACTIVE VIDEO CALL SCREEN -->
   <div id="call-screen" class="screen">
-    <div id="call-timer-overlay">⏱️ Remaining today: 300m</div>
+    <div id="call-timer-overlay">⏱️ 300m left</div>
+    <!-- Remote Volume & Settings Pill (Visible to Family Member during call) -->
+    <div id="in-call-volume-bar">
+      <span>🔊 Vol: <strong id="in-call-vol-label" style="color:#fef08a;">85%</strong></span>
+      <button class="vol-step-btn" onclick="stepNanaVolume(-15)">−</button>
+      <button class="vol-step-btn" onclick="stepNanaVolume(15)">+</button>
+      <button class="vol-step-btn" style="background:#334155;" onclick="openSettingsModal()">⚙️</button>
+    </div>
     <div id="video-container" onclick="resetIdleTimer()"></div>
     <button class="hangup-btn" onclick="endCall()">End Call</button>
   </div>
 
   <!-- 5. FAMILY MEMBER PHONE DIALER -->
   <div id="family-screen" class="screen" style="justify-content: center; gap: 12px;">
-    <img id="family-self-photo" src="" style="width: 110px; height: 110px; border-radius: 50%; object-fit: cover; border: 4px solid #fff;">
+    <img id="family-self-photo" src="" style="width: 105px; height: 105px; border-radius: 50%; object-fit: cover; border: 4px solid #fff;">
     <h1 id="family-greeting" style="font-size: 2rem; margin: 0;">Call Nana</h1>
     
     <button class="giant-btn" style="height: 28vh; font-size: 2.5rem;" onclick="startCallFromFamily()">
       📹 Ring Nana Now
     </button>
 
-    <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="font-size: 1.15rem; padding: 12px 20px; width: 88vw; background: #0284c7; border-color: #38bdf8;">
+    <button class="tone-btn" style="font-size: 1.15rem; padding: 14px 20px; width: 88vw; background: #1e293b; border-color: #facc15; color: #fef08a;" onclick="openSettingsModal()">
+      ⚙️ Nana's Tablet Settings (Vol, Ring Time, Display)
+    </button>
+
+    <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="font-size: 1.1rem; padding: 12px 20px; width: 88vw; background: #0284c7; border-color: #38bdf8;">
       🔔 1-Tap Setup: Connect My Telegram Alerts
     </a>
 
-    <button class="tone-btn" style="font-size: 1.15rem; padding: 12px 20px; width: 88vw; background: #334155;" onclick="document.getElementById('guide-modal').style.display='flex'">
+    <button class="tone-btn" style="font-size: 1.1rem; padding: 12px 20px; width: 88vw; background: #334155;" onclick="document.getElementById('guide-modal').style.display='flex'">
       📖 iPhone & Android Loud Ringing Guide
-    </button>
-
-    <button class="tone-btn" style="font-size: 1.15rem; padding: 12px 20px; width: 88vw;" onclick="openRingtoneModal()">
-      🔊 Change Nana's Tablet Ringtone
     </button>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getDatabase, ref, set, onValue, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+    import { getDatabase, ref, set, update, onValue, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
     function showScreen(id) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -336,7 +449,6 @@
       throw new Error("Missing Family Secret Key in URL.");
     }
 
-    // Encrypted config string (Zero readable URLs in source code!)
     const ENCRYPTED_URLS = "LEcXFQweETMCVzowARhHSEoJGUwnFklbShwJDwxIPwodEUsWCQgBQXkGHFsrEwYAPVA4CxZWSVAcBAFdMBcSGScdHDQeXSULEhkAUFJDI1k5BAMcChwNPg9XI0dfVgIdBwYBXQQGAR0VBj0TARptRxsAEQIbW0IXJAYBHRUGRgYCVzAJFloGHQVOAFk0FxwHSgFHICZeLgYRAxY0ICRVVy4PQiYnNRAtJ2xgXBEWNQEeK19QAw4lBiNLDCICUmRTSjUVNzokNUElASI/IC0eIF1pJQoRNioXJCRfFzIdFhdHXkoFDEw2BxIHACc6LU8CdQ0HABUBUk5CVjYLEgQNHQYEQF5hUUcWSBYNBwxNOxFeBhEWCk8ITSUKAxFIBQ0SGQl5AxoGABAJEghcNhESFgQBDU8MSCdHDg==";
 
     let UNLOCKED;
@@ -352,7 +464,7 @@
     }
 
     const CONFIG = {
-      appVersion: "1.1.0",
+      appVersion: "1.3.0",
       dailyRoomUrl: UNLOCKED.dailyRoomUrl,
       telegramBotUsername: UNLOCKED.telegramBotUsername,
       googleScriptUrl: UNLOCKED.googleScriptUrl,
@@ -371,14 +483,34 @@
       ]
     };
 
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
+    } catch (e) {}
+
     const role = params.get('role') || 'nana';
     const callerId = params.get('id') || 'ryan';
     const autoAnswerFromTelegram = params.get('answer') === 'true';
     const activeFamilyMember = CONFIG.familyMembers.find(m => m.id === callerId) || CONFIG.familyMembers[4];
 
+    let tabletSettings = {
+      volume: 85,
+      ringDurationSec: 60,
+      ringtone: 'uk-phone',
+      voicePrompts: true,
+      speechRate: 0.9,
+      awakeBrightness: 85,
+      dimDelaySec: 120,
+      nightModeEnabled: true,
+      reloadTrigger: 0
+    };
+
+    let initialReloadTrigger = null;
     let callFrame = null;
     let ringInterval = null;
     let outboundTimeout = null;
+    let incomingRingTimeout = null;
     let callTimerInterval = null;
     let idleCheckTimer = null;
     let safetyCountdownInterval = null;
@@ -386,7 +518,6 @@
     let connectedTelegramMembers = [];
     let missedCallerObj = null;
     let todayMinutesUsed = 0;
-    let selectedRingtone = localStorage.getItem('nana_ringtone') || 'uk-phone';
     let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
     function setPhotoWithFallback(imgEl, member) {
@@ -399,11 +530,94 @@
     const basePath = `portals/${FAMILY_SECRET}`;
     const callStateRef = ref(db, `${basePath}/callState`);
     const versionRef = ref(db, `${basePath}/version`);
-    const ringtoneRef = ref(db, `${basePath}/ringtone`);
+    const settingsRef = ref(db, `${basePath}/settings`);
     const missedCallRef = ref(db, `${basePath}/missedCall`);
     
     const todayStr = new Date().toISOString().split('T')[0];
     const dailyUsageRef = ref(db, `${basePath}/usage/${todayStr}`);
+
+    window.openSettingsModal = () => {
+      refreshSettingsModalButtons();
+      document.getElementById('settings-modal').style.display = 'flex';
+    };
+
+    window.closeSettingsModal = () => {
+      document.getElementById('settings-modal').style.display = 'none';
+    };
+
+    window.updateSetting = async (key, value) => {
+      tabletSettings[key] = value;
+      refreshSettingsModalButtons();
+      await update(settingsRef, { [key]: value });
+    };
+
+    window.previewAndSetTone = async (toneName) => {
+      tabletSettings.ringtone = toneName;
+      refreshSettingsModalButtons();
+      playSelectedRingtoneAudio(toneName);
+      await update(settingsRef, { ringtone: toneName });
+    };
+
+    window.stepNanaVolume = async (delta) => {
+      const nextVol = Math.max(25, Math.min(100, tabletSettings.volume + delta));
+      await window.updateSetting('volume', nextVol);
+    };
+
+    window.clearMissedCallRemotely = async () => {
+      await set(missedCallRef, { callerId: null, timestamp: Date.now() });
+    };
+
+    window.forceReloadNanaTablet = async () => {
+      await update(settingsRef, { reloadTrigger: Date.now() });
+    };
+
+    function refreshSettingsModalButtons() {
+      document.getElementById('lbl-vol').innerText = `${tabletSettings.volume}%`;
+      document.getElementById('in-call-vol-label').innerText = `${tabletSettings.volume}%`;
+      document.getElementById('lbl-ringtime').innerText = `${tabletSettings.ringDurationSec}s`;
+
+      const highlightGroup = (prefix, activeVal) => {
+        document.querySelectorAll(`[id^="${prefix}"]`).forEach(b => b.classList.remove('selected'));
+        const el = document.getElementById(`${prefix}${activeVal}`);
+        if (el) el.classList.add('selected');
+      };
+
+      highlightGroup('set-vol-', tabletSettings.volume);
+      highlightGroup('set-ring-', tabletSettings.ringDurationSec);
+      highlightGroup('set-tone-', tabletSettings.ringtone);
+      highlightGroup('set-voice-', tabletSettings.voicePrompts ? 'on' : 'off');
+      highlightGroup('set-rate-', tabletSettings.speechRate);
+      highlightGroup('set-bright-', tabletSettings.awakeBrightness);
+      highlightGroup('set-dim-', tabletSettings.dimDelaySec);
+      highlightGroup('set-night-', tabletSettings.nightModeEnabled ? 'on' : 'off');
+    }
+
+    onValue(settingsRef, (snapshot) => {
+      const remote = snapshot.val();
+      if (remote) {
+        tabletSettings = { ...tabletSettings, ...remote };
+        refreshSettingsModalButtons();
+
+        if (role === 'nana') {
+          if (initialReloadTrigger === null) {
+            initialReloadTrigger = tabletSettings.reloadTrigger || 0;
+          } else if (tabletSettings.reloadTrigger && tabletSettings.reloadTrigger !== initialReloadTrigger) {
+            window.location.reload(true);
+          }
+
+          updateClockAndNightMode();
+
+          if (window.AndroidBridge && window.AndroidBridge.updateTabletHardwareSettings) {
+            window.AndroidBridge.updateTabletHardwareSettings(
+              Number(tabletSettings.volume) || 85,
+              Number(tabletSettings.awakeBrightness) || 85,
+              Number(tabletSettings.dimDelaySec ?? 120),
+              Number(tabletSettings.speechRate) || 0.9
+            );
+          }
+        }
+      }
+    });
 
     onValue(dailyUsageRef, (snapshot) => {
       todayMinutesUsed = snapshot.val() || 0;
@@ -423,7 +637,6 @@
       }
     });
 
-    // Build 7-person grid
     const gridEl = document.getElementById('family-grid');
     CONFIG.familyMembers.forEach(member => {
       const card = document.createElement('div');
@@ -475,6 +688,7 @@
 
     if (role === 'family') {
       document.getElementById('family-greeting').innerText = `Call Nana (as ${activeFamilyMember.name})`;
+      document.getElementById('in-call-volume-bar').style.display = 'flex';
       setPhotoWithFallback(document.getElementById('family-self-photo'), activeFamilyMember);
       updateFamilyTelegramButtonUI();
       syncTelegramViaGoogleScript();
@@ -496,7 +710,7 @@
       document.getElementById('night-clock').innerText = timeStr;
 
       const hour = now.getHours();
-      const isNight = (hour >= 21 || hour < 8);
+      const isNight = tabletSettings.nightModeEnabled && (hour >= 21 || hour < 8);
       document.getElementById('night-dimmer').style.display = (isNight && currentState === 'idle') ? 'flex' : 'none';
     }
 
@@ -504,16 +718,14 @@
       document.getElementById('night-dimmer').style.display = 'none';
     };
 
-    // =========================================================================
-    // RINGTONE SYNTHESIZER
-    // =========================================================================
-    function playNote(freq, startTime, duration, type = 'sine', peakGain = 0.6) {
+    function playNote(freq, startTime, duration, type = 'sine', baseGain = 0.6) {
       if (audioCtx.state === 'suspended') audioCtx.resume();
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
+      const scaledGain = baseGain * (tabletSettings.volume / 100);
       osc.type = type;
       osc.frequency.setValueAtTime(freq, startTime);
-      gain.gain.setValueAtTime(peakGain, startTime);
+      gain.gain.setValueAtTime(scaledGain, startTime);
       gain.gain.exponentialRampToValueAtTime(0.008, startTime + duration);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
@@ -527,23 +739,23 @@
         const now = audioCtx.currentTime;
         if (toneName === 'uk-phone') {
           [0, 0.55].forEach(offset => {
-            playNote(400, now + offset, 0.35, 'square', 0.35);
-            playNote(450, now + offset, 0.35, 'square', 0.35);
+            playNote(400, now + offset, 0.35, 'square', 0.4);
+            playNote(450, now + offset, 0.35, 'square', 0.4);
           });
         } else if (toneName === 'westminster') {
-          playNote(329.63, now, 0.35, 'triangle', 0.7);
-          playNote(415.30, now + 0.35, 0.35, 'triangle', 0.7);
-          playNote(369.99, now + 0.70, 0.35, 'triangle', 0.7);
-          playNote(246.94, now + 1.05, 0.65, 'triangle', 0.7);
+          playNote(329.63, now, 0.35, 'triangle', 0.75);
+          playNote(415.30, now + 0.35, 0.35, 'triangle', 0.75);
+          playNote(369.99, now + 0.70, 0.35, 'triangle', 0.75);
+          playNote(246.94, now + 1.05, 0.65, 'triangle', 0.75);
         } else if (toneName === 'marimba') {
-          playNote(523.25, now, 0.25, 'sine', 0.7);
-          playNote(659.25, now + 0.22, 0.25, 'sine', 0.7);
-          playNote(783.99, now + 0.44, 0.25, 'sine', 0.7);
-          playNote(1046.50, now + 0.66, 0.55, 'sine', 0.7);
+          playNote(523.25, now, 0.25, 'sine', 0.75);
+          playNote(659.25, now + 0.22, 0.25, 'sine', 0.75);
+          playNote(783.99, now + 0.44, 0.25, 'sine', 0.75);
+          playNote(1046.50, now + 0.66, 0.55, 'sine', 0.75);
         } else if (toneName === 'bell') {
           [0, 0.35, 0.70].forEach(offset => {
-            playNote(880, now + offset, 0.28, 'sine', 0.65);
-            playNote(1760, now + offset, 0.28, 'triangle', 0.4);
+            playNote(880, now + offset, 0.28, 'sine', 0.7);
+            playNote(1760, now + offset, 0.28, 'triangle', 0.45);
           });
         }
       } catch (e) {}
@@ -556,47 +768,12 @@
       clearTimeout(clockTapTimer);
       if (clockTapCount >= 3) {
         clockTapCount = 0;
-        openRingtoneModal();
+        openSettingsModal();
       } else {
         clockTapTimer = setTimeout(() => { clockTapCount = 0; }, 1200);
       }
     };
 
-    window.openRingtoneModal = () => {
-      highlightSelectedToneButton();
-      document.getElementById('ringtone-modal').style.display = 'flex';
-    };
-
-    window.closeRingtoneModal = () => {
-      document.getElementById('ringtone-modal').style.display = 'none';
-    };
-
-    window.selectRingtone = async (toneName) => {
-      selectedRingtone = toneName;
-      localStorage.setItem('nana_ringtone', toneName);
-      highlightSelectedToneButton();
-      playSelectedRingtoneAudio(toneName);
-      await set(ringtoneRef, toneName);
-    };
-
-    function highlightSelectedToneButton() {
-      document.querySelectorAll('.tone-btn').forEach(b => b.classList.remove('selected'));
-      const activeBtn = document.getElementById(`tone-${selectedRingtone}`);
-      if (activeBtn) activeBtn.classList.add('selected');
-    }
-
-    onValue(ringtoneRef, (snapshot) => {
-      const tone = snapshot.val();
-      if (tone) {
-        selectedRingtone = tone;
-        localStorage.setItem('nana_ringtone', tone);
-        highlightSelectedToneButton();
-      }
-    });
-
-    // =========================================================================
-    // MISSED CALLS
-    // =========================================================================
     onValue(missedCallRef, (snapshot) => {
       const data = snapshot.val();
       if (role === 'nana' && data && data.callerId) {
@@ -624,9 +801,6 @@
       }
     }
 
-    // =========================================================================
-    // CALL STATE, QUOTA & 60-MINUTE IDLE SAFETY CHECK
-    // =========================================================================
     async function startCallFromNana(member) {
       if (CONFIG.dailyMinuteQuota - todayMinutesUsed <= 0) {
         showScreen('quota-exceeded-screen');
@@ -650,6 +824,7 @@
       showScreen('outbound-screen');
       ringFamilyOnTelegramLoop(member);
 
+      const ringTimeoutMs = (Number(tabletSettings.ringDurationSec) || 60) * 1000;
       clearTimeout(outboundTimeout);
       outboundTimeout = setTimeout(async () => {
         if (currentState === 'calling_family') {
@@ -657,15 +832,16 @@
           await set(missedCallRef, { callerId: member.id, timestamp: Date.now() });
           await endCall();
         }
-      }, 45000);
+      }, ringTimeoutMs);
     }
 
     async function ringFamilyOnTelegramLoop(member) {
       let lastMessageId = null;
       const originUrl = window.location.origin + window.location.pathname;
       const answerUrl = `${originUrl}?role=family&id=${encodeURIComponent(member.id)}&key=${encodeURIComponent(FAMILY_SECRET)}&answer=true`;
+      const totalRings = Math.max(4, Math.floor((Number(tabletSettings.ringDurationSec) || 60) / 6));
 
-      for (let i = 1; i <= 6; i++) {
+      for (let i = 1; i <= totalRings; i++) {
         const snap = await get(callStateRef);
         if (!snap.exists() || snap.val().status !== 'calling_family') break;
 
@@ -686,7 +862,7 @@
           if (json.ok && json.messageId) lastMessageId = json.messageId;
         } catch (e) {}
 
-        await new Promise(r => setTimeout(r, 5000));
+        await new Promise(r => setTimeout(r, 5500));
       }
     }
 
@@ -717,6 +893,7 @@
 
     window.answerCallAsNana = async () => {
       stopRingingUI();
+      clearMissedCallBanner();
       await set(callStateRef, {
         status: 'connected',
         callerName: 'Nana',
@@ -727,11 +904,12 @@
 
     window.endCall = async () => {
       clearTimeout(outboundTimeout);
+      clearTimeout(incomingRingTimeout);
       stopRingingUI();
       stopCallDurationTracker();
       stopIdleSafetyChecker();
-      if (role === 'nana' && currentState === 'ringing_nana') {
-        const lastCallerId = document.getElementById('ringing-screen').dataset.callerId;
+      if (currentState === 'ringing_nana') {
+        const lastCallerId = document.getElementById('ringing-screen').dataset.callerId || activeFamilyMember.id;
         if (lastCallerId) {
           await set(missedCallRef, { callerId: lastCallerId, timestamp: Date.now() });
         }
@@ -753,14 +931,25 @@
           const callerObj = CONFIG.familyMembers.find(m => m.id === data.callerId) || CONFIG.familyMembers[4];
           document.getElementById('ringing-screen').dataset.callerId = callerObj.id;
           startRingingUI(callerObj);
+
+          const ringTimeoutMs = (Number(tabletSettings.ringDurationSec) || 60) * 1000;
+          clearTimeout(incomingRingTimeout);
+          incomingRingTimeout = setTimeout(async () => {
+            if (currentState === 'ringing_nana') {
+              await set(missedCallRef, { callerId: callerObj.id, timestamp: Date.now() });
+              await set(callStateRef, { status: 'idle', timestamp: Date.now() });
+            }
+          }, ringTimeoutMs);
         } else if (data.status === 'connected') {
           clearTimeout(outboundTimeout);
+          clearTimeout(incomingRingTimeout);
           stopRingingUI();
           showScreen('call-screen');
           startCallDurationTracker();
           startIdleSafetyChecker();
         } else if (data.status === 'idle') {
           clearTimeout(outboundTimeout);
+          clearTimeout(incomingRingTimeout);
           stopRingingUI();
           stopCallDurationTracker();
           stopIdleSafetyChecker();
@@ -790,7 +979,7 @@
 
         const remaining = Math.max(0, CONFIG.dailyMinuteQuota - (todayMinutesUsed + 1));
         const timerEl = document.getElementById('call-timer-overlay');
-        if (timerEl) timerEl.innerText = `⏱️ Remaining today: ${remaining}m`;
+        if (timerEl) timerEl.innerText = `⏱️ ${remaining}m left`;
 
         if (remaining <= 0) {
           endCall();
@@ -803,15 +992,12 @@
       callTimerInterval = null;
     }
 
-    // =========================================================================
-    // 60-MINUTE "STILL THERE?" SAFETY CHECKER (ON FAMILY PHONE ONLY)
-    // =========================================================================
     function startIdleSafetyChecker() {
       stopIdleSafetyChecker();
       if (role === 'family') {
         idleCheckTimer = setTimeout(() => {
           triggerSafetyCheckModal();
-        }, 3600000); // 60 minutes
+        }, 3600000);
       }
     }
 
@@ -886,19 +1072,23 @@
     }
 
     function speakOutLoud(text) {
+      if (!tabletSettings.voicePrompts && role === 'nana') return;
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         const msg = new SpeechSynthesisUtterance(text);
-        msg.rate = 0.9;
+        msg.rate = Number(tabletSettings.speechRate) || 0.9;
+        msg.volume = Math.min(1.0, (Number(tabletSettings.volume) || 85) / 100);
         window.speechSynthesis.speak(msg);
       }
     }
 
     function playChimeAndAnnounce(spokenName) {
-      playSelectedRingtoneAudio(selectedRingtone);
-      setTimeout(() => {
-        speakOutLoud(`Incoming video call from ${spokenName}. Tap the big green button to answer.`);
-      }, 1600);
+      playSelectedRingtoneAudio(tabletSettings.ringtone);
+      if (tabletSettings.voicePrompts) {
+        setTimeout(() => {
+          speakOutLoud(`Incoming video call from ${spokenName}. Tap the big green button to answer.`);
+        }, 1600);
+      }
     }
 
     function startRingingUI(callerObj) {
