@@ -525,7 +525,7 @@
     }
 
     const CONFIG = {
-      appVersion: "2.1.0",
+      appVersion: "2.1.1",
       adminPin: "1929",
       apkFileName: "nanaphone.apk", // Placed in the same GitHub folder as index.html
       dailyRoomUrl: UNLOCKED.dailyRoomUrl,
@@ -682,7 +682,7 @@
     // LIVE PRESENCE, BATTERY TELEMETRY & FAMILY STATUS CARD
     // ========================================================================
     window.resetIdleTimer = () => recordHeartbeat();
-    window.addEventListener(' pointerdown', recordHeartbeat, { passive: true });
+    window.addEventListener('pointerdown', recordHeartbeat, { passive: true });
     window.addEventListener('touchstart', recordHeartbeat, { passive: true });
 
     function recordHeartbeat() {
@@ -789,7 +789,7 @@
     }
 
     // ========================================================================
-    // DYNAMIC CONNECTED CONTACTS SYNC
+    // DYNAMIC CONNECTED CONTACTS SYNC (Strict Filter: Connected Members Only)
     // ========================================================================
     onValue(connectedMembersRef, (snap) => {
       const val = snap.val();
@@ -817,7 +817,8 @@
         }
       } catch (e) {}
     }
-function renderContacts(connectedList = []) {
+
+    function renderContacts(connectedList = []) {
       const grid = document.getElementById('family-grid');
       if (!grid) return;
       grid.innerHTML = "";
@@ -834,17 +835,6 @@ function renderContacts(connectedList = []) {
         return;
       }
 
-      displayList.forEach(member => {
-        const card = document.createElement('div');
-        card.className = 'family-card';
-        card.innerHTML = `
-          <div class="photo-wrapper"><img src="${member.photo}" onerror="this.src='${member.fallback}'"></div>
-          <div class="contact-nameplate">${member.name}</div>
-        `;
-        card.onclick = () => openCallConfirmation(member);
-        grid.appendChild(card);
-      });
-    }
       displayList.forEach(member => {
         const card = document.createElement('div');
         card.className = 'family-card';
