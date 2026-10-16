@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- Blocks search engines and scrapers from indexing this page -->
+  <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>NanaPhone Portal</title>
@@ -29,7 +31,7 @@
     }
     .header-title { font-size: 2.1rem; font-weight: 900; color: #ffffff; }
     .header-pills { display: flex; gap: 10px; align-items: center; }
-    .pill {
+    .pill, .clock-pill {
       font-size: 1.8rem; font-weight: 800; color: #e2e8f0;
       background: #1e293b; padding: 6px 18px; border-radius: 16px;
       border: 2px solid #475569; cursor: pointer;
@@ -201,7 +203,7 @@
     </button>
   </div>
 
-  <!-- Missing Key Screen -->
+  <!-- Missing or Wrong Key Screen -->
   <div id="auth-error-screen" class="screen">
     <h1 style="font-size: 3rem;">🔒 Private Family Portal</h1>
     <p style="font-size: 1.6rem; color: #fca5a5;">Please open this page using your full family link containing <code style="background:#000; padding:4px 10px; border-radius:8px;">?key=YOUR_SECRET</code></p>
@@ -230,6 +232,18 @@
       <button class="tone-btn" id="tone-bell" onclick="selectRingtone('bell')">🔔 High-Clarity Bell</button>
     </div>
     <button class="cancel-btn" style="background: #2563eb; margin-top: 10px; font-size: 2rem; padding: 16px 48px;" onclick="closeRingtoneModal()">✔ Done</button>
+  </div>
+
+  <!-- iPhone & Android Loud Ringing Setup Guide Modal -->
+  <div id="guide-modal" style="display:none; position:fixed; inset:0; background:rgba(9,13,22,0.98); z-index:160; flex-direction:column; align-items:center; justify-content:flex-start; padding:24px; overflow-y:auto; text-align:left;">
+    <h2 style="font-size:1.8rem; color:#fef08a; margin-top:0;">🔔 Make Your Phone Ring When Nana Calls</h2>
+    <div style="max-width:650px; font-size:1.05rem; line-height:1.55; color:#e2e8f0;">
+      <p><strong style="color:#38bdf8;">Step 1 (Both iPhone & Android):</strong> Tap the blue <em>"1-Tap Setup: Connect My Telegram Alerts"</em> button on the main screen and tap <strong>Start</strong> inside Telegram.</p>
+      <p><strong style="color:#38bdf8;">Step 2 (Save the Ringtone MP3):</strong> In the Telegram bot chat, press and hold (iPhone) or tap the 3 dots (Android) on the ringtone audio file and select <strong>Save for Notifications</strong>.</p>
+      <p><strong style="color:#38bdf8;">Step 3 (iPhone Users):</strong> Tap <strong>Nanaphone_bot</strong> at the very top of Telegram &rarr; <strong>Mute (Bell icon) &rarr; Customize &rarr; Enable Notifications</strong> &rarr; set <strong>Sound</strong> to the saved ringtone. To make it ring even on Focus/Do Not Disturb, go to <em>iPhone Settings &rarr; Focus &rarr; Do Not Disturb &rarr; Apps</em> and add <strong>Telegram</strong>.</p>
+      <p><strong style="color:#38bdf8;">Step 4 (Android Users):</strong> Tap <strong>Nanaphone_bot</strong> at the top of Telegram &rarr; <strong>Notifications &rarr; Customize</strong> &rarr; set <strong>Sound</strong> to the saved ringtone, set <strong>Vibrate</strong> to <em>Long</em>, set <strong>Importance</strong> to <em>Urgent / Pop on screen</em>, and toggle <strong>Override Do Not Disturb</strong> ON.</p>
+    </div>
+    <button class="cancel-btn" style="background:#2563eb; font-size:1.5rem; padding:14px 40px; margin-top:20px;" onclick="document.getElementById('guide-modal').style.display='none'">✔ Got It</button>
   </div>
 
   <!-- 1. NANA'S 7-PERSON PHOTO GRID -->
@@ -276,33 +290,23 @@
   </div>
 
   <!-- 5. FAMILY MEMBER PHONE DIALER -->
-  <div id="family-screen" class="screen" style="justify-content: center; gap: 16px;">
-    <img id="family-self-photo" src="" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid #fff;">
-    <h1 id="family-greeting" style="font-size: 2.2rem; margin: 0;">Call Nana</h1>
-    <button class="tone-btn" style="font-size: 1.1rem; padding: 12px 20px; width: 88vw; background: #334155;" onclick="document.getElementById('guide-modal').style.display='flex'">
-  📖 iPhone & Android Loud Ringing Guide
-</button>
-
-    <!-- Help Modal -->
-    <div id="guide-modal" style="display:none; position:fixed; inset:0; background:rgba(9,13,22,0.98); z-index:160; flex-direction:column; align-items:center; justify-content:flex-start; padding:24px; overflow-y:auto; text-align:left;">
-      <h2 style="font-size:1.8rem; color:#fef08a; margin-top:0;">🔔 Make Your Phone Ring When Nana Calls</h2>
-      <div style="max-width:600px; font-size:1.05rem; line-height:1.5; color:#e2e8f0;">
-        <p><strong style="color:#38bdf8;">Step 1 (Both):</strong> Tap the blue <em>"Connect My Telegram Alerts"</em> button on the previous screen and tap <strong>Start</strong> in Telegram.</p>
-        <p><strong style="color:#38bdf8;">Step 2 (Save Sound):</strong> In the Telegram bot chat, press and hold (iPhone) or tap the 3 dots (Android) on the ringtone audio file and tap <strong>Save for Notifications</strong>.</p>
-        <p><strong style="color:#38bdf8;">Step 3 (iPhone):</strong> Tap the Bot's name at the top of Telegram &rarr; <strong>Mute &rarr; Customize &rarr; Sound</strong> and pick the ringtone. Then go to <em>iPhone Settings &rarr; Focus &rarr; Do Not Disturb &rarr; Apps</em> and add <strong>Telegram</strong>.</p>
-        <p><strong style="color:#38bdf8;">Step 4 (Android):</strong> Tap the Bot's name at the top of Telegram &rarr; <strong>Notifications &rarr; Customize</strong> &rarr; set <strong>Sound</strong> to the ringtone, <strong>Vibrate</strong> to <em>Long</em>, and enable <strong>Override Do Not Disturb</strong> in system settings.</p>
-      </div>
-      <button class="cancel-btn" style="background:#2563eb; font-size:1.5rem; padding:14px 40px; margin-top:20px;" onclick="document.getElementById('guide-modal').style.display='none'">Got It</button>
-    </div>    
-    <button class="giant-btn" style="height: 30vh; font-size: 2.6rem;" onclick="startCallFromFamily()">
+  <div id="family-screen" class="screen" style="justify-content: center; gap: 12px;">
+    <img id="family-self-photo" src="" style="width: 110px; height: 110px; border-radius: 50%; object-fit: cover; border: 4px solid #fff;">
+    <h1 id="family-greeting" style="font-size: 2rem; margin: 0;">Call Nana</h1>
+    
+    <button class="giant-btn" style="height: 28vh; font-size: 2.5rem;" onclick="startCallFromFamily()">
       📹 Ring Nana Now
     </button>
 
-    <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="font-size: 1.2rem; padding: 14px 20px; width: 88vw; background: #0284c7; border-color: #38bdf8;">
+    <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="font-size: 1.15rem; padding: 12px 20px; width: 88vw; background: #0284c7; border-color: #38bdf8;">
       🔔 1-Tap Setup: Connect My Telegram Alerts
     </a>
 
-    <button class="tone-btn" style="font-size: 1.2rem; padding: 14px 20px; width: 88vw;" onclick="openRingtoneModal()">
+    <button class="tone-btn" style="font-size: 1.15rem; padding: 12px 20px; width: 88vw; background: #334155;" onclick="document.getElementById('guide-modal').style.display='flex'">
+      📖 iPhone & Android Loud Ringing Guide
+    </button>
+
+    <button class="tone-btn" style="font-size: 1.15rem; padding: 12px 20px; width: 88vw;" onclick="openRingtoneModal()">
       🔊 Change Nana's Tablet Ringtone
     </button>
   </div>
@@ -311,21 +315,49 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getDatabase, ref, set, onValue, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
     window.addEventListener('error', (event) => {
       document.getElementById('error-message').innerText = event.message + " (At line " + event.lineno + ")";
       showScreen('error-screen');
     });
 
-    // =========================================================================
-    // 👇 FILL IN YOUR 4 PUBLIC URLS BELOW 👇
-    // =========================================================================
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('key')) {
+      localStorage.setItem('nana_family_secret', params.get('key'));
+    }
+    const FAMILY_SECRET = localStorage.getItem('nana_family_secret') || '';
+
+    if (!FAMILY_SECRET) {
+      showScreen('auth-error-screen');
+      throw new Error("Missing Family Secret Key in URL.");
+    }
+
+    // Encrypted config string (Zero readable URLs in source code!)
+    const ENCRYPTED_URLS = "LEcXFQweETMCVzowARhHSEoJGUwnFklbShwJDwxIPwodEUsWCQgBQXkGHFsrEwYAPVA4CxZWSVAcBAFdMBcSGScdHDQeXSULEhkAUFJDI1k5BAMcChwNPg9XI0dfVgIdBwYBXQQGAR0VBj0TARptRxsAEQIbW0IXJAYBHRUGRgYCVzAJFloGHQVOAFk0FxwHSgFHICZeLgYRAxY0ICRVVy4PQiYnNRAtJ2xgXBEWNQEeK19QAw4lBiNLDCICUmRTSjUVNzokNUElASI/IC0eIF1pJQoRNioXJCRfFzIdFhdHXkoFDEw2BxIHACc6LU8CdQ0HABUBUk5CVjYLEgQNHQYEQF5hUUcWSBYNBwxNOxFeBhEWCk8ITSUKAxFIBQ0SGQl5AxoGABAJEghcNhESFgQBDU8MSCdHDg==";
+
+    let UNLOCKED;
+    try {
+      UNLOCKED = JSON.parse(
+        atob(ENCRYPTED_URLS).split('').map((c, i) =>
+          String.fromCharCode(c.charCodeAt(0) ^ FAMILY_SECRET.charCodeAt(i % FAMILY_SECRET.length))
+        ).join('')
+      );
+    } catch (e) {
+      showScreen('auth-error-screen');
+      throw new Error("Invalid Family Secret Key in URL.");
+    }
+
     const CONFIG = {
-      appVersion: "1.0.8",
-      dailyRoomUrl: "https://nanaphone.daily.co/NanaPhone",               // <-- 1. Your Daily.co Room URL
-      telegramBotUsername: "Nanaphone_bot",                            // <-- 2. Your Bot Username (no @)
-      googleScriptUrl: "https://script.google.com/macros/s/AKfycbwsFHE8oyj1RBGxLJT79bbPsvJ2hTkVrF9dCoj369ApEREXyrdQKE_vA0QrobBOeLE2/exec", // <-- 3. Your Google Apps Script URL
+      appVersion: "1.1.0",
+      dailyRoomUrl: UNLOCKED.dailyRoomUrl,
+      telegramBotUsername: UNLOCKED.telegramBotUsername,
+      googleScriptUrl: UNLOCKED.googleScriptUrl,
       firebase: {
-        databaseURL: "https://nanaphone-f644b-default-rtdb.europe-west1.firebasedatabase.app" // <-- 4. Your Firebase DB URL
+        databaseURL: UNLOCKED.databaseURL
       },
       dailyMinuteQuota: 300,
       familyMembers: [
@@ -338,12 +370,6 @@
         { id: "zara",     name: "Zara",     spokenName: "Zara",   photo: "photos/zara.jpg",     fallback: "https://ui-avatars.com/api/?name=Zara&size=256&background=6d28d9&color=fff&bold=true&font-size=0.45" }
       ]
     };
-
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('key')) {
-      localStorage.setItem('nana_family_secret', params.get('key'));
-    }
-    const FAMILY_SECRET = localStorage.getItem('nana_family_secret') || '';
 
     const role = params.get('role') || 'nana';
     const callerId = params.get('id') || 'ryan';
@@ -363,19 +389,9 @@
     let selectedRingtone = localStorage.getItem('nana_ringtone') || 'uk-phone';
     let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-    function showScreen(id) {
-      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
-    }
-
     function setPhotoWithFallback(imgEl, member) {
       imgEl.onerror = () => { imgEl.onerror = null; imgEl.src = member.fallback; };
       imgEl.src = member.photo;
-    }
-
-    if (!FAMILY_SECRET) {
-      showScreen('auth-error-screen');
-      throw new Error("Missing Family Secret Key in URL.");
     }
 
     const app = initializeApp(CONFIG.firebase);
@@ -430,7 +446,7 @@
     });
 
     async function syncTelegramViaGoogleScript() {
-      if (!CONFIG.googleScriptUrl || CONFIG.googleScriptUrl.includes("YOUR_SCRIPT_ID")) return;
+      if (!CONFIG.googleScriptUrl) return;
       try {
         const res = await fetch(CONFIG.googleScriptUrl, {
           method: 'POST',
@@ -788,14 +804,15 @@
     }
 
     // =========================================================================
-    // 60-MINUTE "STILL THERE?" SAFETY CHECKER
+    // 60-MINUTE "STILL THERE?" SAFETY CHECKER (ON FAMILY PHONE ONLY)
     // =========================================================================
     function startIdleSafetyChecker() {
       stopIdleSafetyChecker();
-      // Triggers every 60 minutes (3,600,000 ms) of active call
-      idleCheckTimer = setTimeout(() => {
-        triggerSafetyCheckModal();
-      }, 3600000);
+      if (role === 'family') {
+        idleCheckTimer = setTimeout(() => {
+          triggerSafetyCheckModal();
+        }, 3600000); // 60 minutes
+      }
     }
 
     function stopIdleSafetyChecker() {
@@ -818,13 +835,12 @@
         if (secondsLeft <= 0) {
           stopIdleSafetyChecker();
           speakOutLoud("Call ending due to inactivity.");
-          endCall(); // Auto-hang up if no one touches the screen for 60 seconds
+          endCall();
         }
       }, 1000);
     }
 
     window.resetIdleTimer = () => {
-      // If modal is showing, acknowledging it resets the 60-minute timer
       stopIdleSafetyChecker();
       if (currentState === 'connected') {
         startIdleSafetyChecker();
