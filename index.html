@@ -13,7 +13,7 @@
       box-sizing: border-box;
       user-select: none;
       -webkit-user-select: none;
-      touch-action: manipulation; /* Tolerates slight finger slips on touch */
+      touch-action: manipulation;
     }
     body, html {
       margin: 0; padding: 0; width: 100vw; height: 100vh;
@@ -24,7 +24,7 @@
     .screen {
       display: none; width: 100vw; height: 100vh;
       flex-direction: column; align-items: center; justify-content: space-between;
-      padding: 52px 18px 50px 18px; /* Clears top 50dp & bottom 48dp Android touch shields */
+      padding: 52px 18px 50px 18px;
       text-align: center;
     }
     .active { display: flex; }
@@ -54,20 +54,21 @@
       font-size: 1.3rem; font-weight: 700; color: #e2e8f0; cursor: pointer;
     }
 
-    /* Missed Call Banner */
+    /* Per-Person Missed Calls Top Bar */
     #missed-call-banner {
       display: none; width: 100%; background: #7f1d1d; border: 4px solid #f87171;
-      border-radius: 20px; padding: 8px 18px; align-items: center; justify-content: space-between;
-      margin-bottom: 4px; animation: pulseMissed 1.5s infinite; cursor: pointer;
+      border-radius: 18px; padding: 8px 14px; align-items: center; justify-content: space-between;
+      gap: 10px; margin-bottom: 4px; animation: pulseMissed 1.5s infinite; flex-wrap: wrap;
     }
     @keyframes pulseMissed {
       0%, 100% { background: #7f1d1d; }
       50% { background: #991b1b; }
     }
-    .missed-text { font-size: 1.85rem; font-weight: 900; color: #fef08a; }
-    .missed-btn {
-      background: #22c55e; color: #000; font-size: 1.65rem; font-weight: 900;
-      border: 3px solid #fff; border-radius: 14px; padding: 6px 20px; cursor: pointer;
+    .missed-label { font-size: 1.5rem; font-weight: 900; color: #fef08a; }
+    .missed-chips-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .missed-chip-btn {
+      background: #22c55e; color: #000; font-size: 1.35rem; font-weight: 900;
+      border: 3px solid #fff; border-radius: 14px; padding: 6px 16px; cursor: pointer;
     }
 
     /* Dynamic Contact Grid */
@@ -77,6 +78,7 @@
       width: 100%; flex: 1; margin-top: 4px;
     }
     .family-card {
+      position: relative;
       width: calc(25% - 12px);
       height: calc(50% - 8px);
       background: #1e293b; border: 5px solid #64748b; border-radius: 24px;
@@ -84,6 +86,21 @@
       cursor: pointer; padding: 8px 8px 6px 8px;
       box-shadow: 0 10px 22px rgba(0,0,0,0.6);
       transition: transform 0.1s, border-color 0.1s;
+    }
+    .family-card.has-missed {
+      border-color: #f87171;
+      background: #3b1118;
+      animation: pulseCardMissed 1.6s infinite;
+    }
+    @keyframes pulseCardMissed {
+      0%, 100% { border-color: #f87171; box-shadow: 0 0 18px rgba(248, 113, 113, 0.7); }
+      50% { border-color: #fef08a; box-shadow: 0 0 26px rgba(254, 240, 138, 0.9); }
+    }
+    .missed-card-badge {
+      position: absolute; top: -10px; right: -10px; z-index: 20;
+      background: #dc2626; color: #fef08a; border: 3px solid #ffffff;
+      border-radius: 16px; padding: 4px 12px; font-size: 1.25rem; font-weight: 900;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.7);
     }
     .family-card:active {
       transform: scale(0.96); background: #334155; border-color: #22c55e;
@@ -93,7 +110,7 @@
       width: 100%; overflow: hidden;
     }
     .family-card img {
-      width: 104px; height: 104px; border-radius: 50%;
+      width: 102px; height: 102px; border-radius: 50%;
       object-fit: cover; border: 4px solid #ffffff;
       background: #0f172a; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     }
@@ -101,7 +118,7 @@
       width: 100%; background: #0f172a;
       border: 3px solid #facc15; border-radius: 14px;
       padding: 4px 3px; margin-top: 4px;
-      font-size: 2.05rem; font-weight: 900; color: #fef08a;
+      font-size: 2rem; font-weight: 900; color: #fef08a;
       letter-spacing: 0.5px; line-height: 1.1;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
@@ -163,6 +180,33 @@
       width: 92vw; max-width: 680px; background: #1e293b; border: 3px solid #64748b;
       border-radius: 20px; padding: 16px; margin-bottom: 14px; text-align: left;
     }
+
+    /* iOS & Android Ringtone Guide Modal */
+    #phone-guide-modal {
+      display: none; position: fixed; inset: 0; background: rgba(9, 13, 22, 0.98);
+      z-index: 10005; flex-direction: column; align-items: center; justify-content: flex-start;
+      padding: 20px 16px 40px 16px; overflow-y: auto;
+    }
+    .guide-tabs {
+      display: flex; gap: 10px; width: 92vw; max-width: 640px; margin-bottom: 14px;
+    }
+    .guide-tab-btn {
+      flex: 1; padding: 12px; font-size: 1.15rem; font-weight: 900;
+      border-radius: 14px; border: 3px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer;
+    }
+    .guide-tab-btn.active {
+      background: #0284c7; border-color: #ffffff; color: #fef08a;
+    }
+    .guide-box {
+      width: 92vw; max-width: 640px; background: #1e293b; border: 2px solid #38bdf8;
+      border-radius: 20px; padding: 16px 18px; text-align: left; margin-bottom: 14px;
+      font-size: 1rem; line-height: 1.5; color: #f1f5f9;
+    }
+    .guide-step {
+      margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #334155;
+    }
+    .guide-step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .guide-step strong { color: #fef08a; font-size: 1.08rem; }
 
     /* Custom Zero-Iframe Video Call Screen */
     #call-screen { padding: 0; position: relative; background: #000; overflow: hidden; }
@@ -254,8 +298,8 @@
       cursor: pointer; box-shadow: 0 10px 25px rgba(0,0,0,0.85); pointer-events: auto;
     }
     .tone-btn {
-      background: #1e293b; color: #fff; border: 4px solid #475569;
-      border-radius: 20px; padding: 12px 18px; font-size: 1.1rem; font-weight: 800;
+      background: #1e293b; color: #fff; border: 3px solid #475569;
+      border-radius: 18px; padding: 11px 14px; font-size: 1.02rem; font-weight: 800;
       cursor: pointer; text-decoration: none; display: inline-block;
     }
     #night-dimmer {
@@ -267,7 +311,7 @@
 </head>
 <body>
 
-  <!-- Giant Warm Toast Banner (Triggered when Family sends a Hug/Wave) -->
+  <!-- Giant Warm Toast Banner -->
   <div id="love-toast-banner">❤️ Thinking of you, Nana!</div>
 
   <!-- Night Mode Screen -->
@@ -314,6 +358,7 @@
   <div id="confirm-modal">
     <h1 id="confirm-prompt-title" style="font-size: 3.4rem; color: #fef08a; margin: 0 0 16px 0;">Call Phil?</h1>
     <img id="confirm-photo" src="" alt="Family Member">
+    <p id="confirm-missed-note" style="font-size: 1.5rem; color: #fca5a5; margin: 0 0 6px 0; font-weight: 800; display:none;"></p>
     <p style="font-size: 1.6rem; color: #cbd5e1; margin: 0;">Cancels in <span id="confirm-timer" style="color:#f87171; font-weight:bold;">15</span>s</p>
     <div class="confirm-btn-row">
       <button class="confirm-btn" style="background:#22c55e; color:#000;" onclick="executeConfirmedCall()">📞 YES, CALL NOW</button>
@@ -327,6 +372,71 @@
     <p style="font-size: 1.1rem; color: #94a3b8; margin: 0 0 16px 0;">Messages & photos from the family Telegram group</p>
     <div id="bulletin-posts-container" style="width:100%; display:flex; flex-direction:column; align-items:center;"></div>
     <button class="cancel-btn" style="background:#2563eb; padding: 12px 36px; font-size: 1.5rem;" onclick="closeFamilyBulletin()">Close</button>
+  </div>
+
+  <!-- iOS & Android Loud Ringtone Setup Guide Modal (For Family Members) -->
+  <div id="phone-guide-modal">
+    <h2 style="font-size: 1.65rem; color: #fef08a; margin: 0 0 6px 0;">🔔 Make Nana's Calls Ring Loudly</h2>
+    <p style="font-size: 0.95rem; color: #cbd5e1; margin: 0 0 14px 0; max-width: 600px;">
+      Because Nana calls via Telegram notifications (6 rings over 50 seconds), follow the steps for your phone below so it rings like a real phone call:
+    </p>
+
+    <div class="guide-tabs">
+      <button id="tab-btn-ios" class="guide-tab-btn active" onclick="switchGuideTab('ios')">🍏 iPhone (iOS) Guide</button>
+      <button id="tab-btn-android" class="guide-tab-btn" onclick="switchGuideTab('android')">🤖 Android Guide</button>
+    </div>
+
+    <!-- iPhone (iOS) Guide -->
+    <div id="guide-content-ios" class="guide-box">
+      <div class="guide-step">
+        <strong>Step 1: Link the Telegram Bot</strong><br>
+        Tap the blue <em>"1-Tap Setup: Connect Telegram Alerts"</em> button on the main screen and tap <strong>Start</strong> at the bottom of Telegram. (You should immediately get a "✅ Connected!" reply).
+      </div>
+      <div class="guide-step">
+        <strong>Step 2: Set a Long Ringtone in Telegram (Crucial!)</strong><br>
+        1. Inside the <strong>NanaPhone Bot</strong> chat in Telegram, tap the Bot's name/photo at the very top.<br>
+        2. Tap <strong>Mute (Bell Icon)</strong> &rarr; <strong>Customize</strong>.<br>
+        3. Toggle <strong>Enable Notifications</strong> ON.<br>
+        4. Tap <strong>Sound</strong> and pick a long melody (like <em>Opening</em>, <em>Radiate</em>, or upload a custom 25-second ringtone MP3) instead of a short 1-second "Ding".
+      </div>
+      <div class="guide-step">
+        <strong>Step 3: Bypass iPhone "Focus / Do Not Disturb"</strong><br>
+        1. Open your iPhone <strong>Settings</strong> &rarr; <strong>Focus</strong> &rarr; <strong>Do Not Disturb</strong> (and <em>Sleep</em>).<br>
+        2. Tap <strong>Apps</strong> &rarr; <strong>Add Apps</strong> &rarr; select <strong>Telegram</strong>.<br>
+        3. Turn ON <strong>Time Sensitive Notifications</strong> so Nana's calls break through even when your iPhone is in Focus mode.
+      </div>
+      <div class="guide-step">
+        <strong>Step 4: Keep Banner Persistent on Screen</strong><br>
+        Open iPhone <strong>Settings</strong> &rarr; <strong>Notifications</strong> &rarr; <strong>Telegram</strong> &rarr; set <strong>Banner Style</strong> to <strong>Persistent</strong> so Nana's call banner stays on your screen until you tap it.
+      </div>
+    </div>
+
+    <!-- Android Guide -->
+    <div id="guide-content-android" class="guide-box" style="display:none;">
+      <div class="guide-step">
+        <strong>Step 1: Link the Telegram Bot</strong><br>
+        Tap the blue <em>"1-Tap Setup: Connect Telegram Alerts"</em> button on the main screen and tap <strong>Start</strong> at the bottom of Telegram. (You should immediately get a "✅ Connected!" reply).
+      </div>
+      <div class="guide-step">
+        <strong>Step 2: Set a Long Ringtone for Nana's Bot Only</strong><br>
+        1. Inside the <strong>NanaPhone Bot</strong> chat in Telegram, tap the Bot's name at the top.<br>
+        2. Tap <strong>Notifications</strong> &rarr; <strong>Customize</strong> &rarr; toggle <strong>Enable Custom Notifications</strong> ON.<br>
+        3. Tap <strong>Sound</strong> and choose a long phone ringtone (rather than a short message beep).<br>
+        4. Set <strong>Vibrate</strong> to <strong>Long</strong> and <strong>Priority / Importance</strong> to <strong>Urgent (Pop on screen)</strong>.
+      </div>
+      <div class="guide-step">
+        <strong>Step 3: Override "Do Not Disturb" (Pixel / Samsung / OnePlus)</strong><br>
+        1. Long-press the <strong>Telegram</strong> app icon on your phone &rarr; tap <strong>App Info (i)</strong> &rarr; <strong>Notifications</strong> &rarr; <strong>Notification Categories</strong>.<br>
+        2. Tap the custom category created for <strong>NanaPhone Bot</strong>.<br>
+        3. Toggle ON <strong>Override Do Not Disturb</strong> so Nana's calls still ring even if your phone is on DND.
+      </div>
+      <div class="guide-step">
+        <strong>Step 4: Disable Battery Optimization for Instant Ringing</strong><br>
+        In Telegram <strong>App Info</strong> &rarr; <strong>App Battery Usage</strong>, select <strong>Unrestricted</strong> so Android never delays Nana's incoming call alerts when your screen is off.
+      </div>
+    </div>
+
+    <button class="cancel-btn" style="background:#22c55e; color:#000; padding:12px 40px; font-size:1.35rem;" onclick="closePhoneGuideModal()">✔ Got It</button>
   </div>
 
   <!-- 1. NANA'S MAIN GRID SCREEN -->
@@ -344,9 +454,10 @@
       <span style="font-weight:900; color:#38bdf8;">Read Messages ➔</span>
     </div>
     
-    <div id="missed-call-banner" onclick="callBackMissedCall()">
-      <div class="missed-text" id="missed-call-text">Missed call!</div>
-      <button class="missed-btn">📞 CALL BACK</button>
+    <!-- Per-Person Missed Calls Summary Bar -->
+    <div id="missed-call-banner">
+      <div class="missed-label">📞 Missed Calls — Tap to Call Back:</div>
+      <div id="missed-chips-container" class="missed-chips-row"></div>
     </div>
 
     <div id="family-grid" class="family-grid"></div>
@@ -367,7 +478,7 @@
     <button class="giant-btn" style="pointer-events:none;">📞 TOUCH ANYWHERE<br>TO ANSWER</button>
   </div>
 
-  <!-- 4. ACTIVE VIDEO CALL SCREEN (Custom Zero-Iframe Video Layout) -->
+  <!-- 4. ACTIVE VIDEO CALL SCREEN -->
   <div id="call-screen" class="screen" onclick="resetIdleTimer()">
     <div id="call-status-pill">🟢 Connected — Speak Normally</div>
     <div id="call-connecting-banner">📹 Connecting video...</div>
@@ -389,18 +500,21 @@
   </div>
 
   <!-- 5. FAMILY MEMBER SCREEN -->
-  <div id="family-screen" class="screen" style="justify-content: center; gap: 10px; padding: 16px;">
-    <img id="family-self-photo" src="" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 4px solid #fff;">
-    <h1 id="family-greeting" style="font-size: 1.75rem; margin: 0;">Call Nana</h1>
-    <div id="nana-presence-card" style="background:#1e293b; border:2px solid #38bdf8; border-radius:14px; padding:10px 16px; font-size:1.05rem; line-height:1.45; width:88vw; max-width:520px;">
+  <div id="family-screen" class="screen" style="justify-content: center; gap: 8px; padding: 14px;">
+    <img id="family-self-photo" src="" style="width: 84px; height: 84px; border-radius: 50%; object-fit: cover; border: 4px solid #fff;">
+    <h1 id="family-greeting" style="font-size: 1.65rem; margin: 0;">Call Nana</h1>
+    <div id="nana-presence-card" style="background:#1e293b; border:2px solid #38bdf8; border-radius:14px; padding:8px 14px; font-size:1rem; line-height:1.4; width:90vw; max-width:520px;">
       Checking tablet status...
     </div>
-    <button id="family-ring-btn" class="giant-btn" style="height: 22vh; font-size: 2.2rem;" onclick="startCallFromFamily()">📹 Ring Nana Now</button>
-    <div style="display:flex; gap:10px; width:88vw; max-width:520px;">
-      <button class="tone-btn" style="flex:1; background:#be185d; border-color:#f472b6;" onclick="sendLoveToastToNana()">❤️ Send Hug to Nana's Screen</button>
+    <button id="family-ring-btn" class="giant-btn" style="height: 20vh; font-size: 2.1rem; width: 90vw; max-width: 520px;" onclick="startCallFromFamily()">📹 Ring Nana Now</button>
+    
+    <div style="display:flex; gap:8px; width:90vw; max-width:520px;">
+      <button class="tone-btn" style="flex:1; background:#be185d; border-color:#f472b6;" onclick="sendLoveToastToNana()">❤️ Send Hug</button>
       <button class="tone-btn" style="flex:1; background:#1e293b; border-color:#facc15; color:#fef08a;" onclick="openSettingsModal()">⚙️ Tablet Settings</button>
     </div>
-    <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="width: 88vw; max-width:520px; background:#0284c7; border-color:#38bdf8;">🔔 1-Tap Setup: Connect Telegram Alerts</a>
+
+    <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="width: 90vw; max-width:520px; background:#0284c7; border-color:#38bdf8;">🔔 Step 1: 1-Tap Connect Telegram Alerts</a>
+    <button class="tone-btn" style="width: 90vw; max-width:520px; background:#0f172a; border-color:#22c55e; color:#86efac;" onclick="openPhoneGuideModal()">📱 Step 2: iPhone & Android Loud Ringtone Guide</button>
   </div>
 
   <!-- REMOTE SETTINGS MODAL -->
@@ -483,6 +597,13 @@
         <button class="opt-btn" id="set-dim-0" onclick="updateSetting('dimDelaySec', 0)">Never</button>
       </div>
     </div>
+
+    <!-- Telegram Webhook Repair Tool -->
+    <div class="settings-card">
+      <div class="settings-label"><span>🔧 Telegram Bot Sync & Webhook</span><span id="lbl-sync-status" style="font-size:0.9rem; color:#38bdf8;"></span></div>
+      <div class="settings-sub">If pressing "Start" in Telegram didn't reply, tap below to re-bind the Telegram webhook to your Google Script URL:</div>
+      <button class="opt-btn" style="width:100%; background:#0284c7; border-color:#38bdf8; color:#fff;" onclick="forceWebhookAndMemberSync()">🔄 Re-Link Telegram Webhook & Sync Contacts Now</button>
+    </div>
     
     <button class="cancel-btn" style="background:#22c55e; color:#000; padding:12px 40px; font-size:1.4rem;" onclick="closeSettingsModal()">✔ Done</button>
   </div>
@@ -525,9 +646,9 @@
     }
 
     const CONFIG = {
-      appVersion: "2.1.1",
+      appVersion: "2.2.0",
       adminPin: "1929",
-      apkFileName: "nanaphone.apk", // Placed in the same GitHub folder as index.html
+      apkFileName: "nanaphone.apk",
       dailyRoomUrl: UNLOCKED.dailyRoomUrl,
       telegramBotUsername: UNLOCKED.telegramBotUsername,
       googleScriptUrl: UNLOCKED.googleScriptUrl,
@@ -556,9 +677,13 @@
     const presenceRef = ref(db, `${basePath}/presence`);
     const bulletinRef = ref(db, `${basePath}/bulletin`);
     const settingsRef = ref(db, `${basePath}/settings`);
-    const missedCallRef = ref(db, `${basePath}/missedCall`);
+    const missedCallsMapRef = ref(db, `${basePath}/missedCalls`);
     const connectedMembersRef = ref(db, `${basePath}/connectedMembers`);
     const loveToastRef = ref(db, `${basePath}/loveToast`);
+
+    function getMemberMissedCallRef(memberId) {
+      return ref(db, `${basePath}/missedCalls/${memberId}`);
+    }
 
     function getTodayUsageRef() {
       return ref(db, `${basePath}/usage/${new Date().toISOString().split('T')[0]}`);
@@ -566,7 +691,7 @@
 
     let callObject = null;
     let pendingCallContact = null;
-    let lastMissedCaller = null;
+    let missedCallsByMember = {}; // { phil: { count: 2, timestamp: 1700000000 } }
     let confirmTimer = null;
     let ringInterval = null;
     let telegramBurstInterval = null;
@@ -596,6 +721,26 @@
       awakeBrightness: 85,
       dimDelaySec: 120,
       nightModeEnabled: true
+    };
+
+    // ========================================================================
+    // iOS & ANDROID LOUD RINGTONE GUIDE MODAL
+    // ========================================================================
+    window.openPhoneGuideModal = () => {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      switchGuideTab(isIOS ? 'ios' : 'android');
+      document.getElementById('phone-guide-modal').style.display = 'flex';
+    };
+
+    window.closePhoneGuideModal = () => {
+      document.getElementById('phone-guide-modal').style.display = 'none';
+    };
+
+    window.switchGuideTab = (os) => {
+      document.getElementById('tab-btn-ios').classList.toggle('active', os === 'ios');
+      document.getElementById('tab-btn-android').classList.toggle('active', os === 'android');
+      document.getElementById('guide-content-ios').style.display = os === 'ios' ? 'block' : 'none';
+      document.getElementById('guide-content-android').style.display = os === 'android' ? 'block' : 'none';
     };
 
     // ========================================================================
@@ -646,7 +791,6 @@
     };
 
     window.adminExecuteAction = (action) => {
-      // Resolve nanaphone.apk in the same folder as index.html on GitHub Pages
       const baseFolderUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/');
       const apkDownloadUrl = `${baseFolderUrl}${CONFIG.apkFileName}?t=${Date.now()}`;
 
@@ -703,7 +847,6 @@
       });
     }
 
-    // Also report battery status every 2 minutes even when idle
     if (role === 'nana') {
       setTimeout(recordHeartbeat, 3000);
       setInterval(() => {
@@ -734,8 +877,10 @@
         battText = ` • ${icon} (${latestPresenceData.batteryLevel}%)`;
       }
 
-      const remainingQuota = Math.max(0, CONFIG.dailyMinuteQuota - todayMinutesUsed);
-      const quotaLine = `<span style="color:#94a3b8; font-size:0.9rem;">⏱️ Daily video quota: ${remainingQuota}m left</span>`;
+      const isConnectedToTelegram = connectedMemberIds.includes(activeFamilyMember.id);
+      const tgStatusLine = isConnectedToTelegram
+        ? `<span style="color:#4ade80; font-size:0.9rem;">✅ Your Telegram alerts are connected</span>`
+        : `<span style="color:#fbbf24; font-size:0.9rem;">⚠️ Tap "Step 1: Connect Telegram" below so Nana can call you</span>`;
 
       const st = latestCallData?.status || 'idle';
       if (st !== 'idle') {
@@ -746,13 +891,13 @@
           ? `🔴 <strong>On a video call with ${withName}</strong>`
           : `🟡 <strong>Ringing (${withName})</strong>`;
         card.style.borderColor = '#f87171';
-        card.innerHTML = `${statusLabel}<br><span style="color:#cbd5e1; font-size:0.95rem;">${touchText}${battText}</span><br>${quotaLine}`;
+        card.innerHTML = `${statusLabel}<br><span style="color:#cbd5e1; font-size:0.92rem;">${touchText}${battText}</span><br>${tgStatusLine}`;
         if (ringBtn && otherId && otherId !== activeFamilyMember.id) {
           ringBtn.disabled = true;
         }
       } else {
         card.style.borderColor = '#22c55e';
-        card.innerHTML = `🟢 <strong>Nana is available</strong><br><span style="color:#cbd5e1; font-size:0.95rem;">${touchText}${battText}</span><br>${quotaLine}`;
+        card.innerHTML = `🟢 <strong>Nana is available</strong><br><span style="color:#cbd5e1; font-size:0.92rem;">${touchText}${battText}</span><br>${tgStatusLine}`;
         if (ringBtn) ringBtn.disabled = false;
       }
     }
@@ -789,7 +934,7 @@
     }
 
     // ========================================================================
-    // DYNAMIC CONNECTED CONTACTS SYNC (Strict Filter: Connected Members Only)
+    // DYNAMIC CONNECTED CONTACTS & AUTO-WEBHOOK HEALING
     // ========================================================================
     onValue(connectedMembersRef, (snap) => {
       const val = snap.val();
@@ -801,6 +946,7 @@
         connectedMemberIds = [];
       }
       if (role === 'nana') renderContacts(connectedMemberIds);
+      if (role === 'family') updateFamilyPresenceBanner();
     });
 
     async function syncConnectedFamilyFromTelegram() {
@@ -808,14 +954,90 @@
         const res = await fetch(CONFIG.googleScriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ secret: SERVICE_TOKEN, action: "sync" })
+          body: JSON.stringify({
+            secret: SERVICE_TOKEN,
+            action: "sync",
+            webhookUrl: CONFIG.googleScriptUrl
+          })
         });
         const data = await res.json();
         if (data.ok && Array.isArray(data.connected)) {
           connectedMemberIds = data.connected;
           if (role === 'nana') renderContacts(connectedMemberIds);
+          if (role === 'family') updateFamilyPresenceBanner();
         }
-      } catch (e) {}
+        return data;
+      } catch (e) {
+        return { ok: false, error: e.toString() };
+      }
+    }
+
+    window.forceWebhookAndMemberSync = async () => {
+      const lbl = document.getElementById('lbl-sync-status');
+      if (lbl) lbl.innerText = "Syncing...";
+      const res = await syncConnectedFamilyFromTelegram();
+      if (res && res.ok) {
+        if (lbl) lbl.innerText = `✅ Linked (${(res.connected || []).length} connected)`;
+        alert(`Webhook linked! Connected family members: ${(res.connected || []).join(", ") || "None yet - tap Step 1 in Telegram now!"}`);
+      } else {
+        if (lbl) lbl.innerText = "⚠️ Check Script Deployment";
+        alert("Could not reach Google Apps Script. Make sure you deployed a New Version with 'Who has access: Anyone'.");
+      }
+    };
+
+    // ========================================================================
+    // PER-PERSON MISSED CALLS TRACKING & INDIVIDUAL CLEARING
+    // ========================================================================
+    async function incrementMissedCallForMember(memberId) {
+      await runTransaction(getMemberMissedCallRef(memberId), (current) => {
+        const prevCount = current && current.count ? Number(current.count) : 0;
+        return {
+          count: prevCount + 1,
+          timestamp: Date.now()
+        };
+      });
+    }
+
+    async function clearMissedCallsForMember(memberId) {
+      if (!memberId) return;
+      await remove(getMemberMissedCallRef(memberId));
+    }
+
+    onValue(missedCallsMapRef, (snap) => {
+      missedCallsByMember = snap.val() || {};
+      renderMissedCallsBanner();
+      if (role === 'nana') renderContacts(connectedMemberIds);
+    });
+
+    function renderMissedCallsBanner() {
+      const banner = document.getElementById('missed-call-banner');
+      const chipsContainer = document.getElementById('missed-chips-container');
+      if (!banner || !chipsContainer) return;
+
+      chipsContainer.innerHTML = "";
+      const entries = Object.entries(missedCallsByMember)
+        .filter(([id, info]) => info && info.count > 0)
+        .sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+
+      if (entries.length === 0) {
+        banner.style.display = 'none';
+        return;
+      }
+
+      entries.forEach(([memberId, info]) => {
+        const member = CONFIG.familyMembers.find(m => m.id === memberId);
+        if (!member) return;
+        const timeStr = info.timestamp
+          ? new Date(info.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '';
+        const btn = document.createElement('button');
+        btn.className = 'missed-chip-btn';
+        btn.innerText = `📞 Call ${member.name} (${info.count} missed${timeStr ? ' • ' + timeStr : ''})`;
+        btn.onclick = () => startCallFromNana(member);
+        chipsContainer.appendChild(btn);
+      });
+
+      banner.style.display = 'flex';
     }
 
     function renderContacts(connectedList = []) {
@@ -828,17 +1050,27 @@
 
       if (displayList.length === 0) {
         grid.innerHTML = `
-          <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; color:#94a3b8; font-size:1.8rem; font-weight:700;">
-            <p>⏳ Waiting for family members to connect their Telegram alerts...</p>
+          <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; color:#94a3b8; font-size:1.7rem; font-weight:700; padding:20px;">
+            <p style="margin:0 0 12px 0;">⏳ Waiting for family members to connect their Telegram alerts...</p>
+            <button class="tone-btn" style="font-size:1.2rem; background:#0284c7; border-color:#38bdf8;" onclick="syncConnectedFamilyFromTelegram()">🔄 Check for Connected Family Now</button>
           </div>
         `;
         return;
       }
 
       displayList.forEach(member => {
+        const missedInfo = missedCallsByMember[member.id];
+        const missedCount = missedInfo && missedInfo.count ? Number(missedInfo.count) : 0;
+
         const card = document.createElement('div');
-        card.className = 'family-card';
+        card.className = missedCount > 0 ? 'family-card has-missed' : 'family-card';
+
+        const badgeHtml = missedCount > 0
+          ? `<div class="missed-card-badge">📞 ${missedCount} MISSED</div>`
+          : '';
+
         card.innerHTML = `
+          ${badgeHtml}
           <div class="photo-wrapper"><img src="${member.photo}" onerror="this.src='${member.fallback}'"></div>
           <div class="contact-nameplate">${member.name}</div>
         `;
@@ -852,33 +1084,6 @@
       if (role === 'family') updateFamilyPresenceBanner();
     });
 
-    // Missed Call Management
-    onValue(missedCallRef, (snap) => {
-      const data = snap.val();
-      const banner = document.getElementById('missed-call-banner');
-      if (!data || !data.callerId) {
-        banner.style.display = 'none';
-        lastMissedCaller = null;
-        return;
-      }
-      const member = CONFIG.familyMembers.find(m => m.id === data.callerId);
-      if (member) {
-        lastMissedCaller = member;
-        const timeString = data.timestamp
-          ? new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          : '';
-        document.getElementById('missed-call-text').innerText = `📞 Missed call from ${member.name} ${timeString ? '(' + timeString + ')' : ''}`;
-        banner.style.display = 'flex';
-      }
-    });
-
-    window.callBackMissedCall = async () => {
-      if (!lastMissedCaller) return;
-      const target = lastMissedCaller;
-      await remove(missedCallRef);
-      startCallFromNana(target);
-    };
-
     // Confirm Call Modal Logic
     window.openCallConfirmation = (member) => {
       pendingCallContact = member;
@@ -886,6 +1091,16 @@
       const img = document.getElementById('confirm-photo');
       img.onerror = () => { img.src = member.fallback; };
       img.src = member.photo;
+
+      const missedInfo = missedCallsByMember[member.id];
+      const missedNoteEl = document.getElementById('confirm-missed-note');
+      if (missedInfo && missedInfo.count > 0) {
+        missedNoteEl.innerText = `📞 ${member.name} tried calling you ${missedInfo.count} ${missedInfo.count === 1 ? 'time' : 'times'}`;
+        missedNoteEl.style.display = 'block';
+      } else {
+        missedNoteEl.style.display = 'none';
+      }
+
       document.getElementById('confirm-modal').style.display = 'flex';
 
       let seconds = 15;
@@ -1148,7 +1363,7 @@
       }
     }
 
-    // Custom WebRTC Video Engine (Zero Rotate Prompts!)
+    // Custom WebRTC Video Engine
     async function joinDailyRoom() {
       if (callObject) return;
 
@@ -1232,7 +1447,9 @@
       showScreen('outbound-screen');
       speakMsg(`Calling ${member.spokenName} now. Please wait.`);
 
-      await remove(missedCallRef);
+      // Clear missed calls for THIS specific person because Nana is calling them back
+      await clearMissedCallsForMember(member.id);
+
       await set(callStateRef, { status: 'calling_family', callerId: 'nana', targetId: member.id, timestamp: Date.now() });
       await joinDailyRoom();
       startTelegramRingBurst(member);
@@ -1242,7 +1459,7 @@
       outboundTimeout = setTimeout(async () => {
         if (currentState === 'calling_family') {
           speakMsg(`Sorry, ${member.spokenName} could not answer right now.`);
-          await set(missedCallRef, { callerId: member.id, timestamp: Date.now() });
+          await incrementMissedCallForMember(member.id);
           await endCall();
         }
       }, ringTimeoutMs);
@@ -1281,10 +1498,13 @@
     window.answerCallAsNana = async () => {
       clearTimeout(autoAnswerTimeout);
       stopRingingUI();
-      await remove(missedCallRef);
+      const activeCallerId = latestCallData?.callerId;
+      if (activeCallerId && activeCallerId !== 'nana') {
+        await clearMissedCallsForMember(activeCallerId);
+      }
       await set(callStateRef, {
         status: 'connected',
-        callerId: latestCallData?.callerId || 'family',
+        callerId: activeCallerId || 'family',
         targetId: 'nana',
         timestamp: Date.now()
       });
@@ -1371,7 +1591,7 @@
           clearTimeout(incomingRingTimeout);
           incomingRingTimeout = setTimeout(async () => {
             if (currentState === 'ringing_nana') {
-              await set(missedCallRef, { callerId: caller.id, timestamp: Date.now() });
+              await incrementMissedCallForMember(caller.id);
               await endCall();
             }
           }, ringTimeoutMs);
@@ -1382,6 +1602,12 @@
           clearTimeout(autoAnswerTimeout);
           stopTelegramRingBurst();
           stopRingingUI();
+
+          // Clear missed calls for the person Nana is now connected with!
+          const connectedPartnerId = data.callerId === 'nana' ? data.targetId : data.callerId;
+          if (connectedPartnerId) {
+            clearMissedCallsForMember(connectedPartnerId);
+          }
 
           if (window.AndroidBridge && window.AndroidBridge.updateTabletHardwareSettings) {
             window.AndroidBridge.updateTabletHardwareSettings(
@@ -1441,9 +1667,11 @@
       document.getElementById('in-call-volume-bar').style.display = 'flex';
       document.getElementById('telegram-link-btn').href = `https://t.me/${CONFIG.telegramBotUsername}?start=${activeFamilyMember.id}`;
       showScreen('family-screen');
+      syncConnectedFamilyFromTelegram();
 
       if (autoAnswerFromTelegram) {
         window.history.replaceState({}, document.title, `${window.location.pathname}?role=family&id=${encodeURIComponent(activeFamilyMember.id)}&key=${encodeURIComponent(SERVICE_TOKEN)}`);
+        clearMissedCallsForMember(activeFamilyMember.id);
         set(callStateRef, { status: 'connected', callerId: 'nana', targetId: activeFamilyMember.id, timestamp: Date.now() });
         showScreen('call-screen');
         joinDailyRoom();
