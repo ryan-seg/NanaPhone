@@ -34,12 +34,18 @@
       width: 100%; display: flex; justify-content: space-between; align-items: center;
       padding: 0 8px; height: 7vh;
     }
-    .header-title { font-size: 2rem; font-weight: 900; color: #ffffff; }
+    .header-title { font-size: 1.95rem; font-weight: 900; color: #ffffff; }
     .header-pills { display: flex; gap: 10px; align-items: center; }
     .pill, .clock-pill {
-      font-size: 1.9rem; font-weight: 900; color: #fef08a;
-      background: #1e293b; padding: 6px 20px; border-radius: 16px;
-      border: 2px solid #475569; cursor: pointer;
+      font-size: 1.8rem; font-weight: 900; color: #fef08a;
+      background: #1e293b; padding: 6px 18px; border-radius: 16px;
+      border: 3px solid #475569; cursor: pointer;
+    }
+    .radio-pill {
+      font-size: 1.8rem; font-weight: 900; color: #ffffff;
+      background: #0284c7; padding: 6px 22px; border-radius: 16px;
+      border: 3px solid #ffffff; cursor: pointer;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.6);
     }
     .gear-pill {
       font-size: 1.15rem; font-weight: 800; color: #94a3b8;
@@ -122,6 +128,38 @@
       font-size: 2rem; font-weight: 900; color: #fef08a;
       letter-spacing: 0.5px; line-height: 1.1;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* Senior Radio Button Styles */
+    .giant-radio-btn {
+      width: 90vw;
+      max-width: 650px;
+      height: 28vh;
+      font-size: 3rem;
+      font-weight: 900;
+      color: #ffffff;
+      background: #1e293b;
+      border: 8px solid #475569;
+      border-radius: 36px;
+      cursor: pointer;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      transition: transform 0.1s, border-color 0.1s, background 0.1s;
+    }
+    .giant-radio-btn:active { transform: scale(0.97); }
+    .giant-radio-btn.playing {
+      background: #064e3b;
+      border-color: #22c55e;
+      color: #fef08a;
+      animation: pulseRadioGlow 2s infinite;
+    }
+    @keyframes pulseRadioGlow {
+      0%, 100% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.5); }
+      50% { box-shadow: 0 0 35px rgba(34, 197, 94, 0.9); }
     }
 
     /* Confirm Call Modal */
@@ -375,7 +413,7 @@
     <button class="cancel-btn" style="background:#2563eb; padding: 12px 36px; font-size: 1.5rem;" onclick="closeFamilyBulletin()">Close</button>
   </div>
 
-  <!-- iOS & Android Loud Ringtone Setup Guide Modal -->
+  <!-- iOS & Android Loud Ringtone Guide Modal -->
   <div id="phone-guide-modal">
     <h2 style="font-size: 1.65rem; color: #fef08a; margin: 0 0 6px 0;">🔔 Make Nana's Calls Ring Loudly</h2>
     <p style="font-size: 0.95rem; color: #cbd5e1; margin: 0 0 14px 0; max-width: 600px;">
@@ -390,48 +428,36 @@
     <div id="guide-content-ios" class="guide-box">
       <div class="guide-step">
         <strong>Step 1: Link the Telegram Bot</strong><br>
-        Tap the blue <em>"Step 1: 1-Tap Connect Telegram Alerts"</em> button on the main screen and tap <strong>Start</strong> at the bottom of Telegram. (You should immediately get a "✅ Connected!" reply).
+        Tap the blue <em>"1. Connect Telegram"</em> button on the main screen and tap <strong>Start</strong> at the bottom of Telegram.
       </div>
       <div class="guide-step">
         <strong>Step 2: Set a Long Ringtone in Telegram (Crucial!)</strong><br>
         1. Inside the <strong>NanaPhone Bot</strong> chat in Telegram, tap the Bot's name/photo at the very top.<br>
         2. Tap <strong>Mute (Bell Icon)</strong> &rarr; <strong>Customize</strong>.<br>
         3. Toggle <strong>Enable Notifications</strong> ON.<br>
-        4. Tap <strong>Sound</strong> and pick a long melody (like <em>Opening</em>, <em>Radiate</em>, or upload a custom 25-second ringtone MP3) instead of a short 1-second "Ding".
+        4. Tap <strong>Sound</strong> and pick a long melody instead of a short 1-second "Ding".
       </div>
       <div class="guide-step">
         <strong>Step 3: Bypass iPhone "Focus / Do Not Disturb"</strong><br>
-        1. Open your iPhone <strong>Settings</strong> &rarr; <strong>Focus</strong> &rarr; <strong>Do Not Disturb</strong> (and <em>Sleep</em>).<br>
-        2. Tap <strong>Apps</strong> &rarr; <strong>Add Apps</strong> &rarr; select <strong>Telegram</strong>.<br>
-        3. Turn ON <strong>Time Sensitive Notifications</strong> so Nana's calls break through even when your iPhone is in Focus mode.
-      </div>
-      <div class="guide-step">
-        <strong>Step 4: Keep Banner Persistent on Screen</strong><br>
-        Open iPhone <strong>Settings</strong> &rarr; <strong>Notifications</strong> &rarr; <strong>Telegram</strong> &rarr; set <strong>Banner Style</strong> to <strong>Persistent</strong> so Nana's call banner stays on your screen until you tap it.
+        1. Open your iPhone <strong>Settings</strong> &rarr; <strong>Focus</strong> &rarr; <strong>Do Not Disturb</strong>.<br>
+        2. Tap <strong>Apps</strong> &rarr; <strong>Add Apps</strong> &rarr; select <strong>Telegram</strong> and turn ON <strong>Time Sensitive Notifications</strong>.
       </div>
     </div>
 
     <div id="guide-content-android" class="guide-box" style="display:none;">
       <div class="guide-step">
         <strong>Step 1: Link the Telegram Bot</strong><br>
-        Tap the blue <em>"Step 1: 1-Tap Connect Telegram Alerts"</em> button on the main screen and tap <strong>Start</strong> at the bottom of Telegram. (You should immediately get a "✅ Connected!" reply).
+        Tap the blue <em>"1. Connect Telegram"</em> button on the main screen and tap <strong>Start</strong> at the bottom of Telegram.
       </div>
       <div class="guide-step">
         <strong>Step 2: Set a Long Ringtone for Nana's Bot Only</strong><br>
         1. Inside the <strong>NanaPhone Bot</strong> chat in Telegram, tap the Bot's name at the top.<br>
         2. Tap <strong>Notifications</strong> &rarr; <strong>Customize</strong> &rarr; toggle <strong>Enable Custom Notifications</strong> ON.<br>
-        3. Tap <strong>Sound</strong> and choose a long phone ringtone (rather than a short message beep).<br>
-        4. Set <strong>Vibrate</strong> to <strong>Long</strong> and <strong>Priority / Importance</strong> to <strong>Urgent (Pop on screen)</strong>.
+        3. Set <strong>Priority</strong> to <strong>Urgent (Pop on screen)</strong>.
       </div>
       <div class="guide-step">
-        <strong>Step 3: Override "Do Not Disturb" (Pixel / Samsung / OnePlus)</strong><br>
-        1. Long-press the <strong>Telegram</strong> app icon on your phone &rarr; tap <strong>App Info (i)</strong> &rarr; <strong>Notifications</strong> &rarr; <strong>Notification Categories</strong>.<br>
-        2. Tap the custom category created for <strong>NanaPhone Bot</strong>.<br>
-        3. Toggle ON <strong>Override Do Not Disturb</strong> so Nana's calls still ring even if your phone is on DND.
-      </div>
-      <div class="guide-step">
-        <strong>Step 4: Disable Battery Optimization for Instant Ringing</strong><br>
-        In Telegram <strong>App Info</strong> &rarr; <strong>App Battery Usage</strong>, select <strong>Unrestricted</strong> so Android never delays Nana's incoming call alerts when your screen is off.
+        <strong>Step 3: Override "Do Not Disturb"</strong><br>
+        Long-press the <strong>Telegram</strong> app icon &rarr; <strong>App Info</strong> &rarr; <strong>Notifications</strong> &rarr; select the custom category and toggle ON <strong>Override Do Not Disturb</strong>.
       </div>
     </div>
 
@@ -443,8 +469,9 @@
     <div class="header-bar">
       <div class="header-title">Tap a photo to call family</div>
       <div class="header-pills">
+        <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM Radio</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.3</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.5</div>
       </div>
     </div>
 
@@ -461,6 +488,40 @@
     <div id="family-grid" class="family-grid"></div>
   </div>
 
+  <!-- 1B. NANA'S SENIOR RADIO SCREEN (Super Easy 1-Tap Classic FM + Volume + Back) -->
+  <div id="radio-screen" class="screen" style="background:#090d16; justify-content:space-between; padding:52px 18px 48px 18px;">
+    <!-- Giant Unmissable Top Return Bar -->
+    <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
+      <button class="cancel-btn" style="background:#22c55e; color:#000; border-color:#ffffff; font-size:1.9rem; padding:14px 32px;" onclick="closeRadioScreen()">
+        🏠 Back to Family Calls
+      </button>
+      <div id="radio-status-label" style="font-size:1.7rem; font-weight:900; color:#fef08a;">
+        Radio Off
+      </div>
+    </div>
+
+    <!-- Center Giant Play / Stop Button -->
+    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; width:100%;">
+      <button class="giant-radio-btn" id="btn-classicfm" onclick="toggleClassicFM()">
+        <span style="font-size:4.5rem;">🎻</span>
+        <span>Classic FM Radio</span>
+        <span id="radio-action-prompt" style="font-size:1.25rem; font-weight:700; color:#cbd5e1;">(Tap to Turn On)</span>
+      </button>
+    </div>
+
+    <!-- Bottom Giant Volume & Turn Off Bar for Nana -->
+    <div style="width:100%; background:#1e293b; border:3px solid #475569; border-radius:24px; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:14px;">
+      <div style="font-size:1.4rem; font-weight:900; color:#fef08a;">🔊 Volume: <span id="nana-vol-display">85%</span></div>
+      <div style="display:flex; gap:12px;">
+        <button class="vol-step-btn" style="font-size:1.6rem; padding:12px 24px;" onclick="adjustNanaRadioVolume(-15)">🔉 Quieter</button>
+        <button class="vol-step-btn" style="font-size:1.6rem; padding:12px 24px; background:#0284c7;" onclick="adjustNanaRadioVolume(15)">🔊 Louder</button>
+      </div>
+      <button class="cancel-btn" style="font-size:1.4rem; padding:12px 28px; background:#7f1d1d; border-color:#f87171;" onclick="stopRadioAndSync(true)">⏹️ Stop Radio</button>
+    </div>
+
+    <audio id="nana-radio-stream" preload="none"></audio>
+  </div>
+
   <!-- 2. OUTBOUND CALL SCREEN -->
   <div id="outbound-screen" class="screen" style="background:#1e1b4b; justify-content:center;">
     <img id="outbound-photo" src="" style="width:190px; height:190px; border-radius:50%; border:7px solid #fff; margin-bottom:14px; object-fit:cover;">
@@ -469,7 +530,7 @@
     <button class="cancel-btn" onclick="endCall()">✖ Cancel Call</button>
   </div>
 
-  <!-- 3. INCOMING RING SCREEN (Touching ANYWHERE on the screen answers!) -->
+  <!-- 3. INCOMING RING SCREEN -->
   <div id="ringing-screen" class="screen" style="background:#064e3b; justify-content:center; cursor:pointer;" onclick="answerCallAsNana()">
     <img id="caller-photo" src="" style="width:165px; height:165px; border-radius:50%; border:6px solid #fff; margin-bottom:10px; object-fit:cover;">
     <h1 id="caller-title" style="font-size: 3.8rem; color: #fef08a; margin: 0 0 14px 0;">Incoming Call!</h1>
@@ -498,24 +559,42 @@
   </div>
 
   <!-- 5. FAMILY MEMBER SCREEN -->
-  <div id="family-screen" class="screen" style="justify-content: center; gap: 8px; padding: 14px;">
-    <img id="family-self-photo" src="" style="width: 84px; height: 84px; border-radius: 50%; object-fit: cover; border: 4px solid #fff;">
-    <h1 id="family-greeting" style="font-size: 1.65rem; margin: 0;">Call Nana</h1>
-    <div id="nana-presence-card" style="background:#1e293b; border:2px solid #38bdf8; border-radius:14px; padding:8px 14px; font-size:1rem; line-height:1.4; width:90vw; max-width:520px;">
+  <div id="family-screen" class="screen" style="justify-content: flex-start; gap: 8px; padding: 14px; overflow-y: auto;">
+    <div style="display:flex; align-items:center; gap:12px; margin-top:4px;">
+      <img id="family-self-photo" src="" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid #fff;">
+      <h1 id="family-greeting" style="font-size: 1.5rem; margin: 0;">Call Nana</h1>
+    </div>
+
+    <div id="nana-presence-card" style="background:#1e293b; border:2px solid #38bdf8; border-radius:14px; padding:8px 14px; font-size:0.98rem; line-height:1.4; width:92vw; max-width:540px;">
       Checking tablet status...
     </div>
-    <button id="family-ring-btn" class="giant-btn" style="height: 20vh; font-size: 2.1rem; width: 90vw; max-width: 520px;" onclick="startCallFromFamily()">📹 Ring Nana Now</button>
-    
-    <div style="display:flex; gap:8px; width:90vw; max-width:520px;">
-      <button class="tone-btn" style="flex:1; background:#be185d; border-color:#f472b6;" onclick="sendLoveToastToNana()">❤️ Send Hug</button>
-      <button class="tone-btn" style="flex:1; background:#1e293b; border-color:#facc15; color:#fef08a;" onclick="openSettingsModal()">⚙️ Tablet Settings</button>
+
+    <button id="family-ring-btn" class="giant-btn" style="height: 16vh; min-height: 95px; font-size: 2rem; width: 92vw; max-width: 540px; border-width: 6px; border-radius: 28px;" onclick="startCallFromFamily()">📹 Ring Nana Now</button>
+
+    <!-- REMOTE RADIO CONTROLLER FOR FAMILY -->
+    <div class="settings-card" style="width:92vw; max-width:540px; margin-bottom:2px; padding:10px 12px;">
+      <div class="settings-label" style="font-size:1.05rem;">
+        <span>🎻 Put Classic FM Radio On For Nana</span>
+        <span id="lbl-remote-ent-status" style="color:#4ade80; font-size:0.92rem;">Off</span>
+      </div>
+      <div class="opt-row" style="margin-bottom:6px;">
+        <button class="opt-btn" id="fam-ent-classicfm" onclick="remoteSetEntertainment('classicfm')">🎻 Turn Classic FM ON</button>
+        <button class="opt-btn" style="background:#7f1d1d; border-color:#f87171; color:#fff;" onclick="remoteSetEntertainment('off')">⏹️ Turn Radio Off</button>
+      </div>
     </div>
 
-    <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="width: 90vw; max-width:520px; background:#0284c7; border-color:#38bdf8;">🔔 Step 1: 1-Tap Connect Telegram Alerts</a>
-    <button class="tone-btn" style="width: 90vw; max-width:520px; background:#0f172a; border-color:#22c55e; color:#86efac;" onclick="openPhoneGuideModal()">📱 Step 2: iPhone & Android Loud Ringtone Guide</button>
+    <div style="display:flex; gap:8px; width:92vw; max-width:540px;">
+      <button class="tone-btn" style="flex:1; background:#be185d; border-color:#f472b6;" onclick="sendLoveToastToNana()">❤️ Send Hug</button>
+      <button class="tone-btn" style="flex:1; background:#1e293b; border-color:#facc15; color:#fef08a;" onclick="openSettingsModal()">⚙️ Volume & Settings</button>
+    </div>
+
+    <div style="display:flex; gap:8px; width:92vw; max-width:540px;">
+      <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="flex:1; background:#0284c7; border-color:#38bdf8;">🔔 1. Connect Telegram</a>
+      <button class="tone-btn" style="flex:1; background:#0f172a; border-color:#22c55e; color:#86efac;" onclick="openPhoneGuideModal()">📱 2. Ringtone Guide</button>
+    </div>
   </div>
 
-  <!-- 6. FAMILY PICKUP CONFIRMATION SCREEN (Prevents Telegram Preview Bot from Auto-Answering!) -->
+  <!-- 6. FAMILY PICKUP CONFIRMATION SCREEN -->
   <div id="family-pickup-screen" class="screen" style="background:#064e3b; justify-content:center; gap:20px; padding:24px;">
     <h1 style="font-size: 2.6rem; color: #fef08a; margin: 0;">🚨 Nana is Calling You!</h1>
     <p style="font-size: 1.25rem; color: #e2e8f0; margin: 0;">Tap the green button below to connect your camera and microphone:</p>
@@ -529,8 +608,8 @@
     <p style="font-size: 0.95rem; color: #94a3b8; margin: 0 0 14px 0;">Settings sync instantly to Nana's tablet over Firebase.</p>
 
     <div class="settings-card">
-      <div class="settings-label"><span>🔊 Video Call Audio Volume</span><span id="lbl-call-vol">85%</span></div>
-      <div class="settings-sub">Controls Nana's speaker volume during active video conversations.</div>
+      <div class="settings-label"><span>🔊 Speaker Volume</span><span id="lbl-call-vol">85%</span></div>
+      <div class="settings-sub">Controls Nana's speaker volume during calls and radio.</div>
       <div class="opt-row">
         <button class="opt-btn" id="set-callvol-50" onclick="updateSetting('callVolume', 50)">50%</button>
         <button class="opt-btn" id="set-callvol-70" onclick="updateSetting('callVolume', 70)">70%</button>
@@ -541,7 +620,6 @@
 
     <div class="settings-card">
       <div class="settings-label"><span>🔔 Ringing Volume (Alerts)</span><span id="lbl-ring-vol">85%</span></div>
-      <div class="settings-sub">How loud the tablet rings when family calls.</div>
       <div class="opt-row">
         <button class="opt-btn" id="set-ringvol-50" onclick="updateSetting('ringVolume', 50)">50%</button>
         <button class="opt-btn" id="set-ringvol-70" onclick="updateSetting('ringVolume', 70)">70%</button>
@@ -552,7 +630,6 @@
 
     <div class="settings-card">
       <div class="settings-label"><span>🎵 Nana's Ringtone</span></div>
-      <div class="settings-sub">Tap to audition tone and update Nana's ring melody.</div>
       <div class="opt-row">
         <button class="opt-btn" id="set-tone-uk-phone" onclick="previewAndSetTone('uk-phone')">☎️ Phone</button>
         <button class="opt-btn" id="set-tone-westminster" onclick="previewAndSetTone('westminster')">🕰️ Chime</button>
@@ -563,7 +640,6 @@
 
     <div class="settings-card">
       <div class="settings-label"><span>⚡ Hands-Free Auto-Answer</span></div>
-      <div class="settings-sub">If enabled, Nana's tablet rings for 10s then answers automatically without touching the screen.</div>
       <div class="opt-row">
         <button class="opt-btn" id="set-autoans-off" onclick="updateSetting('autoAnswer', false)">👆 Tap to Answer (Normal)</button>
         <button class="opt-btn" id="set-autoans-on" onclick="updateSetting('autoAnswer', true)">⚡ Auto-Answer (10s)</button>
@@ -606,7 +682,6 @@
 
     <div class="settings-card">
       <div class="settings-label"><span>🔧 Telegram Bot Sync & Webhook</span><span id="lbl-sync-status" style="font-size:0.9rem; color:#38bdf8;"></span></div>
-      <div class="settings-sub">Flushes any stuck Telegram messages and syncs connected family members:</div>
       <button class="opt-btn" style="width:100%; background:#0284c7; border-color:#38bdf8; color:#fff;" onclick="forceWebhookAndMemberSync()">🔄 Flush Telegram Queue & Sync Contacts Now</button>
     </div>
     
@@ -651,7 +726,7 @@
     }
 
     const CONFIG = {
-      appVersion: "2.3.0",
+      appVersion: "2.5.0",
       adminPin: "1929",
       apkFileName: "nanaphone.apk",
       dailyRoomUrl: UNLOCKED.dailyRoomUrl,
@@ -670,6 +745,8 @@
       ]
     };
 
+    const CLASSIC_FM_STREAM = "https://media-ice.musicradio.com/ClassicFMMP3";
+
     const role = params.get('role') || 'nana';
     const callerId = params.get('id') || 'ryan';
     const autoAnswerFromTelegram = params.get('answer') === 'true';
@@ -685,6 +762,7 @@
     const missedCallsMapRef = ref(db, `${basePath}/missedCalls`);
     const connectedMembersRef = ref(db, `${basePath}/connectedMembers`);
     const loveToastRef = ref(db, `${basePath}/loveToast`);
+    const entertainmentRef = ref(db, `${basePath}/entertainment`);
 
     function getMemberMissedCallRef(memberId) {
       return ref(db, `${basePath}/missedCalls/${memberId}`);
@@ -695,6 +773,8 @@
     }
 
     let callObject = null;
+    let isRadioPlaying = false;
+    let latestEntState = { activeKey: "off", title: "Off" };
     let pendingCallContact = null;
     let missedCallsByMember = {};
     let confirmTimer = null;
@@ -727,6 +807,112 @@
       dimDelaySec: 120,
       nightModeEnabled: true
     };
+
+    // ========================================================================
+    // CLASSIC FM RADIO ENGINE
+    // ========================================================================
+    const radioPlayer = document.getElementById('nana-radio-stream');
+
+    window.openRadioScreen = () => {
+      showScreen('radio-screen');
+      recordHeartbeat("Opened Classic FM Radio");
+    };
+
+    window.closeRadioScreen = () => {
+      window.stopRadioAndSync(true);
+      showScreen('grid-screen');
+      recordHeartbeat("On Home Grid");
+    };
+
+    window.toggleClassicFM = async () => {
+      if (isRadioPlaying) {
+        await window.stopRadioAndSync(true);
+      } else {
+        await set(entertainmentRef, {
+          activeKey: "classicfm",
+          title: "Classic FM Radio 🎻",
+          timestamp: Date.now()
+        });
+      }
+    };
+
+    window.remoteSetEntertainment = async (key) => {
+      if (key === 'off') {
+        await set(entertainmentRef, { activeKey: "off", title: "Off", timestamp: Date.now() });
+      } else {
+        await set(entertainmentRef, { activeKey: "classicfm", title: "Classic FM Radio 🎻", timestamp: Date.now() });
+      }
+    };
+
+    window.stopRadioAndSync = async (syncToFirebase = true) => {
+      isRadioPlaying = false;
+      if (radioPlayer) {
+        radioPlayer.pause();
+        radioPlayer.removeAttribute('src');
+        radioPlayer.load();
+      }
+      const btn = document.getElementById('btn-classicfm');
+      if (btn) btn.classList.remove('playing');
+      document.getElementById('radio-action-prompt').innerText = "(Tap to Turn On)";
+      document.getElementById('radio-status-label').innerText = "Radio Off";
+
+      if (syncToFirebase) {
+        await set(entertainmentRef, { activeKey: "off", title: "Off", timestamp: Date.now() });
+      }
+    };
+
+    function startLocalRadioStream() {
+      if (!radioPlayer) return;
+      isRadioPlaying = true;
+
+      const vol = Math.min(1.0, Math.max(0.2, (Number(tabletSettings.callVolume) || 85) / 100));
+      radioPlayer.volume = vol;
+      radioPlayer.src = CLASSIC_FM_STREAM;
+      radioPlayer.play().catch(() => {});
+
+      const btn = document.getElementById('btn-classicfm');
+      if (btn) btn.classList.add('playing');
+      document.getElementById('radio-action-prompt').innerText = "Playing Live...";
+      document.getElementById('radio-status-label').innerText = "Playing Classic FM 🎻";
+      speakMsg("Playing Classic FM");
+    }
+
+    window.adjustNanaRadioVolume = async (delta) => {
+      const nextVol = Math.max(25, Math.min(100, (Number(tabletSettings.callVolume) || 85) + delta));
+      await window.updateSetting('callVolume', nextVol);
+    };
+
+    onValue(entertainmentRef, (snap) => {
+      const data = snap.val() || { activeKey: "off", title: "Off" };
+      latestEntState = data;
+      const activeKey = data.activeKey || "off";
+
+      if (role === 'family') {
+        const lbl = document.getElementById('lbl-remote-ent-status');
+        if (lbl) lbl.innerText = activeKey === 'off' ? 'Off' : 'Classic FM Playing 🎻';
+        const famBtn = document.getElementById('fam-ent-classicfm');
+        if (famBtn) famBtn.classList.toggle('selected', activeKey !== 'off');
+        updateFamilyPresenceBanner();
+      } else if (role === 'nana') {
+        if (currentState !== 'idle') return;
+
+        if (activeKey === 'off') {
+          if (isRadioPlaying) {
+            window.stopRadioAndSync(false);
+            showScreen('grid-screen');
+          }
+          return;
+        }
+
+        document.getElementById('night-dimmer').style.display = 'none';
+        if (!document.getElementById('radio-screen').classList.contains('active')) {
+          showScreen('radio-screen');
+        }
+        if (!isRadioPlaying) {
+          startLocalRadioStream();
+        }
+      }
+    });
 
     // iOS & Android Guide Modal
     window.openPhoneGuideModal = () => {
@@ -823,12 +1009,12 @@
       closeAdminPinModal();
     };
 
-    // Presence & Battery Telemetry
+    // Presence & Live Activity Telemetry
     window.resetIdleTimer = () => recordHeartbeat();
-    window.addEventListener('pointerdown', recordHeartbeat, { passive: true });
-    window.addEventListener('touchstart', recordHeartbeat, { passive: true });
+    window.addEventListener('pointerdown', () => recordHeartbeat(), { passive: true });
+    window.addEventListener('touchstart', () => recordHeartbeat(), { passive: true });
 
-    function recordHeartbeat() {
+    function recordHeartbeat(customActivity = null) {
       if (role !== 'nana') return;
       let batteryLevel = null;
       let isCharging = null;
@@ -839,15 +1025,17 @@
           isCharging = b.charging;
         } catch (e) {}
       }
-      update(presenceRef, {
+      const payload = {
         lastActive: Date.now(),
         batteryLevel: batteryLevel,
         isCharging: isCharging
-      });
+      };
+      if (customActivity) payload.lastActivity = customActivity;
+      update(presenceRef, payload);
     }
 
     if (role === 'nana') {
-      setTimeout(recordHeartbeat, 3000);
+      setTimeout(() => recordHeartbeat("Tablet Online"), 3000);
       setInterval(() => {
         if (window.AndroidBridge && window.AndroidBridge.getBatteryStatusJson) {
           try {
@@ -876,10 +1064,14 @@
         battText = ` • ${icon} (${latestPresenceData.batteryLevel}%)`;
       }
 
+      const radioStatus = (latestEntState && latestEntState.activeKey && latestEntState.activeKey !== 'off')
+        ? `<div style="color:#fef08a; font-weight:800; margin-top:2px;">🎻 Listening to Classic FM Radio</div>`
+        : `<div style="color:#94a3b8; font-size:0.9rem;">🎻 Radio: Off (On Home Screen)</div>`;
+
       const isConnectedToTelegram = connectedMemberIds.includes(activeFamilyMember.id);
       const tgStatusLine = isConnectedToTelegram
-        ? `<span style="color:#4ade80; font-size:0.9rem;">✅ Your Telegram alerts are connected</span>`
-        : `<span style="color:#fbbf24; font-size:0.9rem;">⚠️ Tap "Step 1: Connect Telegram" below so Nana can call you</span>`;
+        ? `<span style="color:#4ade80; font-size:0.88rem;">✅ Your Telegram alerts are connected</span>`
+        : `<span style="color:#fbbf24; font-size:0.88rem;">⚠️ Tap "1. Connect Telegram" below so Nana can call you</span>`;
 
       const st = latestCallData?.status || 'idle';
       if (st !== 'idle') {
@@ -890,13 +1082,13 @@
           ? `🔴 <strong>On a video call with ${withName}</strong>`
           : `🟡 <strong>Ringing (${withName})</strong>`;
         card.style.borderColor = '#f87171';
-        card.innerHTML = `${statusLabel}<br><span style="color:#cbd5e1; font-size:0.92rem;">${touchText}${battText}</span><br>${tgStatusLine}`;
+        card.innerHTML = `${statusLabel}<br><span style="color:#cbd5e1; font-size:0.9rem;">${touchText}${battText}</span><br>${tgStatusLine}`;
         if (ringBtn && otherId && otherId !== activeFamilyMember.id) {
           ringBtn.disabled = true;
         }
       } else {
         card.style.borderColor = '#22c55e';
-        card.innerHTML = `🟢 <strong>Nana is available</strong><br><span style="color:#cbd5e1; font-size:0.92rem;">${touchText}${battText}</span><br>${tgStatusLine}`;
+        card.innerHTML = `🟢 <strong>Nana is available</strong>${radioStatus}<span style="color:#cbd5e1; font-size:0.9rem;">${touchText}${battText}</span><br>${tgStatusLine}`;
         if (ringBtn) ringBtn.disabled = false;
       }
     }
@@ -1205,12 +1397,13 @@
       document.getElementById('lbl-call-vol').innerText = `${callVol}%`;
       document.getElementById('lbl-ring-vol').innerText = `${ringVol}%`;
       document.getElementById('in-call-vol-label').innerText = `${callVol}%`;
+      document.getElementById('nana-vol-display').innerText = `${callVol}%`;
       document.getElementById('lbl-ringtime').innerText = `${tabletSettings.ringDurationSec}s`;
 
+      const scaledVol = Math.min(1.0, Math.max(0.2, callVol / 100));
       const remAudio = document.getElementById('remote-audio');
-      if (remAudio && role === 'nana') {
-        remAudio.volume = Math.min(1.0, Math.max(0.2, callVol / 100));
-      }
+      if (remAudio && role === 'nana') remAudio.volume = scaledVol;
+      if (radioPlayer && role === 'nana') radioPlayer.volume = scaledVol;
 
       const highlight = (prefix, val) => {
         document.querySelectorAll(`[id^="${prefix}"]`).forEach(b => b.classList.remove('selected'));
@@ -1235,7 +1428,7 @@
         refreshSettingsUI();
 
         if (role === 'nana' && window.AndroidBridge && window.AndroidBridge.updateTabletHardwareSettings) {
-          const activeVol = (currentState === 'connected')
+          const activeVol = (currentState === 'connected' || isRadioPlaying)
             ? (tabletSettings.callVolume ?? 85)
             : (tabletSettings.ringVolume ?? 85);
 
@@ -1430,8 +1623,9 @@
       document.getElementById('local-video').srcObject = null;
     }
 
-    // Outbound Call from Nana (Stays on Outbound Screen until Family actually answers!)
     async function startCallFromNana(member) {
+      await window.stopRadioAndSync(true);
+
       currentState = 'calling_family';
       const outImg = document.getElementById('outbound-photo');
       outImg.onerror = () => { outImg.src = member.fallback; };
@@ -1455,7 +1649,6 @@
       }, ringTimeoutMs);
     }
 
-    // Human-Tap Confirmation when Family opens the Telegram Answer URL
     window.confirmFamilyPickupFromTelegram = async () => {
       await clearMissedCallsForMember(activeFamilyMember.id);
       await set(callStateRef, {
@@ -1541,7 +1734,7 @@
       }
     }
 
-    // Call State Router
+    // Call State Router (Automatically Stops Radio on Any Call!)
     onValue(callStateRef, (snap) => {
       const data = snap.val();
       if (!data) return;
@@ -1552,6 +1745,9 @@
 
       if (data.status !== 'idle') {
         document.getElementById('night-dimmer').style.display = 'none';
+        if (role === 'nana' && isRadioPlaying) {
+          window.stopRadioAndSync(true);
+        }
       }
 
       if (role === 'nana') {
@@ -1631,7 +1827,9 @@
           stopCallUsageTimer();
           stopRingingUI();
           destroyDailyRoom();
-          showScreen('grid-screen');
+          if (!isRadioPlaying) {
+            showScreen('grid-screen');
+          }
         }
       } else if (role === 'family') {
         if (data.status === 'calling_family' && data.targetId === activeFamilyMember.id) {
@@ -1673,7 +1871,6 @@
       window.syncConnectedFamilyFromTelegram();
 
       if (autoAnswerFromTelegram) {
-        // Strip &answer=true from URL bar and show the 1-tap human pickup screen (blocks Telegram preview crawler!)
         window.history.replaceState({}, document.title, `${window.location.pathname}?role=family&id=${encodeURIComponent(activeFamilyMember.id)}&key=${encodeURIComponent(SERVICE_TOKEN)}`);
         showScreen('family-pickup-screen');
       } else {
@@ -1693,7 +1890,7 @@
       document.getElementById('night-clock').innerText = timeStr;
       const hour = new Date().getHours();
       const isNightWindow = tabletSettings.nightModeEnabled && (hour >= 21 || hour < 8);
-      const canShowDimmer = isNightWindow && currentState === 'idle' && Date.now() > nightDismissedUntilMs;
+      const canShowDimmer = isNightWindow && currentState === 'idle' && !isRadioPlaying && Date.now() > nightDismissedUntilMs;
       document.getElementById('night-dimmer').style.display = canShowDimmer ? 'flex' : 'none';
     }
 
