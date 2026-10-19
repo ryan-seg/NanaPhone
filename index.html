@@ -91,14 +91,14 @@
       cursor: pointer;
     }
 
-    /* Compact Non-Overlapping Message Ticker Bar */
+    /* Smart Message Ticker Bar (Hidden unless unread messages exist & enabled) */
     .message-ticker-bar {
+      display: none;
       width: 100%;
       background: #1e293b;
-      border: 2px solid #38bdf8;
+      border: 3px solid #38bdf8;
       border-radius: 14px;
       padding: 7px 16px;
-      display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
@@ -107,6 +107,7 @@
       font-weight: 700;
       color: #e2e8f0;
       cursor: pointer;
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.25);
     }
     #ticker-preview-text {
       white-space: nowrap;
@@ -510,7 +511,7 @@
       </div>
     </div>
 
-    <!-- UNLOCKED GEAR MENU: Includes Missed Call Clear, Battery Voice Mute, Night Mode & System Tools -->
+    <!-- UNLOCKED GEAR MENU -->
     <div id="admin-actions-section" class="admin-actions-box">
       <!-- Quick Care Actions -->
       <div class="settings-card" style="width:100%; margin-bottom:4px;">
@@ -525,6 +526,17 @@
           <button class="opt-btn" onclick="muteBatteryVoiceForHours(4)">🔇 Mute Batt 4h</button>
           <button class="opt-btn" onclick="muteBatteryVoiceForHours(12)">🔇 Mute Batt 12h</button>
           <button class="opt-btn" onclick="muteBatteryVoiceForHours(24)">🔇 Mute Batt 24h</button>
+        </div>
+      </div>
+
+      <!-- Family Notes Bar Visibility Control inside Gear Menu -->
+      <div class="settings-card" style="width:100%; margin-bottom:4px;">
+        <div class="settings-label"><span>💬 Family Notes & Photos Bar</span></div>
+        <div class="settings-sub">Only appears when new unread Telegram messages arrive, or can be turned off completely.</div>
+        <div class="opt-row">
+          <button class="opt-btn" id="gear-notes-on" onclick="updateSetting('showBulletinBar', true)">💬 Show on New Notes</button>
+          <button class="opt-btn" id="gear-notes-off" onclick="updateSetting('showBulletinBar', false)">🙈 Always Hide Bar</button>
+          <button class="opt-btn" style="background:#0284c7; border-color:#fff; color:#fff;" onclick="dismissCurrentBulletinBar()">🧹 Dismiss Current Note</button>
         </div>
       </div>
 
@@ -584,7 +596,7 @@
     <h1 style="font-size: 2.2rem; color: #fef08a; margin: 0 0 6px 0;">💬 Family Messages</h1>
     <p style="font-size: 1.05rem; color: #94a3b8; margin: 0 0 14px 0;">Messages & photos from the family Telegram group</p>
     <div id="bulletin-posts-container" style="width:100%; display:flex; flex-direction:column; align-items:center;"></div>
-    <button class="cancel-btn" style="background:#2563eb; padding: 12px 36px; font-size: 1.5rem;" onclick="closeFamilyBulletin()">Close</button>
+    <button class="cancel-btn" style="background:#22c55e; color:#000; padding: 14px 40px; font-size: 1.6rem;" onclick="closeFamilyBulletin()">✔ Close & Hide Bar</button>
   </div>
 
   <!-- iOS & Android Loud Ringtone Setup Guide Modal -->
@@ -645,13 +657,14 @@
       <div class="header-pills">
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.6</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.6.1</div>
       </div>
     </div>
 
-    <div class="message-ticker-bar" onclick="openFamilyBulletin()">
-      <span id="ticker-preview-text">💬 Tap to view latest family notes & photos</span>
-      <span style="font-weight:900; color:#38bdf8; white-space:nowrap;">Read Notes ➔</span>
+    <!-- Smart Family Notes Ticker Bar (Only shown when unread notes exist & enabled) -->
+    <div id="message-ticker-bar" class="message-ticker-bar" onclick="openFamilyBulletin()">
+      <span id="ticker-preview-text">💬 New family note! Tap to view</span>
+      <span style="font-weight:900; color:#38bdf8; white-space:nowrap;">Read Note ➔</span>
     </div>
     
     <div id="missed-call-banner">
@@ -790,6 +803,17 @@
         <button class="opt-btn" onclick="muteBatteryVoiceForHours(4)">🔇 Mute 4h</button>
         <button class="opt-btn" onclick="muteBatteryVoiceForHours(12)">🔇 Mute 12h</button>
         <button class="opt-btn" onclick="muteBatteryVoiceForHours(24)">🔇 Mute 24h</button>
+      </div>
+    </div>
+
+    <!-- Family Notes & Photos Bar Control Card -->
+    <div class="settings-card">
+      <div class="settings-label"><span>💬 Family Notes & Photos Bar</span></div>
+      <div class="settings-sub">Only appears on Nana's screen when unread Telegram notes exist, or can be hidden completely.</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-notes-on" onclick="updateSetting('showBulletinBar', true)">💬 Show on New Notes</button>
+        <button class="opt-btn" id="set-notes-off" onclick="updateSetting('showBulletinBar', false)">🙈 Always Hide Bar</button>
+        <button class="opt-btn" style="background:#0284c7; border-color:#fff; color:#fff;" onclick="dismissCurrentBulletinBar()">🧹 Dismiss Current Note</button>
       </div>
     </div>
 
@@ -944,7 +968,7 @@
     }
 
     const CONFIG = {
-      appVersion: "2.6.0",
+      appVersion: "2.6.1",
       adminPin: "1929",
       apkFileName: "nanaphone.apk",
       dailyRoomUrl: UNLOCKED.dailyRoomUrl,
@@ -952,7 +976,6 @@
       googleScriptUrl: UNLOCKED.googleScriptUrl,
       firebase: { databaseURL: UNLOCKED.databaseURL },
       dailyMinuteQuota: 300,
-      // Supports up to 8 contacts cleanly in a 4x2 grid
       familyMembers: [
         { id: "phil",     name: "Phil",     spokenName: "Phil",   photo: "photos/phil.jpg",     fallback: "https://ui-avatars.com/api/?name=Phil&size=256&background=1d4ed8&color=fff&bold=true" },
         { id: "nicky-s",  name: "Nicky S",  spokenName: "Nicky",  photo: "photos/nicky-s.jpg",  fallback: "https://ui-avatars.com/api/?name=NS&size=256&background=be185d&color=fff&bold=true" },
@@ -997,6 +1020,8 @@
     let latestEntState = { activeKey: "off", title: "Off" };
     let pendingCallContact = null;
     let missedCallsByMember = {};
+    let latestBulletinPosts = {};
+    let newestBulletinTimestamp = 0;
     let confirmTimer = null;
     let ringInterval = null;
     let telegramBurstInterval = null;
@@ -1032,11 +1057,13 @@
       nightStartHour: 21,
       nightEndHour: 8,
       nightBlockCalls: false,
-      batteryVoiceMutedUntil: 0
+      batteryVoiceMutedUntil: 0,
+      showBulletinBar: true,
+      bulletinClearedAt: 0
     };
 
     // ========================================================================
-    // BATTERY VOICE MUTE & CLEAR ALL MISSED CALLS
+    // BATTERY VOICE MUTE, MISSED CALL CLEAR & BULLETIN VISIBILITY
     // ========================================================================
     window.muteBatteryVoiceForHours = async (hours) => {
       const mutedUntil = hours > 0 ? (Date.now() + hours * 3600 * 1000) : 0;
@@ -1056,14 +1083,30 @@
       if (role === 'nana') renderContacts(connectedMemberIds);
     };
 
+    window.dismissCurrentBulletinBar = async () => {
+      const now = Date.now();
+      tabletSettings.bulletinClearedAt = now;
+      updateBulletinTickerVisibility();
+      await update(settingsRef, { bulletinClearedAt: now });
+    };
+
+    function updateBulletinTickerVisibility() {
+      const bar = document.getElementById('message-ticker-bar');
+      if (!bar) return;
+      const isEnabled = tabletSettings.showBulletinBar !== false;
+      const clearedAt = Number(tabletSettings.bulletinClearedAt) || 0;
+      const hasUnread = newestBulletinTimestamp > 0 && newestBulletinTimestamp > clearedAt;
+
+      bar.style.display = (isEnabled && hasUnread) ? 'flex' : 'none';
+    }
+
     function isBatteryVoiceCurrentlyMuted() {
       return (Number(tabletSettings.batteryVoiceMutedUntil) || 0) > Date.now();
     }
 
-    // Intercept any spoken battery warning if currently muted
     window.announceBatteryWarning = (warningText) => {
       if (isBatteryVoiceCurrentlyMuted()) return;
-      if (Date.now() - lastBatterySpokenMs < 180000) return; // Don't repeat more than once every 3m
+      if (Date.now() - lastBatterySpokenMs < 180000) return;
       lastBatterySpokenMs = Date.now();
       speakMsg(warningText, true);
     };
@@ -1576,21 +1619,31 @@
       if (target) startCallFromNana(target);
     };
 
-    // Bulletin Posts
+    // Bulletin Posts & Unread Detection
     window.openFamilyBulletin = () => document.getElementById('bulletin-modal').style.display = 'flex';
-    window.closeFamilyBulletin = () => document.getElementById('bulletin-modal').style.display = 'none';
+    window.closeFamilyBulletin = async () => {
+      document.getElementById('bulletin-modal').style.display = 'none';
+      // Mark messages as read so the ticker bar hides until the next new message arrives
+      await window.dismissCurrentBulletinBar();
+    };
 
     onValue(bulletinRef, (snap) => {
-      const posts = snap.val() || {};
+      latestBulletinPosts = snap.val() || {};
       const container = document.getElementById('bulletin-posts-container');
       container.innerHTML = "";
-      const keys = Object.keys(posts).reverse().slice(0, 8);
+      const keys = Object.keys(latestBulletinPosts).reverse().slice(0, 8);
+
+      newestBulletinTimestamp = 0;
       if (keys.length > 0) {
-        const newest = posts[keys[0]];
+        const newest = latestBulletinPosts[keys[0]];
+        newestBulletinTimestamp = Number(newest.timestamp) || 1;
         document.getElementById('ticker-preview-text').innerText = `💬 ${newest.author || 'Family'}: "${newest.text || 'Sent a photo 📷'}"`;
       }
+
+      updateBulletinTickerVisibility();
+
       keys.forEach(k => {
-        const item = posts[k];
+        const item = latestBulletinPosts[k];
         const d = document.createElement('div');
         d.className = 'bulletin-post';
 
@@ -1643,6 +1696,7 @@
       tabletSettings[key] = value;
       refreshSettingsUI();
       updateClock();
+      updateBulletinTickerVisibility();
       await update(settingsRef, { [key]: value });
     };
 
@@ -1663,6 +1717,7 @@
       const ringVol = tabletSettings.ringVolume ?? tabletSettings.volume ?? 85;
       const nStart = tabletSettings.nightStartHour ?? 21;
       const nEnd = tabletSettings.nightEndHour ?? 8;
+      const showNotes = tabletSettings.showBulletinBar !== false;
 
       document.getElementById('lbl-call-vol').innerText = `${callVol}%`;
       document.getElementById('lbl-ring-vol').innerText = `${ringVol}%`;
@@ -1676,7 +1731,6 @@
       if (gWin) gWin.innerText = tabletSettings.nightModeEnabled ? winStr : "Disabled";
       if (rWin) rWin.innerText = tabletSettings.nightModeEnabled ? winStr : "Disabled";
 
-      // Update battery mute status label
       const mutedUntil = Number(tabletSettings.batteryVoiceMutedUntil) || 0;
       const muteText = mutedUntil > Date.now()
         ? `🔇 Battery Voice Muted until ${new Date(mutedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
@@ -1707,7 +1761,11 @@
       highlight('set-bright-', tabletSettings.awakeBrightness);
       highlight('set-dim-', tabletSettings.dimDelaySec);
 
-      // Night Mode highlights (Remote & Gear)
+      // Family Notes Bar toggle highlights
+      highlight('set-notes-', showNotes ? 'on' : 'off');
+      highlight('gear-notes-', showNotes ? 'on' : 'off');
+
+      // Night Mode highlights
       highlight('set-night-', tabletSettings.nightModeEnabled ? 'on' : 'off');
       highlight('gear-night-', tabletSettings.nightModeEnabled ? 'on' : 'off');
       highlight('set-nstart-', nStart);
@@ -1727,6 +1785,7 @@
         tabletSettings = { ...tabletSettings, ...remote };
         refreshSettingsUI();
         updateClock();
+        updateBulletinTickerVisibility();
 
         if (role === 'nana' && window.AndroidBridge && window.AndroidBridge.updateTabletHardwareSettings) {
           const activeVol = (currentState === 'connected' || isRadioPlaying)
@@ -2082,7 +2141,6 @@
         if (data.status === 'ringing_nana') {
           const caller = CONFIG.familyMembers.find(m => m.id === data.callerId) || CONFIG.familyMembers[0];
 
-          // If Do Not Disturb Call Blocking is active during Night Mode, log missed call silently
           if (isCurrentlyInNightWindow() && tabletSettings.nightBlockCalls) {
             incrementMissedCallForMember(caller.id);
             endCall();
@@ -2198,7 +2256,6 @@
     function speakMsg(text, isBatteryAlert = false) {
       if (!tabletSettings.voicePrompts) return;
       if (isBatteryAlert && isBatteryVoiceCurrentlyMuted()) return;
-      // Also catch any battery/charger phrase if muted
       if (isBatteryVoiceCurrentlyMuted() && /battery|charger|plug|power/i.test(text)) return;
 
       if ('speechSynthesis' in window && text) {
