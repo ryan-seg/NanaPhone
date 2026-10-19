@@ -42,7 +42,7 @@
       flex-shrink: 0;
     }
     .header-title {
-      font-size: clamp(1.35rem, 2.2vw, 1.85rem);
+      font-size: clamp(1.25rem, 2vw, 1.75rem);
       font-weight: 900;
       color: #ffffff;
       white-space: nowrap;
@@ -56,7 +56,7 @@
       flex-shrink: 0;
     }
     .pill, .clock-pill {
-      font-size: clamp(1.25rem, 2vw, 1.65rem);
+      font-size: clamp(1.2rem, 1.9vw, 1.55rem);
       font-weight: 900;
       color: #fef08a;
       background: #1e293b;
@@ -66,17 +66,44 @@
       white-space: nowrap;
       cursor: pointer;
     }
-    .radio-pill {
-      font-size: clamp(1.25rem, 2vw, 1.65rem);
+    .chat-pill {
+      position: relative;
+      font-size: clamp(1.2rem, 1.9vw, 1.55rem);
       font-weight: 900;
       color: #ffffff;
-      background: #0284c7;
+      background: #0088cc;
       padding: 6px 16px;
       border-radius: 14px;
       border: 3px solid #ffffff;
       white-space: nowrap;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.5);
+      box-shadow: 0 4px 12px rgba(0, 136, 204, 0.5);
+    }
+    .chat-unread-badge {
+      display: none;
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #dc2626;
+      color: #fef08a;
+      border: 2px solid #ffffff;
+      border-radius: 999px;
+      padding: 1px 8px;
+      font-size: 0.95rem;
+      font-weight: 900;
+      animation: pulseMissed 1.4s infinite;
+    }
+    .radio-pill {
+      font-size: clamp(1.2rem, 1.9vw, 1.55rem);
+      font-weight: 900;
+      color: #ffffff;
+      background: #047857;
+      padding: 6px 16px;
+      border-radius: 14px;
+      border: 3px solid #ffffff;
+      white-space: nowrap;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(4, 120, 87, 0.5);
     }
     .gear-pill {
       font-size: 1.05rem;
@@ -95,8 +122,8 @@
     .message-ticker-bar {
       display: none;
       width: 100%;
-      background: #1e293b;
-      border: 3px solid #38bdf8;
+      background: #0088cc;
+      border: 3px solid #ffffff;
       border-radius: 14px;
       padding: 7px 16px;
       justify-content: space-between;
@@ -104,10 +131,10 @@
       gap: 12px;
       flex-shrink: 0;
       font-size: clamp(1.05rem, 1.8vw, 1.25rem);
-      font-weight: 700;
-      color: #e2e8f0;
+      font-weight: 800;
+      color: #ffffff;
       cursor: pointer;
-      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.25);
+      box-shadow: 0 4px 14px rgba(0, 136, 204, 0.45);
     }
     #ticker-preview-text {
       white-space: nowrap;
@@ -255,6 +282,236 @@
       flex-shrink: 0;
     }
 
+    /* ======================================================================
+       SENIOR TELEGRAM CHAT INTERFACE STYLES
+       ====================================================================== */
+    #bulletin-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #0e1621; /* Authentic Telegram Dark Background */
+      z-index: 135;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 0;
+      overflow: hidden;
+    }
+    .tg-header {
+      width: 100%;
+      background: #17212b;
+      border-bottom: 3px solid #0088cc;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .tg-back-home-btn {
+      background: #22c55e;
+      color: #000000;
+      border: 3px solid #ffffff;
+      border-radius: 18px;
+      padding: 10px 22px;
+      font-size: clamp(1.25rem, 2.1vw, 1.65rem);
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .tg-header-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-align: left;
+      flex: 1;
+    }
+    .tg-avatar-circle {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: #0088cc;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 900;
+      border: 2px solid #ffffff;
+      flex-shrink: 0;
+    }
+    .tg-chat-feed {
+      width: 100%;
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .tg-bubble {
+      max-width: 82%;
+      padding: 12px 16px;
+      border-radius: 20px;
+      text-align: left;
+      position: relative;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .tg-bubble.incoming {
+      align-self: flex-start;
+      background: #182533;
+      border: 2px solid #2b5278;
+      border-bottom-left-radius: 4px;
+    }
+    .tg-bubble.outgoing {
+      align-self: flex-end;
+      background: #2b5278;
+      border: 2px solid #38bdf8;
+      border-bottom-right-radius: 4px;
+    }
+    .tg-sender-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+    }
+    .tg-sender-name {
+      font-size: 1.25rem;
+      font-weight: 900;
+      color: #38bdf8;
+    }
+    .tg-bubble.outgoing .tg-sender-name {
+      color: #fef08a;
+    }
+    .tg-msg-time {
+      font-size: 0.95rem;
+      color: #94a3b8;
+      font-weight: 700;
+    }
+    .tg-msg-text {
+      font-size: clamp(1.35rem, 2.2vw, 1.7rem);
+      line-height: 1.35;
+      color: #ffffff;
+      font-weight: 700;
+      word-wrap: break-word;
+      user-select: text;
+    }
+    .tg-speak-chip {
+      align-self: flex-start;
+      background: #0284c7;
+      color: #ffffff;
+      border: 2px solid #7dd3fc;
+      border-radius: 12px;
+      padding: 6px 14px;
+      font-size: 1.05rem;
+      font-weight: 800;
+      cursor: pointer;
+      margin-top: 2px;
+    }
+
+    /* Bottom Composer Area */
+    .tg-composer-area {
+      width: 100%;
+      background: #17212b;
+      border-top: 2px solid #2b5278;
+      padding: 10px 14px 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .tg-quick-pills {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      width: 100%;
+    }
+    .tg-quick-btn {
+      background: #1e293b;
+      color: #fef08a;
+      border: 2px solid #38bdf8;
+      border-radius: 14px;
+      padding: 8px 6px;
+      font-size: clamp(0.95rem, 1.5vw, 1.15rem);
+      font-weight: 900;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tg-quick-btn:active {
+      background: #0284c7;
+      color: #ffffff;
+      transform: scale(0.97);
+    }
+    .tg-input-row {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      align-items: center;
+    }
+    .tg-text-input {
+      flex: 1;
+      height: 56px;
+      background: #0e1621;
+      color: #ffffff;
+      border: 3px solid #64748b;
+      border-radius: 28px;
+      padding: 0 20px;
+      font-size: 1.4rem;
+      font-weight: 700;
+      outline: none;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    .tg-text-input:focus {
+      border-color: #38bdf8;
+      background: #090d16;
+    }
+    .tg-text-input::placeholder {
+      color: #94a3b8;
+    }
+    .tg-mic-btn {
+      height: 56px;
+      padding: 0 18px;
+      background: #334155;
+      color: #ffffff;
+      border: 3px solid #94a3b8;
+      border-radius: 28px;
+      font-size: 1.25rem;
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .tg-send-btn {
+      height: 56px;
+      padding: 0 26px;
+      background: #0088cc;
+      color: #ffffff;
+      border: 3px solid #ffffff;
+      border-radius: 28px;
+      font-size: 1.4rem;
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0, 136, 204, 0.5);
+    }
+    .tg-send-btn:active {
+      transform: scale(0.96);
+      background: #0284c7;
+    }
+
     /* Senior Radio Button Styles */
     .giant-radio-btn {
       width: 90vw;
@@ -335,17 +592,6 @@
     .admin-action-btn {
       padding: 12px 14px; font-size: 1.1rem; font-weight: 900;
       border-radius: 14px; border: 3px solid #fff; cursor: pointer;
-    }
-
-    /* Family Bulletin Modal */
-    #bulletin-modal {
-      display: none; position: fixed; inset: 0; background: rgba(9, 13, 22, 0.98);
-      z-index: 135; flex-direction: column; align-items: center; justify-content: flex-start;
-      padding: 30px 16px 40px 16px; overflow-y: auto;
-    }
-    .bulletin-post {
-      width: 92vw; max-width: 680px; background: #1e293b; border: 3px solid #64748b;
-      border-radius: 20px; padding: 16px; margin-bottom: 14px; text-align: left;
     }
 
     /* iOS & Android Ringtone Guide Modal */
@@ -438,7 +684,7 @@
     .settings-sub { font-size: 0.92rem; color: #94a3b8; margin-bottom: 10px; }
     .opt-row { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
     .opt-btn {
-      flex: 1; min-width: 68px; background: #0f172a; color: #e2e8f0;
+      flex: 1; min-width: 64px; background: #0f172a; color: #e2e8f0;
       border: 3px solid #475569; border-radius: 12px; padding: 10px 6px;
       font-size: 0.98rem; font-weight: 800; cursor: pointer; text-align: center;
     }
@@ -469,6 +715,14 @@
       border-radius: 18px; padding: 11px 14px; font-size: 1.02rem; font-weight: 800;
       cursor: pointer; text-decoration: none; display: inline-block;
     }
+
+    /* Smooth Screen Brightness & Idle Dimming Overlay */
+    #brightness-overlay {
+      position: fixed; inset: 0; background: #000000;
+      pointer-events: none; z-index: 88; opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+
     #night-dimmer {
       display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95);
       z-index: 90; flex-direction: column; align-items: center; justify-content: center;
@@ -477,6 +731,9 @@
   </style>
 </head>
 <body>
+
+  <!-- Smooth Software Brightness & Idle Dimming Layer -->
+  <div id="brightness-overlay"></div>
 
   <!-- Giant Warm Toast Banner -->
   <div id="love-toast-banner">❤️ Thinking of you, Nana!</div>
@@ -513,7 +770,6 @@
 
     <!-- UNLOCKED GEAR MENU -->
     <div id="admin-actions-section" class="admin-actions-box">
-      <!-- Quick Care Actions -->
       <div class="settings-card" style="width:100%; margin-bottom:4px;">
         <div class="settings-label"><span>📞 Missed Calls & Battery Voice Announcements</span></div>
         <div class="settings-sub" id="lbl-battery-mute-status">Battery Voice Status: Active</div>
@@ -529,14 +785,68 @@
         </div>
       </div>
 
+      <!-- Brightness, Dimming Level & Idle Timeout inside Gear Menu -->
+      <div class="settings-card" style="width:100%; margin-bottom:4px;">
+        <div class="settings-label">
+          <span>🔆 Brightness & Idle Dimming</span>
+          <span id="lbl-gear-bright-summary" style="color:#38bdf8; font-size:0.95rem;">85% ➔ 15% (2m)</span>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Normal (Awake) Brightness:</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button class="opt-btn" id="gear-bright-40" onclick="updateSetting('awakeBrightness', 40)">40%</button>
+          <button class="opt-btn" id="gear-bright-60" onclick="updateSetting('awakeBrightness', 60)">60%</button>
+          <button class="opt-btn" id="gear-bright-85" onclick="updateSetting('awakeBrightness', 85)">85%</button>
+          <button class="opt-btn" id="gear-bright-100" onclick="updateSetting('awakeBrightness', 100)">100%</button>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Idle Dimmed Brightness Level:</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button class="opt-btn" id="gear-dimlvl-5" onclick="updateSetting('dimBrightness', 5)">5% (Dark)</button>
+          <button class="opt-btn" id="gear-dimlvl-15" onclick="updateSetting('dimBrightness', 15)">15% (Soft)</button>
+          <button class="opt-btn" id="gear-dimlvl-30" onclick="updateSetting('dimBrightness', 30)">30% (Low)</button>
+          <button class="opt-btn" id="gear-dimlvl-50" onclick="updateSetting('dimBrightness', 50)">50% (Med)</button>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Time Until Dimming Happens:</div>
+        <div class="opt-row">
+          <button class="opt-btn" id="gear-dim-30" onclick="updateSetting('dimDelaySec', 30)">30s</button>
+          <button class="opt-btn" id="gear-dim-60" onclick="updateSetting('dimDelaySec', 60)">1m</button>
+          <button class="opt-btn" id="gear-dim-120" onclick="updateSetting('dimDelaySec', 120)">2m</button>
+          <button class="opt-btn" id="gear-dim-300" onclick="updateSetting('dimDelaySec', 300)">5m</button>
+          <button class="opt-btn" id="gear-dim-600" onclick="updateSetting('dimDelaySec', 600)">10m</button>
+          <button class="opt-btn" id="gear-dim-0" onclick="updateSetting('dimDelaySec', 0)">Never</button>
+        </div>
+      </div>
+
+      <!-- Normal Volume & Ringing Volume inside Gear Menu -->
+      <div class="settings-card" style="width:100%; margin-bottom:4px;">
+        <div class="settings-label">
+          <span>🔊 Normal Call/Radio & Ringing Volumes</span>
+          <span id="lbl-gear-vol-summary" style="color:#38bdf8; font-size:0.95rem;">Call 85% • Ring 85%</span>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Normal Speaker Volume (Calls & Classic FM Radio):</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button class="opt-btn" id="gear-callvol-30" onclick="updateSetting('callVolume', 30)">30%</button>
+          <button class="opt-btn" id="gear-callvol-50" onclick="updateSetting('callVolume', 50)">50%</button>
+          <button class="opt-btn" id="gear-callvol-70" onclick="updateSetting('callVolume', 70)">70%</button>
+          <button class="opt-btn" id="gear-callvol-85" onclick="updateSetting('callVolume', 85)">85%</button>
+          <button class="opt-btn" id="gear-callvol-100" onclick="updateSetting('callVolume', 100)">100%</button>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Incoming Call Ringing Volume:</div>
+        <div class="opt-row">
+          <button class="opt-btn" id="gear-ringvol-30" onclick="updateSetting('ringVolume', 30)">30%</button>
+          <button class="opt-btn" id="gear-ringvol-50" onclick="updateSetting('ringVolume', 50)">50%</button>
+          <button class="opt-btn" id="gear-ringvol-70" onclick="updateSetting('ringVolume', 70)">70%</button>
+          <button class="opt-btn" id="gear-ringvol-85" onclick="updateSetting('ringVolume', 85)">85%</button>
+          <button class="opt-btn" id="gear-ringvol-100" onclick="updateSetting('ringVolume', 100)">100%</button>
+        </div>
+      </div>
+
       <!-- Family Notes Bar Visibility Control inside Gear Menu -->
       <div class="settings-card" style="width:100%; margin-bottom:4px;">
-        <div class="settings-label"><span>💬 Family Notes & Photos Bar</span></div>
-        <div class="settings-sub">Only appears when new unread Telegram messages arrive, or can be turned off completely.</div>
+        <div class="settings-label"><span>💬 Family Notes Alert Bar</span></div>
         <div class="opt-row">
           <button class="opt-btn" id="gear-notes-on" onclick="updateSetting('showBulletinBar', true)">💬 Show on New Notes</button>
-          <button class="opt-btn" id="gear-notes-off" onclick="updateSetting('showBulletinBar', false)">🙈 Always Hide Bar</button>
-          <button class="opt-btn" style="background:#0284c7; border-color:#fff; color:#fff;" onclick="dismissCurrentBulletinBar()">🧹 Dismiss Current Note</button>
+          <button class="opt-btn" id="gear-notes-off" onclick="updateSetting('showBulletinBar', false)">🙈 Hide Alert Bar</button>
+          <button class="opt-btn" style="background:#0284c7; border-color:#fff; color:#fff;" onclick="dismissCurrentBulletinBar()">🧹 Mark Read</button>
         </div>
       </div>
 
@@ -591,12 +901,53 @@
     </div>
   </div>
 
-  <!-- Family Message Board Modal -->
+  <!-- SENIOR TELEGRAM-STYLE CHAT & REPLY MODAL -->
   <div id="bulletin-modal">
-    <h1 style="font-size: 2.2rem; color: #fef08a; margin: 0 0 6px 0;">💬 Family Messages</h1>
-    <p style="font-size: 1.05rem; color: #94a3b8; margin: 0 0 14px 0;">Messages & photos from the family Telegram group</p>
-    <div id="bulletin-posts-container" style="width:100%; display:flex; flex-direction:column; align-items:center;"></div>
-    <button class="cancel-btn" style="background:#22c55e; color:#000; padding: 14px 40px; font-size: 1.6rem;" onclick="closeFamilyBulletin()">✔ Close & Hide Bar</button>
+    <!-- Top Telegram Header with Giant Return to Calls Button -->
+    <div class="tg-header">
+      <button class="tg-back-home-btn" onclick="closeFamilyBulletin()">
+        <span>🏠</span> <span>Back to Family Calls</span>
+      </button>
+      <div class="tg-header-info">
+        <div class="tg-avatar-circle">✈️</div>
+        <div>
+          <div style="font-size:1.35rem; font-weight:900; color:#ffffff;">Family Telegram Chat</div>
+          <div id="tg-send-status" style="font-size:0.95rem; color:#4ade80; font-weight:700;">🟢 Connected to Family Group</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scrollable Telegram Message Bubbles Feed -->
+    <div id="bulletin-posts-container" class="tg-chat-feed"></div>
+
+    <!-- Bottom Telegram Composer (1-Tap Quick Phrases + Type Box + Mic + Send) -->
+    <div class="tg-composer-area">
+      <!-- 1-Tap Quick Replies -->
+      <div class="tg-quick-pills">
+        <button class="tg-quick-btn" onclick="sendNanaChatMessage('❤️ I love you all!')">❤️ Love you all</button>
+        <button class="tg-quick-btn" onclick="sendNanaChatMessage('👋 Thank you!')">👋 Thank you</button>
+        <button class="tg-quick-btn" onclick="sendNanaChatMessage('😊 I am doing okay today.')">😊 Doing okay</button>
+        <button class="tg-quick-btn" onclick="sendNanaChatMessage('📞 Please call me when free.')">📞 Call me soon</button>
+      </div>
+
+      <!-- Type Box + Voice Dictation + Send Button -->
+      <div class="tg-input-row">
+        <input
+          id="nana-chat-input"
+          type="text"
+          class="tg-text-input"
+          placeholder="Tap here to type a message to family..."
+          autocomplete="off"
+          onkeydown="if(event.key==='Enter') submitTypedNanaMessage()"
+        />
+        <button id="tg-mic-btn" class="tg-mic-btn" onclick="startNanaVoiceDictation()">
+          🎤 <span id="mic-btn-label">Speak</span>
+        </button>
+        <button class="tg-send-btn" onclick="submitTypedNanaMessage()">
+          <span>Send</span> <span>➤</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- iOS & Android Loud Ringtone Setup Guide Modal -->
@@ -655,16 +1006,21 @@
     <div class="header-bar">
       <div class="header-title">Tap a photo to call family</div>
       <div class="header-pills">
+        <!-- Easy-to-Identify Telegram Chat Button with Unread Badge -->
+        <div class="chat-pill" onclick="openFamilyBulletin()">
+          ✈️ Family Chat
+          <span id="chat-unread-badge" class="chat-unread-badge">NEW</span>
+        </div>
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.6.1</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.7</div>
       </div>
     </div>
 
     <!-- Smart Family Notes Ticker Bar (Only shown when unread notes exist & enabled) -->
     <div id="message-ticker-bar" class="message-ticker-bar" onclick="openFamilyBulletin()">
-      <span id="ticker-preview-text">💬 New family note! Tap to view</span>
-      <span style="font-weight:900; color:#38bdf8; white-space:nowrap;">Read Note ➔</span>
+      <span id="ticker-preview-text">💬 New family message! Tap to open chat</span>
+      <span style="font-weight:900; color:#fef08a; white-space:nowrap;">Open Chat ➔</span>
     </div>
     
     <div id="missed-call-banner">
@@ -767,8 +1123,9 @@
     </div>
 
     <div style="display:flex; gap:8px; width:92vw; max-width:540px;">
+      <button class="tone-btn" style="flex:1; background:#0088cc; border-color:#7dd3fc;" onclick="openFamilyBulletin()">✈️ Family Chat</button>
       <button class="tone-btn" style="flex:1; background:#be185d; border-color:#f472b6;" onclick="sendLoveToastToNana()">❤️ Send Hug</button>
-      <button class="tone-btn" style="flex:1; background:#1e293b; border-color:#facc15; color:#fef08a;" onclick="openSettingsModal()">⚙️ Settings & Night Mode</button>
+      <button class="tone-btn" style="flex:1; background:#1e293b; border-color:#facc15; color:#fef08a;" onclick="openSettingsModal()">⚙️ Controls</button>
     </div>
 
     <div style="display:flex; gap:8px; width:92vw; max-width:540px;">
@@ -785,45 +1142,80 @@
     <button class="cancel-btn" style="font-size: 1.4rem; padding: 12px 32px;" onclick="endCall()">✖ Decline</button>
   </div>
 
-  <!-- REMOTE SETTINGS MODAL -->
+  <!-- REMOTE FAMILY SETTINGS MODAL -->
   <div id="settings-modal">
-    <h2 style="font-size: 1.7rem; color: #fef08a; margin: 0 0 4px 0;">⚙️ Remote Audio, Night Mode & Care Settings</h2>
-    <p style="font-size: 0.95rem; color: #94a3b8; margin: 0 0 14px 0;">Settings sync instantly to Nana's tablet over Firebase.</p>
+    <h2 style="font-size: 1.7rem; color: #fef08a; margin: 0 0 4px 0;">⚙️ Family Remote Tablet Controls</h2>
+    <p style="font-size: 0.95rem; color: #94a3b8; margin: 0 0 14px 0;">All changes apply immediately to Nana's tablet over Firebase.</p>
 
-    <!-- Missed Calls & Battery Voice Mute Card -->
+    <!-- 1. Normal Brightness, Idle Dimming Level & Time Till Dimming -->
     <div class="settings-card">
-      <div class="settings-label"><span>🧹 Missed Calls & Battery Voice Mute</span></div>
-      <div class="settings-sub" id="lbl-remote-battery-mute">Battery Voice Status: Active</div>
-      <div class="opt-row" style="margin-bottom:8px;">
-        <button class="opt-btn" style="background:#dc2626; border-color:#fff; color:#fff;" onclick="clearAllMissedCalls()">🧹 Clear All Missed Calls</button>
-        <button class="opt-btn" onclick="muteBatteryVoiceForHours(0)">🔊 Unmute Battery Voice</button>
+      <div class="settings-label">
+        <span>🔆 Screen Brightness & Idle Dimming</span>
+        <span id="lbl-remote-bright-summary" style="color:#38bdf8; font-size:0.95rem;">85% ➔ 15% (2m)</span>
       </div>
+      <div class="settings-sub" style="margin-bottom:4px;">Normal (Awake) Brightness:</div>
+      <div class="opt-row" style="margin-bottom:10px;">
+        <button class="opt-btn" id="set-bright-40" onclick="updateSetting('awakeBrightness', 40)">40%</button>
+        <button class="opt-btn" id="set-bright-60" onclick="updateSetting('awakeBrightness', 60)">60%</button>
+        <button class="opt-btn" id="set-bright-85" onclick="updateSetting('awakeBrightness', 85)">85%</button>
+        <button class="opt-btn" id="set-bright-100" onclick="updateSetting('awakeBrightness', 100)">100%</button>
+      </div>
+      <div class="settings-sub" style="margin-bottom:4px;">Dimmed Brightness Level (When Idle):</div>
+      <div class="opt-row" style="margin-bottom:10px;">
+        <button class="opt-btn" id="set-dimlvl-5" onclick="updateSetting('dimBrightness', 5)">5% (Dark)</button>
+        <button class="opt-btn" id="set-dimlvl-15" onclick="updateSetting('dimBrightness', 15)">15% (Soft)</button>
+        <button class="opt-btn" id="set-dimlvl-30" onclick="updateSetting('dimBrightness', 30)">30% (Low)</button>
+        <button class="opt-btn" id="set-dimlvl-50" onclick="updateSetting('dimBrightness', 50)">50% (Med)</button>
+      </div>
+      <div class="settings-sub" style="margin-bottom:4px;">Time Until Dimming Happens:</div>
       <div class="opt-row">
-        <button class="opt-btn" onclick="muteBatteryVoiceForHours(1)">🔇 Mute 1h</button>
-        <button class="opt-btn" onclick="muteBatteryVoiceForHours(4)">🔇 Mute 4h</button>
-        <button class="opt-btn" onclick="muteBatteryVoiceForHours(12)">🔇 Mute 12h</button>
-        <button class="opt-btn" onclick="muteBatteryVoiceForHours(24)">🔇 Mute 24h</button>
+        <button class="opt-btn" id="set-dim-30" onclick="updateSetting('dimDelaySec', 30)">30s</button>
+        <button class="opt-btn" id="set-dim-60" onclick="updateSetting('dimDelaySec', 60)">1m</button>
+        <button class="opt-btn" id="set-dim-120" onclick="updateSetting('dimDelaySec', 120)">2m</button>
+        <button class="opt-btn" id="set-dim-300" onclick="updateSetting('dimDelaySec', 300)">5m</button>
+        <button class="opt-btn" id="set-dim-600" onclick="updateSetting('dimDelaySec', 600)">10m</button>
+        <button class="opt-btn" id="set-dim-0" onclick="updateSetting('dimDelaySec', 0)">Never</button>
       </div>
     </div>
 
-    <!-- Family Notes & Photos Bar Control Card -->
+    <!-- 2. Normal Speaker Volume & Incoming Ringing Volume -->
     <div class="settings-card">
-      <div class="settings-label"><span>💬 Family Notes & Photos Bar</span></div>
-      <div class="settings-sub">Only appears on Nana's screen when unread Telegram notes exist, or can be hidden completely.</div>
+      <div class="settings-label">
+        <span>🔊 Normal Speaker Volume (Calls & Radio)</span>
+        <span id="lbl-call-vol" style="color:#38bdf8;">85%</span>
+      </div>
+      <div class="settings-sub">Controls Nana's normal speaker volume during video calls, voice notes, and Classic FM radio.</div>
       <div class="opt-row">
-        <button class="opt-btn" id="set-notes-on" onclick="updateSetting('showBulletinBar', true)">💬 Show on New Notes</button>
-        <button class="opt-btn" id="set-notes-off" onclick="updateSetting('showBulletinBar', false)">🙈 Always Hide Bar</button>
-        <button class="opt-btn" style="background:#0284c7; border-color:#fff; color:#fff;" onclick="dismissCurrentBulletinBar()">🧹 Dismiss Current Note</button>
+        <button class="opt-btn" id="set-callvol-30" onclick="updateSetting('callVolume', 30)">30%</button>
+        <button class="opt-btn" id="set-callvol-50" onclick="updateSetting('callVolume', 50)">50%</button>
+        <button class="opt-btn" id="set-callvol-70" onclick="updateSetting('callVolume', 70)">70%</button>
+        <button class="opt-btn" id="set-callvol-85" onclick="updateSetting('callVolume', 85)">85%</button>
+        <button class="opt-btn" id="set-callvol-100" onclick="updateSetting('callVolume', 100)">100%</button>
       </div>
     </div>
 
-    <!-- Night Mode / Do Not Disturb Schedule Card -->
+    <div class="settings-card">
+      <div class="settings-label">
+        <span>🔔 Incoming Call Ringing Volume</span>
+        <span id="lbl-ring-vol" style="color:#38bdf8;">85%</span>
+      </div>
+      <div class="settings-sub">Controls how loud the tablet rings when a family member calls Nana.</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-ringvol-30" onclick="updateSetting('ringVolume', 30)">30%</button>
+        <button class="opt-btn" id="set-ringvol-50" onclick="updateSetting('ringVolume', 50)">50%</button>
+        <button class="opt-btn" id="set-ringvol-70" onclick="updateSetting('ringVolume', 70)">70%</button>
+        <button class="opt-btn" id="set-ringvol-85" onclick="updateSetting('ringVolume', 85)">85%</button>
+        <button class="opt-btn" id="set-ringvol-100" onclick="updateSetting('ringVolume', 100)">100%</button>
+      </div>
+    </div>
+
+    <!-- 3. Do Not Disturb / Night Mode Schedule -->
     <div class="settings-card">
       <div class="settings-label">
         <span>🌙 Do Not Disturb (Night Mode)</span>
         <span id="lbl-remote-night-window" style="color:#38bdf8;">21:00 – 08:00</span>
       </div>
-      <div class="settings-sub">Dims screen at night and optionally silences incoming calls.</div>
+      <div class="settings-sub">Blackouts the screen with a soft night clock and optionally blocks incoming rings overnight.</div>
       <div class="opt-row" style="margin-bottom:8px;">
         <button class="opt-btn" id="set-night-on" onclick="updateSetting('nightModeEnabled', true)">🌙 Night Mode ON</button>
         <button class="opt-btn" id="set-night-off" onclick="updateSetting('nightModeEnabled', false)">☀️ Off (Always Awake)</button>
@@ -845,27 +1237,34 @@
       </div>
     </div>
 
+    <!-- 4. Missed Calls & Battery Voice Mute Card -->
     <div class="settings-card">
-      <div class="settings-label"><span>🔊 Speaker Volume</span><span id="lbl-call-vol">85%</span></div>
-      <div class="settings-sub">Controls Nana's speaker volume during calls and radio.</div>
+      <div class="settings-label"><span>🧹 Missed Calls & Battery Voice Mute</span></div>
+      <div class="settings-sub" id="lbl-remote-battery-mute">Battery Voice Status: Active</div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <button class="opt-btn" style="background:#dc2626; border-color:#fff; color:#fff;" onclick="clearAllMissedCalls()">🧹 Clear All Missed Calls</button>
+        <button class="opt-btn" onclick="muteBatteryVoiceForHours(0)">🔊 Unmute Battery Voice</button>
+      </div>
       <div class="opt-row">
-        <button class="opt-btn" id="set-callvol-50" onclick="updateSetting('callVolume', 50)">50%</button>
-        <button class="opt-btn" id="set-callvol-70" onclick="updateSetting('callVolume', 70)">70%</button>
-        <button class="opt-btn" id="set-callvol-85" onclick="updateSetting('callVolume', 85)">85%</button>
-        <button class="opt-btn" id="set-callvol-100" onclick="updateSetting('callVolume', 100)">100%</button>
+        <button class="opt-btn" onclick="muteBatteryVoiceForHours(1)">🔇 Mute 1h</button>
+        <button class="opt-btn" onclick="muteBatteryVoiceForHours(4)">🔇 Mute 4h</button>
+        <button class="opt-btn" onclick="muteBatteryVoiceForHours(12)">🔇 Mute 12h</button>
+        <button class="opt-btn" onclick="muteBatteryVoiceForHours(24)">🔇 Mute 24h</button>
       </div>
     </div>
 
+    <!-- 5. Family Notes & Photos Alert Bar Control Card -->
     <div class="settings-card">
-      <div class="settings-label"><span>🔔 Ringing Volume (Alerts)</span><span id="lbl-ring-vol">85%</span></div>
+      <div class="settings-label"><span>💬 Family Notes Alert Bar</span></div>
+      <div class="settings-sub">Controls whether the blue alert bar pops up below the header when unread Telegram messages arrive.</div>
       <div class="opt-row">
-        <button class="opt-btn" id="set-ringvol-50" onclick="updateSetting('ringVolume', 50)">50%</button>
-        <button class="opt-btn" id="set-ringvol-70" onclick="updateSetting('ringVolume', 70)">70%</button>
-        <button class="opt-btn" id="set-ringvol-85" onclick="updateSetting('ringVolume', 85)">85%</button>
-        <button class="opt-btn" id="set-ringvol-100" onclick="updateSetting('ringVolume', 100)">100%</button>
+        <button class="opt-btn" id="set-notes-on" onclick="updateSetting('showBulletinBar', true)">💬 Show on New Notes</button>
+        <button class="opt-btn" id="set-notes-off" onclick="updateSetting('showBulletinBar', false)">🙈 Hide Alert Bar</button>
+        <button class="opt-btn" style="background:#0284c7; border-color:#fff; color:#fff;" onclick="dismissCurrentBulletinBar()">🧹 Mark Read</button>
       </div>
     </div>
 
+    <!-- 6. Ringtone, Auto-Answer & Ring Duration -->
     <div class="settings-card">
       <div class="settings-label"><span>🎵 Nana's Ringtone</span></div>
       <div class="opt-row" style="margin-bottom:8px;">
@@ -881,10 +1280,14 @@
     </div>
 
     <div class="settings-card">
-      <div class="settings-label"><span>⚡ Hands-Free Auto-Answer</span></div>
-      <div class="opt-row">
+      <div class="settings-label"><span>⚡ Hands-Free Auto-Answer & Spoken Caller-ID</span></div>
+      <div class="opt-row" style="margin-bottom:8px;">
         <button class="opt-btn" id="set-autoans-off" onclick="updateSetting('autoAnswer', false)">👆 Tap to Answer (Normal)</button>
         <button class="opt-btn" id="set-autoans-on" onclick="updateSetting('autoAnswer', true)">⚡ Auto-Answer (10s)</button>
+      </div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-voice-on" onclick="updateSetting('voicePrompts', true)">🗣️ Spoken ID: On</button>
+        <button class="opt-btn" id="set-voice-off" onclick="updateSetting('voicePrompts', false)">🔇 Spoken ID: Off</button>
       </div>
     </div>
 
@@ -896,29 +1299,6 @@
         <button class="opt-btn" id="set-ring-60" onclick="updateSetting('ringDurationSec', 60)">60s</button>
         <button class="opt-btn" id="set-ring-90" onclick="updateSetting('ringDurationSec', 90)">90s</button>
         <button class="opt-btn" id="set-ring-120" onclick="updateSetting('ringDurationSec', 120)">2m</button>
-      </div>
-    </div>
-
-    <div class="settings-card">
-      <div class="settings-label"><span>🗣️ Spoken Caller-ID</span></div>
-      <div class="opt-row">
-        <button class="opt-btn" id="set-voice-on" onclick="updateSetting('voicePrompts', true)">✅ On</button>
-        <button class="opt-btn" id="set-voice-off" onclick="updateSetting('voicePrompts', false)">🔇 Off</button>
-      </div>
-    </div>
-
-    <div class="settings-card">
-      <div class="settings-label"><span>🔆 Brightness & Dimming</span></div>
-      <div class="opt-row" style="margin-bottom:8px;">
-        <button class="opt-btn" id="set-bright-60" onclick="updateSetting('awakeBrightness', 60)">60%</button>
-        <button class="opt-btn" id="set-bright-85" onclick="updateSetting('awakeBrightness', 85)">85%</button>
-        <button class="opt-btn" id="set-bright-100" onclick="updateSetting('awakeBrightness', 100)">100%</button>
-      </div>
-      <div class="opt-row">
-        <button class="opt-btn" id="set-dim-60" onclick="updateSetting('dimDelaySec', 60)">1m</button>
-        <button class="opt-btn" id="set-dim-120" onclick="updateSetting('dimDelaySec', 120)">2m</button>
-        <button class="opt-btn" id="set-dim-300" onclick="updateSetting('dimDelaySec', 300)">5m</button>
-        <button class="opt-btn" id="set-dim-0" onclick="updateSetting('dimDelaySec', 0)">Never</button>
       </div>
     </div>
 
@@ -937,7 +1317,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getDatabase, ref, set, update, onValue, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+    import { getDatabase, ref, set, update, push, onValue, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
     function showScreen(id) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -968,7 +1348,7 @@
     }
 
     const CONFIG = {
-      appVersion: "2.6.1",
+      appVersion: "2.7.0",
       adminPin: "1929",
       apkFileName: "nanaphone.apk",
       dailyRoomUrl: UNLOCKED.dailyRoomUrl,
@@ -1022,6 +1402,7 @@
     let missedCallsByMember = {};
     let latestBulletinPosts = {};
     let newestBulletinTimestamp = 0;
+    let unreadBulletinCount = 0;
     let confirmTimer = null;
     let ringInterval = null;
     let telegramBurstInterval = null;
@@ -1031,6 +1412,8 @@
     let incomingRingTimeout = null;
     let autoAnswerTimeout = null;
     let callTimerInterval = null;
+    let idleDimTimer = null;
+    let isCurrentlyIdleDimmed = false;
     let currentState = 'idle';
     let latestCallData = { status: 'idle' };
     let latestPresenceData = {};
@@ -1052,6 +1435,7 @@
       autoAnswer: false,
       speechRate: 0.9,
       awakeBrightness: 85,
+      dimBrightness: 15,
       dimDelaySec: 120,
       nightModeEnabled: true,
       nightStartHour: 21,
@@ -1061,6 +1445,56 @@
       showBulletinBar: true,
       bulletinClearedAt: 0
     };
+
+    // ========================================================================
+    // SCREEN BRIGHTNESS & IDLE DIMMING ENGINE
+    // ========================================================================
+    function applyScreenBrightness(targetPercent) {
+      if (role !== 'nana') return;
+      const pct = Math.max(5, Math.min(100, Number(targetPercent) || 85));
+
+      const overlay = document.getElementById('brightness-overlay');
+      if (overlay) {
+        const darkness = Math.max(0, Math.min(0.88, (100 - pct) / 105));
+        overlay.style.opacity = darkness.toFixed(2);
+      }
+
+      if (window.AndroidBridge && window.AndroidBridge.updateTabletHardwareSettings) {
+        const activeVol = (currentState === 'connected' || isRadioPlaying)
+          ? (tabletSettings.callVolume ?? 85)
+          : (tabletSettings.ringVolume ?? 85);
+
+        window.AndroidBridge.updateTabletHardwareSettings(
+          Number(activeVol) || 85,
+          pct,
+          Number(tabletSettings.dimDelaySec ?? 120),
+          Number(tabletSettings.speechRate) || 0.9
+        );
+      }
+    }
+
+    function wakeScreenAndResetDimTimer() {
+      if (role !== 'nana') return;
+      isCurrentlyIdleDimmed = false;
+      applyScreenBrightness(tabletSettings.awakeBrightness ?? 85);
+
+      if (idleDimTimer) {
+        clearTimeout(idleDimTimer);
+        idleDimTimer = null;
+      }
+
+      const delaySec = Number(tabletSettings.dimDelaySec ?? 120);
+      const chatOpen = document.getElementById('bulletin-modal')?.style.display === 'flex';
+      if (delaySec > 0 && currentState === 'idle' && !isRadioPlaying && !chatOpen) {
+        idleDimTimer = setTimeout(() => {
+          const stillChatOpen = document.getElementById('bulletin-modal')?.style.display === 'flex';
+          if (currentState === 'idle' && !isRadioPlaying && !stillChatOpen) {
+            isCurrentlyIdleDimmed = true;
+            applyScreenBrightness(tabletSettings.dimBrightness ?? 15);
+          }
+        }, delaySec * 1000);
+      }
+    }
 
     // ========================================================================
     // BATTERY VOICE MUTE, MISSED CALL CLEAR & BULLETIN VISIBILITY
@@ -1092,12 +1526,26 @@
 
     function updateBulletinTickerVisibility() {
       const bar = document.getElementById('message-ticker-bar');
-      if (!bar) return;
+      const badge = document.getElementById('chat-unread-badge');
       const isEnabled = tabletSettings.showBulletinBar !== false;
       const clearedAt = Number(tabletSettings.bulletinClearedAt) || 0;
-      const hasUnread = newestBulletinTimestamp > 0 && newestBulletinTimestamp > clearedAt;
 
-      bar.style.display = (isEnabled && hasUnread) ? 'flex' : 'none';
+      // Count unread messages from family (excluding Nana's own replies)
+      unreadBulletinCount = 0;
+      Object.values(latestBulletinPosts).forEach(p => {
+        if (!p.fromNana && (Number(p.timestamp) || 0) > clearedAt) {
+          unreadBulletinCount++;
+        }
+      });
+
+      const hasUnread = unreadBulletinCount > 0;
+      if (bar) {
+        bar.style.display = (isEnabled && hasUnread) ? 'flex' : 'none';
+      }
+      if (badge) {
+        badge.innerText = unreadBulletinCount > 9 ? '9+' : `${unreadBulletinCount} NEW`;
+        badge.style.display = hasUnread ? 'inline-block' : 'none';
+      }
     }
 
     function isBatteryVoiceCurrentlyMuted() {
@@ -1109,6 +1557,196 @@
       if (Date.now() - lastBatterySpokenMs < 180000) return;
       lastBatterySpokenMs = Date.now();
       speakMsg(warningText, true);
+    };
+
+    // ========================================================================
+    // SENIOR TELEGRAM CHAT & REPLY ENGINE (Type, Quick-Tap, or Voice Dictation)
+    // ========================================================================
+    window.openFamilyBulletin = () => {
+      document.getElementById('bulletin-modal').style.display = 'flex';
+      wakeScreenAndResetDimTimer();
+      recordHeartbeat("Opened Family Chat");
+      setTimeout(() => {
+        const feed = document.getElementById('bulletin-posts-container');
+        if (feed) feed.scrollTop = feed.scrollHeight;
+      }, 80);
+    };
+
+    window.closeFamilyBulletin = async () => {
+      document.getElementById('bulletin-modal').style.display = 'none';
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      wakeScreenAndResetDimTimer();
+      recordHeartbeat("On Home Grid");
+      await window.dismissCurrentBulletinBar();
+    };
+
+    window.submitTypedNanaMessage = async () => {
+      const input = document.getElementById('nana-chat-input');
+      if (!input) return;
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      input.blur();
+      await window.sendNanaChatMessage(text);
+    };
+
+    window.sendNanaChatMessage = async (rawText) => {
+      const text = (rawText || "").trim();
+      if (!text) return;
+
+      const senderLabel = role === 'nana' ? 'Nana' : activeFamilyMember.name;
+      const isFromNana = role === 'nana';
+      const statusEl = document.getElementById('tg-send-status');
+      if (statusEl) statusEl.innerText = "⏳ Sending message to Telegram...";
+
+      try {
+        // 1. Save immediately to Firebase Bulletin so it appears as a chat bubble right away
+        await push(bulletinRef, {
+          author: senderLabel,
+          fromNana: isFromNana,
+          text: text,
+          timestamp: Date.now()
+        });
+
+        // 2. Forward to Telegram via Google Apps Script
+        await fetch(CONFIG.googleScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            secret: SERVICE_TOKEN,
+            action: "nana_reply",
+            text: text
+          })
+        }).catch(() => {});
+
+        if (statusEl) statusEl.innerText = "✅ Message sent to Family Group!";
+        if (role === 'nana') speakMsg("Message sent to the family.");
+        setTimeout(() => {
+          if (statusEl) statusEl.innerText = "🟢 Connected to Family Group";
+        }, 4000);
+      } catch (e) {
+        if (statusEl) statusEl.innerText = "⚠️ Saved to board";
+      }
+    };
+
+    window.startNanaVoiceDictation = () => {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const inputEl = document.getElementById('nana-chat-input');
+      const label = document.getElementById('mic-btn-label');
+
+      if (!SpeechRecognition) {
+        if (inputEl) inputEl.focus();
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-GB';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      if (label) label.innerText = "Listening...";
+
+      recognition.onresult = (event) => {
+        const transcript = (event.results[0][0].transcript || "").trim();
+        if (label) label.innerText = "Speak";
+        if (transcript && inputEl) {
+          inputEl.value = transcript;
+          speakMsg(`You said: ${transcript}. Tap Send to post it.`);
+        }
+      };
+
+      recognition.onerror = () => {
+        if (label) label.innerText = "Speak";
+      };
+
+      recognition.onend = () => {
+        if (label) label.innerText = "Speak";
+      };
+
+      recognition.start();
+    };
+
+    onValue(bulletinRef, (snap) => {
+      latestBulletinPosts = snap.val() || {};
+      const container = document.getElementById('bulletin-posts-container');
+      container.innerHTML = "";
+      const keys = Object.keys(latestBulletinPosts).slice(-20); // Show last 20 messages in chronological order
+
+      newestBulletinTimestamp = 0;
+      if (keys.length > 0) {
+        const newest = latestBulletinPosts[keys[keys.length - 1]];
+        newestBulletinTimestamp = Number(newest.timestamp) || 1;
+        document.getElementById('ticker-preview-text').innerText = `💬 ${newest.author || 'Family'}: "${newest.text || 'Sent a photo 📷'}"`;
+      } else {
+        container.innerHTML = `
+          <div style="margin:auto; color:#94a3b8; font-size:1.5rem; font-weight:700; padding:30px;">
+            No messages yet. Type a message or tap a quick button below to say hello!
+          </div>
+        `;
+      }
+
+      updateBulletinTickerVisibility();
+
+      keys.forEach(k => {
+        const item = latestBulletinPosts[k];
+        const isOutgoing = !!item.fromNana || (item.author && item.author.toLowerCase() === 'nana');
+        const bubble = document.createElement('div');
+        bubble.className = isOutgoing ? 'tg-bubble outgoing' : 'tg-bubble incoming';
+
+        const topRow = document.createElement('div');
+        topRow.className = 'tg-sender-row';
+
+        const authorEl = document.createElement('span');
+        authorEl.className = 'tg-sender-name';
+        authorEl.textContent = isOutgoing ? '👵 Nana (You)' : `👤 ${item.author || 'Family'}`;
+        topRow.appendChild(authorEl);
+
+        if (item.timestamp) {
+          const timeEl = document.createElement('span');
+          timeEl.className = 'tg-msg-time';
+          timeEl.textContent = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          topRow.appendChild(timeEl);
+        }
+        bubble.appendChild(topRow);
+
+        if (item.text) {
+          const p = document.createElement('div');
+          p.className = 'tg-msg-text';
+          p.textContent = item.text;
+          bubble.appendChild(p);
+        }
+
+        if (item.imageUrl) {
+          const img = document.createElement('img');
+          img.src = item.imageUrl;
+          img.style.cssText = 'width:100%; max-height:340px; object-fit:contain; border-radius:14px; margin-top:4px; background:#000;';
+          bubble.appendChild(img);
+        }
+
+        if (item.text) {
+          const btn = document.createElement('button');
+          btn.className = 'tg-speak-chip';
+          btn.textContent = '🔊 Read Aloud';
+          btn.onclick = () => speakNote(`${item.author || 'Family'} says: ${item.text}`);
+          bubble.appendChild(btn);
+        }
+
+        container.appendChild(bubble);
+      });
+
+      // Scroll chat feed to bottom
+      setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+      }, 60);
+    });
+
+    window.speakNote = (rawText) => {
+      if ('speechSynthesis' in window && rawText) {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(rawText);
+        u.rate = Number(tabletSettings.speechRate) || 0.9;
+        window.speechSynthesis.speak(u);
+      }
     };
 
     // ========================================================================
@@ -1159,6 +1797,8 @@
       document.getElementById('radio-action-prompt').innerText = "(Tap to Turn On)";
       document.getElementById('radio-status-label').innerText = "Radio Off";
 
+      wakeScreenAndResetDimTimer();
+
       if (syncToFirebase) {
         await set(entertainmentRef, { activeKey: "off", title: "Off", timestamp: Date.now() });
       }
@@ -1167,6 +1807,7 @@
     function startLocalRadioStream() {
       if (!radioPlayer) return;
       isRadioPlaying = true;
+      wakeScreenAndResetDimTimer();
 
       const vol = Math.min(1.0, Math.max(0.2, (Number(tabletSettings.callVolume) || 85) / 100));
       radioPlayer.volume = vol;
@@ -1267,7 +1908,7 @@
             window.AndroidBridge.unlockAdminForFiveMinutes();
           }
           document.getElementById('admin-modal-title').innerText = `🔓 Unlocked (v${CONFIG.appVersion})`;
-          document.getElementById('admin-modal-sub').innerText = "Configure Night Mode, Mute Battery Voice, Clear Calls, or Update:";
+          document.getElementById('admin-modal-sub').innerText = "Configure Brightness, Dimming, Volumes, Night Mode, or Update:";
           document.getElementById('pin-keypad-section').style.display = 'none';
           document.getElementById('admin-actions-section').style.display = 'flex';
           refreshSettingsUI();
@@ -1314,9 +1955,18 @@
     };
 
     // Presence & Live Activity Telemetry
-    window.resetIdleTimer = () => recordHeartbeat();
-    window.addEventListener('pointerdown', () => recordHeartbeat(), { passive: true });
-    window.addEventListener('touchstart', () => recordHeartbeat(), { passive: true });
+    window.resetIdleTimer = () => {
+      wakeScreenAndResetDimTimer();
+      recordHeartbeat();
+    };
+    window.addEventListener('pointerdown', () => {
+      wakeScreenAndResetDimTimer();
+      recordHeartbeat();
+    }, { passive: true });
+    window.addEventListener('touchstart', () => {
+      wakeScreenAndResetDimTimer();
+      recordHeartbeat();
+    }, { passive: true });
 
     function recordHeartbeat(customActivity = null) {
       if (role !== 'nana') return;
@@ -1342,7 +1992,10 @@
     }
 
     if (role === 'nana') {
-      setTimeout(() => recordHeartbeat("Tablet Online"), 3000);
+      setTimeout(() => {
+        wakeScreenAndResetDimTimer();
+        recordHeartbeat("Tablet Online");
+      }, 3000);
       setInterval(() => {
         if (window.AndroidBridge && window.AndroidBridge.getBatteryStatusJson) {
           try {
@@ -1424,6 +2077,7 @@
       onValue(loveToastRef, (snap) => {
         const val = snap.val();
         if (!val || !val.timestamp || Date.now() - val.timestamp > 15000) return;
+        wakeScreenAndResetDimTimer();
         const banner = document.getElementById('love-toast-banner');
         banner.innerText = `❤️ ${val.senderName} sent you a big hug!`;
         banner.style.display = 'block';
@@ -1619,75 +2273,6 @@
       if (target) startCallFromNana(target);
     };
 
-    // Bulletin Posts & Unread Detection
-    window.openFamilyBulletin = () => document.getElementById('bulletin-modal').style.display = 'flex';
-    window.closeFamilyBulletin = async () => {
-      document.getElementById('bulletin-modal').style.display = 'none';
-      // Mark messages as read so the ticker bar hides until the next new message arrives
-      await window.dismissCurrentBulletinBar();
-    };
-
-    onValue(bulletinRef, (snap) => {
-      latestBulletinPosts = snap.val() || {};
-      const container = document.getElementById('bulletin-posts-container');
-      container.innerHTML = "";
-      const keys = Object.keys(latestBulletinPosts).reverse().slice(0, 8);
-
-      newestBulletinTimestamp = 0;
-      if (keys.length > 0) {
-        const newest = latestBulletinPosts[keys[0]];
-        newestBulletinTimestamp = Number(newest.timestamp) || 1;
-        document.getElementById('ticker-preview-text').innerText = `💬 ${newest.author || 'Family'}: "${newest.text || 'Sent a photo 📷'}"`;
-      }
-
-      updateBulletinTickerVisibility();
-
-      keys.forEach(k => {
-        const item = latestBulletinPosts[k];
-        const d = document.createElement('div');
-        d.className = 'bulletin-post';
-
-        const authorEl = document.createElement('strong');
-        authorEl.style.cssText = 'color:#fef08a; font-size:1.3rem;';
-        authorEl.textContent = `${item.author || 'Family'}:`;
-        d.appendChild(authorEl);
-
-        if (item.text) {
-          const p = document.createElement('p');
-          p.style.cssText = 'font-size:1.4rem; margin:8px 0; color:#f8fafc;';
-          p.textContent = item.text;
-          d.appendChild(p);
-        }
-
-        if (item.imageUrl) {
-          const img = document.createElement('img');
-          img.src = item.imageUrl;
-          img.style.cssText = 'width:100%; border-radius:14px; margin-top:8px;';
-          d.appendChild(img);
-        }
-
-        if (item.text) {
-          const btn = document.createElement('button');
-          btn.className = 'tone-btn';
-          btn.style.cssText = 'padding:8px 18px; font-size:1.1rem; margin-top:10px; background:#0284c7; border-color:#38bdf8;';
-          btn.textContent = '🔊 Read Out Loud';
-          btn.onclick = () => speakNote(`${item.author || 'Family'} says: ${item.text}`);
-          d.appendChild(btn);
-        }
-
-        container.appendChild(d);
-      });
-    });
-
-    window.speakNote = (rawText) => {
-      if ('speechSynthesis' in window && rawText) {
-        window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(rawText);
-        u.rate = Number(tabletSettings.speechRate) || 0.9;
-        window.speechSynthesis.speak(u);
-      }
-    };
-
     // Remote Audio & Settings Controls
     window.openSettingsModal = () => document.getElementById('settings-modal').style.display = 'flex';
     window.closeSettingsModal = () => document.getElementById('settings-modal').style.display = 'none';
@@ -1697,6 +2282,7 @@
       refreshSettingsUI();
       updateClock();
       updateBulletinTickerVisibility();
+      wakeScreenAndResetDimTimer();
       await update(settingsRef, { [key]: value });
     };
 
@@ -1712,9 +2298,19 @@
       await update(settingsRef, { ringtone: toneName });
     };
 
+    function formatDimDelayLabel(sec) {
+      const s = Number(sec ?? 120);
+      if (s === 0) return "Never";
+      if (s < 60) return `${s}s`;
+      return `${Math.round(s / 60)}m`;
+    }
+
     function refreshSettingsUI() {
       const callVol = tabletSettings.callVolume ?? tabletSettings.volume ?? 85;
       const ringVol = tabletSettings.ringVolume ?? tabletSettings.volume ?? 85;
+      const awakeB = tabletSettings.awakeBrightness ?? 85;
+      const dimB = tabletSettings.dimBrightness ?? 15;
+      const dimSec = tabletSettings.dimDelaySec ?? 120;
       const nStart = tabletSettings.nightStartHour ?? 21;
       const nEnd = tabletSettings.nightEndHour ?? 8;
       const showNotes = tabletSettings.showBulletinBar !== false;
@@ -1724,6 +2320,15 @@
       document.getElementById('in-call-vol-label').innerText = `${callVol}%`;
       document.getElementById('nana-vol-display').innerText = `${callVol}%`;
       document.getElementById('lbl-ringtime').innerText = `${tabletSettings.ringDurationSec}s`;
+
+      const brightSum = `${awakeB}% ➔ ${dimB}% (${formatDimDelayLabel(dimSec)})`;
+      const gBrightEl = document.getElementById('lbl-gear-bright-summary');
+      const rBrightEl = document.getElementById('lbl-remote-bright-summary');
+      if (gBrightEl) gBrightEl.innerText = brightSum;
+      if (rBrightEl) rBrightEl.innerText = brightSum;
+
+      const gVolEl = document.getElementById('lbl-gear-vol-summary');
+      if (gVolEl) gVolEl.innerText = `Call ${callVol}% • Ring ${ringVol}%`;
 
       const winStr = `${String(nStart).padStart(2, '0')}:00 – ${String(nEnd).padStart(2, '0')}:00`;
       const gWin = document.getElementById('lbl-gear-night-window');
@@ -1753,19 +2358,25 @@
       };
 
       highlight('set-callvol-', callVol);
+      highlight('gear-callvol-', callVol);
       highlight('set-ringvol-', ringVol);
+      highlight('gear-ringvol-', ringVol);
+
+      highlight('set-bright-', awakeB);
+      highlight('gear-bright-', awakeB);
+      highlight('set-dimlvl-', dimB);
+      highlight('gear-dimlvl-', dimB);
+      highlight('set-dim-', dimSec);
+      highlight('gear-dim-', dimSec);
+
       highlight('set-ring-', tabletSettings.ringDurationSec);
       highlight('set-tone-', tabletSettings.ringtone);
       highlight('set-autoans-', tabletSettings.autoAnswer ? 'on' : 'off');
       highlight('set-voice-', tabletSettings.voicePrompts ? 'on' : 'off');
-      highlight('set-bright-', tabletSettings.awakeBrightness);
-      highlight('set-dim-', tabletSettings.dimDelaySec);
 
-      // Family Notes Bar toggle highlights
       highlight('set-notes-', showNotes ? 'on' : 'off');
       highlight('gear-notes-', showNotes ? 'on' : 'off');
 
-      // Night Mode highlights
       highlight('set-night-', tabletSettings.nightModeEnabled ? 'on' : 'off');
       highlight('gear-night-', tabletSettings.nightModeEnabled ? 'on' : 'off');
       highlight('set-nstart-', nStart);
@@ -1786,19 +2397,7 @@
         refreshSettingsUI();
         updateClock();
         updateBulletinTickerVisibility();
-
-        if (role === 'nana' && window.AndroidBridge && window.AndroidBridge.updateTabletHardwareSettings) {
-          const activeVol = (currentState === 'connected' || isRadioPlaying)
-            ? (tabletSettings.callVolume ?? 85)
-            : (tabletSettings.ringVolume ?? 85);
-
-          window.AndroidBridge.updateTabletHardwareSettings(
-            Number(activeVol) || 85,
-            Number(tabletSettings.awakeBrightness) || 85,
-            Number(tabletSettings.dimDelaySec ?? 120),
-            Number(tabletSettings.speechRate) || 0.9
-          );
-        }
+        wakeScreenAndResetDimTimer();
       }
     });
 
@@ -2001,8 +2600,10 @@
 
     async function startCallFromNana(member) {
       await window.stopRadioAndSync(true);
+      document.getElementById('bulletin-modal').style.display = 'none';
 
       currentState = 'calling_family';
+      wakeScreenAndResetDimTimer();
       const outImg = document.getElementById('outbound-photo');
       outImg.onerror = () => { outImg.src = member.fallback; };
       outImg.src = member.photo;
@@ -2132,6 +2733,7 @@
       if (role === 'family') updateFamilyPresenceBanner();
 
       if (data.status !== 'idle') {
+        document.getElementById('bulletin-modal').style.display = 'none';
         if (role === 'nana' && isRadioPlaying) {
           window.stopRadioAndSync(true);
         }
@@ -2148,20 +2750,12 @@
           }
 
           document.getElementById('night-dimmer').style.display = 'none';
+          wakeScreenAndResetDimTimer();
           const callerImg = document.getElementById('caller-photo');
           callerImg.onerror = () => { callerImg.src = caller.fallback; };
           callerImg.src = caller.photo;
           document.getElementById('caller-title').innerText = `${caller.name} is calling!`;
           showScreen('ringing-screen');
-
-          if (window.AndroidBridge && window.AndroidBridge.updateTabletHardwareSettings) {
-            window.AndroidBridge.updateTabletHardwareSettings(
-              Number(tabletSettings.ringVolume) || 85,
-              Number(tabletSettings.awakeBrightness) || 85,
-              Number(tabletSettings.dimDelaySec ?? 120),
-              Number(tabletSettings.speechRate) || 0.9
-            );
-          }
 
           stopRingingUI();
           playSelectedRingtoneAudio(tabletSettings.ringtone, tabletSettings.ringVolume || 85);
@@ -2192,6 +2786,7 @@
 
         } else if (data.status === 'connected') {
           document.getElementById('night-dimmer').style.display = 'none';
+          wakeScreenAndResetDimTimer();
           clearTimeout(outboundTimeout);
           clearTimeout(incomingRingTimeout);
           clearTimeout(autoAnswerTimeout);
@@ -2201,15 +2796,6 @@
           const connectedPartnerId = data.callerId === 'nana' ? data.targetId : data.callerId;
           if (connectedPartnerId) {
             clearMissedCallsForMember(connectedPartnerId);
-          }
-
-          if (window.AndroidBridge && window.AndroidBridge.updateTabletHardwareSettings) {
-            window.AndroidBridge.updateTabletHardwareSettings(
-              Number(tabletSettings.callVolume) || 85,
-              Number(tabletSettings.awakeBrightness) || 85,
-              Number(tabletSettings.dimDelaySec ?? 120),
-              Number(tabletSettings.speechRate) || 0.9
-            );
           }
 
           showScreen('call-screen');
@@ -2226,6 +2812,7 @@
           if (!isRadioPlaying) {
             showScreen('grid-screen');
           }
+          wakeScreenAndResetDimTimer();
           updateClock();
         }
       } else if (role === 'family') {
@@ -2288,6 +2875,7 @@
       showScreen('grid-screen');
       setInterval(updateClock, 10000);
       updateClock();
+      wakeScreenAndResetDimTimer();
     }
 
     function updateClock() {
@@ -2297,7 +2885,8 @@
       if (clockEl) clockEl.innerText = timeStr;
       if (nightClockEl) nightClockEl.innerText = timeStr;
 
-      const canShowDimmer = isCurrentlyInNightWindow() && currentState === 'idle' && !isRadioPlaying && Date.now() > nightDismissedUntilMs;
+      const chatOpen = document.getElementById('bulletin-modal')?.style.display === 'flex';
+      const canShowDimmer = isCurrentlyInNightWindow() && currentState === 'idle' && !isRadioPlaying && !chatOpen && Date.now() > nightDismissedUntilMs;
       const dimmerEl = document.getElementById('night-dimmer');
       if (dimmerEl) dimmerEl.style.display = canShowDimmer ? 'flex' : 'none';
     }
@@ -2305,6 +2894,7 @@
     window.wakeFromNightMode = () => {
       nightDismissedUntilMs = Date.now() + 15 * 60 * 1000;
       document.getElementById('night-dimmer').style.display = 'none';
+      wakeScreenAndResetDimTimer();
     };
   </script>
 </body>
