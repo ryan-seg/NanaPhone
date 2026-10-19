@@ -16,13 +16,6 @@
       touch-action: manipulation;
     }
 
-    /* Allow virtual keyboard interaction on input fields */
-    input, textarea, [contenteditable="true"] {
-      user-select: text !important;
-      -webkit-user-select: text !important;
-      touch-action: auto !important;
-    }
-
     body, html {
       margin: 0; padding: 0; width: 100vw; height: 100vh;
       background: #090d16; color: #ffffff;
@@ -407,7 +400,6 @@
       color: #ffffff;
       font-weight: 700;
       word-wrap: break-word;
-      user-select: text;
     }
     .tg-speak-chip {
       align-self: flex-start;
@@ -467,22 +459,18 @@
       flex: 1;
       height: 58px;
       background: #0e1621;
-      color: #ffffff;
-      border: 3px solid #64748b;
+      color: #fef08a;
+      border: 3px solid #38bdf8;
       border-radius: 28px;
       padding: 0 20px;
-      font-size: 1.4rem;
-      font-weight: 700;
+      font-size: 1.45rem;
+      font-weight: 800;
       outline: none;
-      user-select: text !important;
-      -webkit-user-select: text !important;
-    }
-    .tg-text-input:focus {
-      border-color: #38bdf8;
-      background: #090d16;
+      cursor: pointer;
     }
     .tg-text-input::placeholder {
       color: #94a3b8;
+      font-weight: 700;
     }
     .tg-mic-btn {
       height: 58px;
@@ -909,7 +897,7 @@
     </div>
   </div>
 
-  <!-- SENIOR TELEGRAM-STYLE CHAT & REPLY MODAL (Top-Mounted Composer + Built-in Big Keyboard) -->
+  <!-- SENIOR TELEGRAM-STYLE CHAT & REPLY MODAL (Single Custom Senior Keyboard Only) -->
   <div id="bulletin-modal">
     <div class="tg-header">
       <button class="tg-back-home-btn" onclick="closeFamilyBulletin()">
@@ -924,7 +912,7 @@
       </div>
     </div>
 
-    <!-- Top-Mounted Composer so Keyboard Never Blocks Input -->
+    <!-- Top-Mounted Composer -->
     <div class="tg-composer-area">
       <div class="tg-quick-pills">
         <button class="tg-quick-btn" onclick="sendNanaChatMessage('❤️ I love you all!')">❤️ Love you all</button>
@@ -934,6 +922,7 @@
       </div>
 
       <div class="tg-input-row">
+        <!-- readonly + inputmode="none" prevents Android's small system keyboard from popping up! -->
         <input
           id="nana-chat-input"
           type="text"
@@ -952,7 +941,7 @@
         </button>
       </div>
 
-      <!-- Built-In Senior On-Screen Keyboard (Reliable fallback if Android soft keyboard is suppressed) -->
+      <!-- Built-In Giant Senior Keyboard (Only this keyboard opens!) -->
       <div id="senior-onscreen-keyboard" style="display:none; flex-direction:column; gap:6px; margin-top:6px; background:#090d16; padding:10px; border-radius:18px; border:2px solid #38bdf8;">
         <div style="display:grid; grid-template-columns:repeat(10, 1fr); gap:6px;">
           <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('Q')">Q</button>
@@ -1061,7 +1050,7 @@
         </div>
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.7.3</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.7.4</div>
       </div>
     </div>
 
@@ -1394,7 +1383,7 @@
     }
 
     const CONFIG = {
-      appVersion: "2.7.3",
+      appVersion: "2.7.4",
       adminPin: "1929",
       apkFileName: "nanaphone.apk",
       dailyRoomUrl: UNLOCKED.dailyRoomUrl,
@@ -1655,9 +1644,11 @@
       const text = input.value.trim();
       if (!text) return;
       input.value = "";
-      input.blur();
       window.closeSeniorKeyboard();
-      await window.sendNanaChatMessage = async (rawText) => {
+      await window.sendNanaChatMessage(text);
+    };
+
+    window.sendNanaChatMessage = async (rawText) => {
       const text = (rawText || "").trim();
       if (!text) return;
 
@@ -1670,7 +1661,7 @@
       }
 
       try {
-        // 1. Save to Firebase Bulletin so it appears on screen immediately
+        // 1. Save immediately to Firebase Bulletin so it appears on screen
         await push(bulletinRef, {
           author: senderLabel,
           fromNana: isFromNana,
@@ -1767,7 +1758,7 @@
       } else {
         container.innerHTML = `
           <div style="margin:auto; color:#94a3b8; font-size:1.5rem; font-weight:700; padding:30px;">
-            No messages yet. Type a message or tap a quick button above to say hello!
+            No messages yet. Tap the box above or a quick button to say hello!
           </div>
         `;
       }
