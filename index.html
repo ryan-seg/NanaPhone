@@ -938,11 +938,11 @@
           id="nana-chat-input"
           type="text"
           class="tg-text-input"
-          placeholder="Tap here to type a message to family..."
+          placeholder="Tap here to open big keyboard..."
           autocomplete="off"
-          tabindex="0"
+          readonly
+          inputmode="none"
           onclick="openSeniorKeyboard()"
-          onkeydown="if(event.key==='Enter') submitTypedNanaMessage()"
         />
         <button id="tg-mic-btn" class="tg-mic-btn" onclick="startNanaVoiceDictation()">
           🎤 <span id="mic-btn-label">Speak</span>
@@ -1657,19 +1657,20 @@
       input.value = "";
       input.blur();
       window.closeSeniorKeyboard();
-      await window.sendNanaChatMessage(text);
-    };
-
-    window.sendNanaChatMessage = async (rawText) => {
+      await window.sendNanaChatMessage = async (rawText) => {
       const text = (rawText || "").trim();
       if (!text) return;
 
       const senderLabel = role === 'nana' ? 'Nana' : activeFamilyMember.name;
       const isFromNana = role === 'nana';
       const statusEl = document.getElementById('tg-send-status');
-      if (statusEl) statusEl.innerText = "⏳ Sending message...";
+      if (statusEl) {
+        statusEl.style.color = "#fef08a";
+        statusEl.innerText = "⏳ Sending message to Telegram...";
+      }
 
       try {
+        // 1. Save to Firebase Bulletin so it appears on screen immediately
         await push(bulletinRef, {
           author: senderLabel,
           fromNana: isFromNana,
@@ -1677,7 +1678,8 @@
           timestamp: Date.now()
         });
 
-        await fetch(CONFIG.googleScriptUrl, {
+        // 2. Forward to Telegram via Google Apps Script and inspect response
+        const res = await fetch(CONFIG.googleScriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({
@@ -1685,15 +1687,32 @@
             action: "nana_reply",
             text: text
           })
-        }).catch(() => {});
+        });
+        const data = await res.json();
 
-        if (statusEl) statusEl.innerText = "✅ Message sent to Family Group!";
-        if (role === 'nana') speakMsg("Message sent to the family.");
+        if (data && data.ok) {
+          if (statusEl) {
+            statusEl.style.color = "#4ade80";
+            statusEl.innerText = `✅ Sent to Telegram (${data.broadcastCount} chat${data.broadcastCount === 1 ? '' : 's'})!`;
+          }
+          if (role === 'nana') speakMsg("Message sent to the family.");
+        } else {
+          if (statusEl) {
+            statusEl.style.color = "#f87171";
+            statusEl.innerText = `⚠️ ${data?.error || 'Telegram not linked yet'}`;
+          }
+        }
         setTimeout(() => {
-          if (statusEl) statusEl.innerText = "🟢 Connected to Family Group";
-        }, 4000);
+          if (statusEl) {
+            statusEl.style.color = "#4ade80";
+            statusEl.innerText = "🟢 Connected to Family Group";
+          }
+        }, 5000);
       } catch (e) {
-        if (statusEl) statusEl.innerText = "⚠️ Saved to board";
+        if (statusEl) {
+          statusEl.style.color = "#f87171";
+          statusEl.innerText = "⚠️ Saved on tablet (Script unreachable)";
+        }
       }
     };
 
