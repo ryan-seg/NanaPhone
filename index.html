@@ -15,23 +15,33 @@
       -webkit-user-select: none;
       touch-action: manipulation;
     }
+
+    /* Allow virtual keyboard interaction on input fields */
+    input, textarea, [contenteditable="true"] {
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      touch-action: auto !important;
+    }
+
     body, html {
       margin: 0; padding: 0; width: 100vw; height: 100vh;
       background: #090d16; color: #ffffff;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       overflow: hidden;
     }
+
+    /* 68px top clearance prevents overlap with the status bar pull-down barrier */
     .screen {
       display: none; width: 100vw; height: 100vh;
       flex-direction: column; align-items: center; justify-content: flex-start;
-      padding: 14px 18px 16px 18px;
+      padding: 68px 18px 16px 18px;
       gap: 8px;
       text-align: center;
       overflow: hidden;
     }
     .active { display: flex; }
 
-    /* Non-Overlapping Single-Line Top Header Bar */
+    /* Single-Line Top Header Bar */
     .header-bar {
       width: 100%;
       display: flex;
@@ -118,7 +128,7 @@
       cursor: pointer;
     }
 
-    /* Smart Message Ticker Bar (Hidden unless unread messages exist & enabled) */
+    /* Smart Message Ticker Bar */
     .message-ticker-bar {
       display: none;
       width: 100%;
@@ -144,7 +154,7 @@
       text-align: left;
     }
 
-    /* Compact Single-Line Missed Calls Top Bar */
+    /* Compact Missed Calls Top Bar */
     #missed-call-banner {
       display: none;
       width: 100%;
@@ -187,7 +197,7 @@
       cursor: pointer;
     }
 
-    /* 4x2 Contact Grid Designed for up to 8 Contacts with Zero Overlap */
+    /* 4x2 Responsive Contact Grid for up to 8 Contacts */
     .family-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -282,17 +292,15 @@
       flex-shrink: 0;
     }
 
-    /* ======================================================================
-       SENIOR TELEGRAM CHAT INTERFACE STYLES
-       ====================================================================== */
+    /* Senior Telegram Chat Styles */
     #bulletin-modal {
       display: none;
       position: fixed;
       inset: 0;
-      background: #0e1621; /* Authentic Telegram Dark Background */
+      background: #0e1621;
       z-index: 135;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: flex-start;
       padding: 0;
       overflow: hidden;
     }
@@ -300,7 +308,7 @@
       width: 100%;
       background: #17212b;
       border-bottom: 3px solid #0088cc;
-      padding: 10px 16px;
+      padding: 68px 16px 12px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -414,11 +422,11 @@
       margin-top: 2px;
     }
 
-    /* Bottom Composer Area */
+    /* Top Composer Area */
     .tg-composer-area {
       width: 100%;
       background: #17212b;
-      border-top: 2px solid #2b5278;
+      border-bottom: 3px solid #2b5278;
       padding: 10px 14px 12px 14px;
       display: flex;
       flex-direction: column;
@@ -457,7 +465,7 @@
     }
     .tg-text-input {
       flex: 1;
-      height: 56px;
+      height: 58px;
       background: #0e1621;
       color: #ffffff;
       border: 3px solid #64748b;
@@ -466,8 +474,8 @@
       font-size: 1.4rem;
       font-weight: 700;
       outline: none;
-      user-select: text;
-      -webkit-user-select: text;
+      user-select: text !important;
+      -webkit-user-select: text !important;
     }
     .tg-text-input:focus {
       border-color: #38bdf8;
@@ -477,7 +485,7 @@
       color: #94a3b8;
     }
     .tg-mic-btn {
-      height: 56px;
+      height: 58px;
       padding: 0 18px;
       background: #334155;
       color: #ffffff;
@@ -492,7 +500,7 @@
       white-space: nowrap;
     }
     .tg-send-btn {
-      height: 56px;
+      height: 58px;
       padding: 0 26px;
       background: #0088cc;
       color: #ffffff;
@@ -512,7 +520,7 @@
       background: #0284c7;
     }
 
-    /* Senior Radio Button Styles */
+    /* Radio Screen Styles */
     .giant-radio-btn {
       width: 90vw;
       max-width: 650px;
@@ -564,7 +572,7 @@
     #admin-pin-modal {
       display: none; position: fixed; inset: 0; background: rgba(9, 13, 22, 0.98);
       z-index: 160; flex-direction: column; align-items: center; justify-content: flex-start;
-      padding: 20px; text-align: center; overflow-y: auto;
+      padding: 68px 20px 30px 20px; text-align: center; overflow-y: auto;
     }
     .pin-dots {
       font-size: 3rem; letter-spacing: 14px; color: #fef08a;
@@ -598,7 +606,7 @@
     #phone-guide-modal {
       display: none; position: fixed; inset: 0; background: rgba(9, 13, 22, 0.98);
       z-index: 10005; flex-direction: column; align-items: center; justify-content: flex-start;
-      padding: 20px 16px 40px 16px; overflow-y: auto;
+      padding: 68px 16px 40px 16px; overflow-y: auto;
     }
     .guide-tabs {
       display: flex; gap: 10px; width: 92vw; max-width: 640px; margin-bottom: 14px;
@@ -640,7 +648,7 @@
       border: 3px solid #facc15; pointer-events: none;
     }
     #call-status-pill {
-      position: absolute; top: 24px; left: 20px; z-index: 50;
+      position: absolute; top: 68px; left: 20px; z-index: 50;
       background: rgba(6, 78, 59, 0.9); border: 2px solid #22c55e;
       padding: 8px 16px; border-radius: 14px; font-size: 1.25rem; font-weight: 800; color: #fef08a;
     }
@@ -656,7 +664,7 @@
 
     /* In-Call Remote Audio & Settings Overlay (Family View) */
     #in-call-volume-bar {
-      display: none; position: absolute; top: 24px; right: 20px; z-index: 10000;
+      display: none; position: absolute; top: 68px; right: 20px; z-index: 10000;
       background: rgba(15, 23, 42, 0.95); border: 3px solid #38bdf8;
       padding: 8px 14px; border-radius: 16px; align-items: center; gap: 8px;
       font-size: 1.05rem; font-weight: 900; color: #ffffff;
@@ -671,7 +679,7 @@
     #settings-modal {
       display: none; position: fixed; inset: 0; background: rgba(9, 13, 22, 0.98);
       z-index: 10001; flex-direction: column; align-items: center; justify-content: flex-start;
-      padding: 24px 16px 40px 16px; overflow-y: auto;
+      padding: 68px 16px 40px 16px; overflow-y: auto;
     }
     .settings-card {
       width: 92vw; max-width: 680px; background: #1e293b; border: 2px solid #475569;
@@ -716,7 +724,7 @@
       cursor: pointer; text-decoration: none; display: inline-block;
     }
 
-    /* Smooth Screen Brightness & Idle Dimming Overlay */
+    /* Screen Brightness & Idle Dimming Overlay */
     #brightness-overlay {
       position: fixed; inset: 0; background: #000000;
       pointer-events: none; z-index: 88; opacity: 0;
@@ -732,7 +740,7 @@
 </head>
 <body>
 
-  <!-- Smooth Software Brightness & Idle Dimming Layer -->
+  <!-- Software Brightness & Idle Dimming Layer -->
   <div id="brightness-overlay"></div>
 
   <!-- Giant Warm Toast Banner -->
@@ -901,9 +909,8 @@
     </div>
   </div>
 
-  <!-- SENIOR TELEGRAM-STYLE CHAT & REPLY MODAL -->
+  <!-- SENIOR TELEGRAM-STYLE CHAT & REPLY MODAL (Top-Mounted Composer + Built-in Big Keyboard) -->
   <div id="bulletin-modal">
-    <!-- Top Telegram Header with Giant Return to Calls Button -->
     <div class="tg-header">
       <button class="tg-back-home-btn" onclick="closeFamilyBulletin()">
         <span>🏠</span> <span>Back to Family Calls</span>
@@ -917,12 +924,8 @@
       </div>
     </div>
 
-    <!-- Scrollable Telegram Message Bubbles Feed -->
-    <div id="bulletin-posts-container" class="tg-chat-feed"></div>
-
-    <!-- Bottom Telegram Composer (1-Tap Quick Phrases + Type Box + Mic + Send) -->
+    <!-- Top-Mounted Composer so Keyboard Never Blocks Input -->
     <div class="tg-composer-area">
-      <!-- 1-Tap Quick Replies -->
       <div class="tg-quick-pills">
         <button class="tg-quick-btn" onclick="sendNanaChatMessage('❤️ I love you all!')">❤️ Love you all</button>
         <button class="tg-quick-btn" onclick="sendNanaChatMessage('👋 Thank you!')">👋 Thank you</button>
@@ -930,7 +933,6 @@
         <button class="tg-quick-btn" onclick="sendNanaChatMessage('📞 Please call me when free.')">📞 Call me soon</button>
       </div>
 
-      <!-- Type Box + Voice Dictation + Send Button -->
       <div class="tg-input-row">
         <input
           id="nana-chat-input"
@@ -938,6 +940,8 @@
           class="tg-text-input"
           placeholder="Tap here to type a message to family..."
           autocomplete="off"
+          tabindex="0"
+          onclick="openSeniorKeyboard()"
           onkeydown="if(event.key==='Enter') submitTypedNanaMessage()"
         />
         <button id="tg-mic-btn" class="tg-mic-btn" onclick="startNanaVoiceDictation()">
@@ -947,7 +951,52 @@
           <span>Send</span> <span>➤</span>
         </button>
       </div>
+
+      <!-- Built-In Senior On-Screen Keyboard (Reliable fallback if Android soft keyboard is suppressed) -->
+      <div id="senior-onscreen-keyboard" style="display:none; flex-direction:column; gap:6px; margin-top:6px; background:#090d16; padding:10px; border-radius:18px; border:2px solid #38bdf8;">
+        <div style="display:grid; grid-template-columns:repeat(10, 1fr); gap:6px;">
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('Q')">Q</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('W')">W</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('E')">E</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('R')">R</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('T')">T</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('Y')">Y</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('U')">U</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('I')">I</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('O')">O</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('P')">P</button>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(9, 1fr); gap:6px; padding:0 18px;">
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('A')">A</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('S')">S</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('D')">D</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('F')">F</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('G')">G</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('H')">H</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('J')">J</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('K')">K</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('L')">L</button>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(9, 1fr); gap:6px;">
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('Z')">Z</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('X')">X</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('C')">C</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('V')">V</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('B')">B</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('N')">N</button>
+          <button class="key-btn" style="height:48px; font-size:1.4rem;" onclick="typeSeniorKey('M')">M</button>
+          <button class="key-btn" style="height:48px; font-size:1.2rem; background:#7f1d1d; grid-column:span 2;" onclick="typeSeniorKey('BACKSPACE')">⌫ Delete</button>
+        </div>
+        <div style="display:grid; grid-template-columns:2fr 5fr 2fr; gap:8px;">
+          <button class="key-btn" style="height:48px; font-size:1.15rem; background:#334155;" onclick="closeSeniorKeyboard()">🔽 Hide Keys</button>
+          <button class="key-btn" style="height:48px; font-size:1.35rem; background:#1e293b;" onclick="typeSeniorKey(' ')">SPACE BAR</button>
+          <button class="key-btn" style="height:48px; font-size:1.3rem; background:#22c55e; color:#000;" onclick="submitTypedNanaMessage()">Send ➤</button>
+        </div>
+      </div>
     </div>
+
+    <!-- Scrollable Chat Feed -->
+    <div id="bulletin-posts-container" class="tg-chat-feed"></div>
   </div>
 
   <!-- iOS & Android Loud Ringtone Setup Guide Modal -->
@@ -1001,23 +1050,21 @@
     <button class="cancel-btn" style="background:#22c55e; color:#000; padding:12px 40px; font-size:1.35rem;" onclick="closePhoneGuideModal()">✔ Got It</button>
   </div>
 
-  <!-- 1. NANA'S MAIN GRID SCREEN (Zero Overlap + Scales for up to 8 Contacts) -->
+  <!-- 1. NANA'S MAIN GRID SCREEN -->
   <div id="grid-screen" class="screen">
     <div class="header-bar">
       <div class="header-title">Tap a photo to call family</div>
       <div class="header-pills">
-        <!-- Easy-to-Identify Telegram Chat Button with Unread Badge -->
         <div class="chat-pill" onclick="openFamilyBulletin()">
           ✈️ Family Chat
           <span id="chat-unread-badge" class="chat-unread-badge">NEW</span>
         </div>
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.7</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.7.3</div>
       </div>
     </div>
 
-    <!-- Smart Family Notes Ticker Bar (Only shown when unread notes exist & enabled) -->
     <div id="message-ticker-bar" class="message-ticker-bar" onclick="openFamilyBulletin()">
       <span id="ticker-preview-text">💬 New family message! Tap to open chat</span>
       <span style="font-weight:900; color:#fef08a; white-space:nowrap;">Open Chat ➔</span>
@@ -1032,7 +1079,7 @@
   </div>
 
   <!-- 1B. NANA'S SENIOR RADIO SCREEN -->
-  <div id="radio-screen" class="screen" style="background:#090d16; justify-content:space-between; padding:24px 18px 24px 18px;">
+  <div id="radio-screen" class="screen" style="background:#090d16; justify-content:space-between; padding:68px 18px 24px 18px;">
     <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
       <button class="cancel-btn" style="background:#22c55e; color:#000; border-color:#ffffff; font-size:1.8rem; padding:12px 28px;" onclick="closeRadioScreen()">
         🏠 Back to Family Calls
@@ -1063,7 +1110,7 @@
   </div>
 
   <!-- 2. OUTBOUND CALL SCREEN -->
-  <div id="outbound-screen" class="screen" style="background:#1e1b4b; justify-content:center;">
+  <div id="outbound-screen" class="screen" style="background:#1e1b4b; justify-content:center; padding-top:68px;">
     <img id="outbound-photo" src="" style="width:180px; height:180px; border-radius:50%; border:7px solid #fff; margin-bottom:14px; object-fit:cover;">
     <h1 id="outbound-title" style="font-size: 3.4rem; margin: 0 0 8px 0; color: #fef08a;">Calling...</h1>
     <p id="outbound-sub" style="font-size: 1.8rem; color: #cbd5e1; margin: 0 0 20px 0;">Ringing their mobile now (1/6)...</p>
@@ -1071,7 +1118,7 @@
   </div>
 
   <!-- 3. INCOMING RING SCREEN -->
-  <div id="ringing-screen" class="screen" style="background:#064e3b; justify-content:center; cursor:pointer;" onclick="answerCallAsNana()">
+  <div id="ringing-screen" class="screen" style="background:#064e3b; justify-content:center; cursor:pointer; padding-top:68px;" onclick="answerCallAsNana()">
     <img id="caller-photo" src="" style="width:160px; height:160px; border-radius:50%; border:6px solid #fff; margin-bottom:10px; object-fit:cover;">
     <h1 id="caller-title" style="font-size: 3.6rem; color: #fef08a; margin: 0 0 14px 0;">Incoming Call!</h1>
     <button class="giant-btn" style="pointer-events:none;">📞 TOUCH ANYWHERE<br>TO ANSWER</button>
@@ -1110,7 +1157,6 @@
 
     <button id="family-ring-btn" class="giant-btn" style="height: 15vh; min-height: 90px; font-size: 2rem; width: 92vw; max-width: 540px; border-width: 6px; border-radius: 28px;" onclick="startCallFromFamily()">📹 Ring Nana Now</button>
 
-    <!-- REMOTE RADIO CONTROLLER FOR FAMILY -->
     <div class="settings-card" style="width:92vw; max-width:540px; margin-bottom:2px; padding:10px 12px;">
       <div class="settings-label" style="font-size:1.05rem;">
         <span>🎻 Put Classic FM Radio On For Nana</span>
@@ -1147,7 +1193,7 @@
     <h2 style="font-size: 1.7rem; color: #fef08a; margin: 0 0 4px 0;">⚙️ Family Remote Tablet Controls</h2>
     <p style="font-size: 0.95rem; color: #94a3b8; margin: 0 0 14px 0;">All changes apply immediately to Nana's tablet over Firebase.</p>
 
-    <!-- 1. Normal Brightness, Idle Dimming Level & Time Till Dimming -->
+    <!-- Normal Brightness, Idle Dimming Level & Time Till Dimming -->
     <div class="settings-card">
       <div class="settings-label">
         <span>🔆 Screen Brightness & Idle Dimming</span>
@@ -1178,7 +1224,7 @@
       </div>
     </div>
 
-    <!-- 2. Normal Speaker Volume & Incoming Ringing Volume -->
+    <!-- Normal Speaker Volume & Incoming Ringing Volume -->
     <div class="settings-card">
       <div class="settings-label">
         <span>🔊 Normal Speaker Volume (Calls & Radio)</span>
@@ -1209,7 +1255,7 @@
       </div>
     </div>
 
-    <!-- 3. Do Not Disturb / Night Mode Schedule -->
+    <!-- Do Not Disturb / Night Mode Schedule -->
     <div class="settings-card">
       <div class="settings-label">
         <span>🌙 Do Not Disturb (Night Mode)</span>
@@ -1237,7 +1283,7 @@
       </div>
     </div>
 
-    <!-- 4. Missed Calls & Battery Voice Mute Card -->
+    <!-- Missed Calls & Battery Voice Mute Card -->
     <div class="settings-card">
       <div class="settings-label"><span>🧹 Missed Calls & Battery Voice Mute</span></div>
       <div class="settings-sub" id="lbl-remote-battery-mute">Battery Voice Status: Active</div>
@@ -1253,7 +1299,7 @@
       </div>
     </div>
 
-    <!-- 5. Family Notes & Photos Alert Bar Control Card -->
+    <!-- Family Notes & Photos Alert Bar Control Card -->
     <div class="settings-card">
       <div class="settings-label"><span>💬 Family Notes Alert Bar</span></div>
       <div class="settings-sub">Controls whether the blue alert bar pops up below the header when unread Telegram messages arrive.</div>
@@ -1264,7 +1310,7 @@
       </div>
     </div>
 
-    <!-- 6. Ringtone, Auto-Answer & Ring Duration -->
+    <!-- Ringtone, Auto-Answer & Ring Duration -->
     <div class="settings-card">
       <div class="settings-label"><span>🎵 Nana's Ringtone</span></div>
       <div class="opt-row" style="margin-bottom:8px;">
@@ -1348,7 +1394,7 @@
     }
 
     const CONFIG = {
-      appVersion: "2.7.0",
+      appVersion: "2.7.3",
       adminPin: "1929",
       apkFileName: "nanaphone.apk",
       dailyRoomUrl: UNLOCKED.dailyRoomUrl,
@@ -1530,7 +1576,6 @@
       const isEnabled = tabletSettings.showBulletinBar !== false;
       const clearedAt = Number(tabletSettings.bulletinClearedAt) || 0;
 
-      // Count unread messages from family (excluding Nana's own replies)
       unreadBulletinCount = 0;
       Object.values(latestBulletinPosts).forEach(p => {
         if (!p.fromNana && (Number(p.timestamp) || 0) > clearedAt) {
@@ -1560,7 +1605,7 @@
     };
 
     // ========================================================================
-    // SENIOR TELEGRAM CHAT & REPLY ENGINE (Type, Quick-Tap, or Voice Dictation)
+    // SENIOR TELEGRAM CHAT & BUILT-IN ON-SCREEN KEYBOARD ENGINE
     // ========================================================================
     window.openFamilyBulletin = () => {
       document.getElementById('bulletin-modal').style.display = 'flex';
@@ -1569,15 +1614,39 @@
       setTimeout(() => {
         const feed = document.getElementById('bulletin-posts-container');
         if (feed) feed.scrollTop = feed.scrollHeight;
-      }, 80);
+      }, 100);
     };
 
     window.closeFamilyBulletin = async () => {
       document.getElementById('bulletin-modal').style.display = 'none';
+      window.closeSeniorKeyboard();
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       wakeScreenAndResetDimTimer();
       recordHeartbeat("On Home Grid");
       await window.dismissCurrentBulletinBar();
+    };
+
+    window.openSeniorKeyboard = () => {
+      const kb = document.getElementById('senior-onscreen-keyboard');
+      if (kb) kb.style.display = 'flex';
+      const feed = document.getElementById('bulletin-posts-container');
+      if (feed) feed.scrollTop = feed.scrollHeight;
+    };
+
+    window.closeSeniorKeyboard = () => {
+      const kb = document.getElementById('senior-onscreen-keyboard');
+      if (kb) kb.style.display = 'none';
+    };
+
+    window.typeSeniorKey = (char) => {
+      const input = document.getElementById('nana-chat-input');
+      if (!input) return;
+      if (char === 'BACKSPACE') {
+        input.value = input.value.slice(0, -1);
+      } else {
+        const nextChar = input.value.length === 0 ? char : char.toLowerCase();
+        input.value += nextChar;
+      }
     };
 
     window.submitTypedNanaMessage = async () => {
@@ -1587,6 +1656,7 @@
       if (!text) return;
       input.value = "";
       input.blur();
+      window.closeSeniorKeyboard();
       await window.sendNanaChatMessage(text);
     };
 
@@ -1597,10 +1667,9 @@
       const senderLabel = role === 'nana' ? 'Nana' : activeFamilyMember.name;
       const isFromNana = role === 'nana';
       const statusEl = document.getElementById('tg-send-status');
-      if (statusEl) statusEl.innerText = "⏳ Sending message to Telegram...";
+      if (statusEl) statusEl.innerText = "⏳ Sending message...";
 
       try {
-        // 1. Save immediately to Firebase Bulletin so it appears as a chat bubble right away
         await push(bulletinRef, {
           author: senderLabel,
           fromNana: isFromNana,
@@ -1608,7 +1677,6 @@
           timestamp: Date.now()
         });
 
-        // 2. Forward to Telegram via Google Apps Script
         await fetch(CONFIG.googleScriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -1635,7 +1703,7 @@
       const label = document.getElementById('mic-btn-label');
 
       if (!SpeechRecognition) {
-        if (inputEl) inputEl.focus();
+        window.openSeniorKeyboard();
         return;
       }
 
@@ -1670,7 +1738,7 @@
       latestBulletinPosts = snap.val() || {};
       const container = document.getElementById('bulletin-posts-container');
       container.innerHTML = "";
-      const keys = Object.keys(latestBulletinPosts).slice(-20); // Show last 20 messages in chronological order
+      const keys = Object.keys(latestBulletinPosts).slice(-25);
 
       newestBulletinTimestamp = 0;
       if (keys.length > 0) {
@@ -1680,7 +1748,7 @@
       } else {
         container.innerHTML = `
           <div style="margin:auto; color:#94a3b8; font-size:1.5rem; font-weight:700; padding:30px;">
-            No messages yet. Type a message or tap a quick button below to say hello!
+            No messages yet. Type a message or tap a quick button above to say hello!
           </div>
         `;
       }
@@ -1734,7 +1802,6 @@
         container.appendChild(bubble);
       });
 
-      // Scroll chat feed to bottom
       setTimeout(() => {
         container.scrollTop = container.scrollHeight;
       }, 60);
