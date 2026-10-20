@@ -505,7 +505,7 @@
       margin-top: 2px;
     }
 
-    /* Composer & 2-Button Quick Replies Area */
+    /* Composer Input Area */
     .tg-composer-area {
       width: 100%;
       background: var(--bg-panel);
@@ -515,30 +515,6 @@
       flex-direction: column;
       gap: 8px;
       flex-shrink: 0;
-    }
-    .tg-quick-pills {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      width: 100%;
-    }
-    .tg-quick-btn {
-      background: var(--key-bg);
-      color: var(--key-text);
-      border: 3px solid var(--border-accent);
-      border-radius: 16px;
-      padding: 12px 14px;
-      font-size: clamp(1.2rem, 2vw, 1.55rem);
-      font-weight: 900;
-      cursor: pointer;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .tg-quick-btn:active {
-      background: #22c55e;
-      color: #000000;
-      transform: scale(0.97);
     }
     .tg-input-row {
       display: flex;
@@ -828,18 +804,6 @@
       font-size: 0.98rem; font-weight: 800; cursor: pointer; text-align: center;
     }
     .opt-btn.selected { background: #064e3b; border-color: #22c55e; color: #fef08a; }
-    .settings-text-input {
-      flex: 1;
-      background: #0f172a;
-      color: #fef08a;
-      border: 2px solid #38bdf8;
-      border-radius: 12px;
-      padding: 10px 12px;
-      font-size: 1rem;
-      font-weight: 700;
-      user-select: text;
-      -webkit-user-select: text;
-    }
 
     /* Action Buttons */
     .giant-btn {
@@ -949,19 +913,6 @@
           <button class="opt-btn" id="gear-kbhide-60" onclick="updateSetting('keyboardTimeoutSec', 60)">1m</button>
           <button class="opt-btn" id="gear-kbhide-120" onclick="updateSetting('keyboardTimeoutSec', 120)">2m</button>
           <button class="opt-btn" id="gear-kbhide-180" onclick="updateSetting('keyboardTimeoutSec', 180)">3m</button>
-        </div>
-      </div>
-
-      <!-- 2 Quick Reply Buttons Customization (Gear Menu) -->
-      <div class="settings-card" style="width:100%; margin-bottom:4px;">
-        <div class="settings-label"><span>💬 Nana's 2 One-Tap Quick Replies</span></div>
-        <div class="opt-row" style="margin-bottom:6px; align-items:center;">
-          <input id="gear-quick1-input" type="text" class="settings-text-input" placeholder="Button 1 text..." />
-          <input id="gear-quick2-input" type="text" class="settings-text-input" placeholder="Button 2 text..." />
-        </div>
-        <div class="opt-row">
-          <button class="opt-btn" style="background:#059669; border-color:#fff; color:#fff;" onclick="saveQuickReplies('gear')">💾 Save 1-Tap Replies</button>
-          <button class="opt-btn" onclick="resetDefaultQuickReplies()">🔄 Reset Defaults</button>
         </div>
       </div>
 
@@ -1100,7 +1051,7 @@
     </div>
   </div>
 
-  <!-- SENIOR TELEGRAM-STYLE CHAT & REPLY MODAL -->
+  <!-- SENIOR TELEGRAM-STYLE CHAT & REPLY MODAL (No 1-Tap Quick Reply Spam) -->
   <div id="bulletin-modal" oncontextmenu="return false;">
     <div class="tg-header">
       <button class="tg-back-home-btn" onclick="closeFamilyBulletin()">
@@ -1115,15 +1066,7 @@
       </div>
     </div>
 
-    <!-- 2 Giant One-Tap Quick Replies at Top -->
-    <div class="tg-composer-area" style="padding-bottom:8px;">
-      <div class="tg-quick-pills">
-        <button id="nana-quick-btn-1" class="tg-quick-btn" onclick="sendQuickReplySlot(1)">📞 Please call me</button>
-        <button id="nana-quick-btn-2" class="tg-quick-btn" onclick="sendQuickReplySlot(2)">😊 I am doing well</button>
-      </div>
-    </div>
-
-    <!-- Scrollable Chat Feed in the Middle -->
+    <!-- Scrollable Chat Feed -->
     <div id="bulletin-posts-container" class="tg-chat-feed"></div>
 
     <!-- Input Box Directly Above the Bottom Keyboard (Always in Nana's Line of Sight) -->
@@ -1230,7 +1173,7 @@
         </div>
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.7.6</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.7.7</div>
       </div>
     </div>
 
@@ -1399,25 +1342,6 @@
         <button class="opt-btn" id="set-kbhide-60" onclick="updateSetting('keyboardTimeoutSec', 60)">1m</button>
         <button class="opt-btn" id="set-kbhide-120" onclick="updateSetting('keyboardTimeoutSec', 120)">2m</button>
         <button class="opt-btn" id="set-kbhide-180" onclick="updateSetting('keyboardTimeoutSec', 180)">3m</button>
-      </div>
-    </div>
-
-    <!-- 2 Quick Reply Buttons Customization (Family Remote Controls) -->
-    <div class="settings-card">
-      <div class="settings-label">
-        <span>💬 Nana's 2 One-Tap Quick Replies</span>
-        <span id="lbl-quick-save-status" style="color:#4ade80; font-size:0.9rem;"></span>
-      </div>
-      <div class="settings-sub">Customize the two big 1-tap message buttons at the top of Nana's Family Chat screen.</div>
-      <div class="opt-row" style="margin-bottom:8px;">
-        <input id="set-quick1-input" type="text" class="settings-text-input" placeholder="Button 1 (e.g. 📞 Please call me)" />
-      </div>
-      <div class="opt-row" style="margin-bottom:8px;">
-        <input id="set-quick2-input" type="text" class="settings-text-input" placeholder="Button 2 (e.g. 😊 I am doing well)" />
-      </div>
-      <div class="opt-row">
-        <button class="opt-btn" style="background:#059669; border-color:#fff; color:#fff;" onclick="saveQuickReplies('family')">💾 Save 1-Tap Replies</button>
-        <button class="opt-btn" onclick="resetDefaultQuickReplies()">🔄 Reset Defaults</button>
       </div>
     </div>
 
@@ -1620,7 +1544,7 @@
     }
 
     const CONFIG = {
-      appVersion: "2.7.6",
+      appVersion: "2.7.7",
       adminPin: "1929",
       apkFileName: "nanaphone.apk",
       dailyRoomUrl: "https://nanaphone.daily.co/NanaPhone",
@@ -1641,8 +1565,6 @@
     };
 
     const CLASSIC_FM_STREAM = "https://media-ice.musicradio.com/ClassicFMMP3";
-    const DEFAULT_QUICK_1 = "📞 Please call me";
-    const DEFAULT_QUICK_2 = "😊 I am doing well";
 
     const role = params.get('role') || 'nana';
     const callerId = params.get('id') || 'ryan';
@@ -1689,6 +1611,7 @@
     let idleDimTimer = null;
     let keyboardHideTimer = null;
     let lastKeyTapMs = 0;
+    let lastChatSendMs = 0;
     let isCurrentlyIdleDimmed = false;
     let currentState = 'idle';
     let latestCallData = { status: 'idle' };
@@ -1723,8 +1646,6 @@
       colorTheme: 'classic-dark',
       keyboardLayout: 'qwerty',
       keyboardTimeoutSec: 60,
-      quickReply1: DEFAULT_QUICK_1,
-      quickReply2: DEFAULT_QUICK_2,
       bulletinClearedAt: 0
     };
 
@@ -1852,40 +1773,8 @@
     };
 
     // ========================================================================
-    // SENIOR TELEGRAM CHAT, QUICK REPLIES & ON-SCREEN KEYBOARD ENGINE
+    // SENIOR TELEGRAM CHAT & ON-SCREEN KEYBOARD ENGINE
     // ========================================================================
-    window.sendQuickReplySlot = (slotNum) => {
-      const msg = slotNum === 1
-        ? (tabletSettings.quickReply1 || DEFAULT_QUICK_1)
-        : (tabletSettings.quickReply2 || DEFAULT_QUICK_2);
-      window.sendNanaChatMessage(msg);
-    };
-
-    window.saveQuickReplies = async (source) => {
-      const in1 = document.getElementById(source === 'gear' ? 'gear-quick1-input' : 'set-quick1-input');
-      const in2 = document.getElementById(source === 'gear' ? 'gear-quick2-input' : 'set-quick2-input');
-      const val1 = (in1?.value || '').trim() || DEFAULT_QUICK_1;
-      const val2 = (in2?.value || '').trim() || DEFAULT_QUICK_2;
-
-      tabletSettings.quickReply1 = val1;
-      tabletSettings.quickReply2 = val2;
-      refreshSettingsUI();
-      await update(settingsRef, { quickReply1: val1, quickReply2: val2 });
-
-      const statusLbl = document.getElementById('lbl-quick-save-status');
-      if (statusLbl) {
-        statusLbl.innerText = '✅ Saved!';
-        setTimeout(() => { statusLbl.innerText = ''; }, 3000);
-      }
-    };
-
-    window.resetDefaultQuickReplies = async () => {
-      tabletSettings.quickReply1 = DEFAULT_QUICK_1;
-      tabletSettings.quickReply2 = DEFAULT_QUICK_2;
-      refreshSettingsUI();
-      await update(settingsRef, { quickReply1: DEFAULT_QUICK_1, quickReply2: DEFAULT_QUICK_2 });
-    };
-
     function renderSeniorKeyboardLayout() {
       const container = document.getElementById('senior-kb-letters-container');
       if (!container) return;
@@ -2039,6 +1928,11 @@
       const text = (rawText || "").trim();
       if (!text) return;
 
+      // 5-second cooldown prevents accidental rapid multi-sends
+      const now = Date.now();
+      if (now - lastChatSendMs < 5000) return;
+      lastChatSendMs = now;
+
       const senderLabel = role === 'nana' ? 'Nana' : activeFamilyMember.name;
       const isFromNana = role === 'nana';
       const statusEl = document.getElementById('tg-send-status');
@@ -2106,7 +2000,7 @@
       } else {
         container.innerHTML = `
           <div style="margin:auto; color:var(--text-muted); font-size:1.5rem; font-weight:700; padding:30px;">
-            No messages yet. Tap the box below or a quick button above to say hello!
+            No messages yet. Tap the box below to open the keyboard and say hello!
           </div>
         `;
       }
@@ -2749,23 +2643,6 @@
       const showRead = !!tabletSettings.showReadAloud;
       const kbLayout = tabletSettings.keyboardLayout || 'qwerty';
       const kbHideSec = tabletSettings.keyboardTimeoutSec ?? 60;
-      const q1 = tabletSettings.quickReply1 || DEFAULT_QUICK_1;
-      const q2 = tabletSettings.quickReply2 || DEFAULT_QUICK_2;
-
-      // Update Nana's 2 One-Tap Quick Reply Buttons & Settings Inputs
-      const btnQ1 = document.getElementById('nana-quick-btn-1');
-      const btnQ2 = document.getElementById('nana-quick-btn-2');
-      if (btnQ1) btnQ1.textContent = q1;
-      if (btnQ2) btnQ2.textContent = q2;
-
-      const setQ1 = document.getElementById('set-quick1-input');
-      const setQ2 = document.getElementById('set-quick2-input');
-      const gearQ1 = document.getElementById('gear-quick1-input');
-      const gearQ2 = document.getElementById('gear-quick2-input');
-      if (setQ1 && document.activeElement !== setQ1) setQ1.value = q1;
-      if (setQ2 && document.activeElement !== setQ2) setQ2.value = q2;
-      if (gearQ1 && document.activeElement !== gearQ1) gearQ1.value = q1;
-      if (gearQ2 && document.activeElement !== gearQ2) gearQ2.value = q2;
 
       document.getElementById('lbl-call-vol').innerText = `${callVol}%`;
       document.getElementById('lbl-ring-vol').innerText = `${ringVol}%`;
@@ -3057,11 +2934,13 @@
         updateDebug();
         const parts = co.participants();
 
-        if (parts.local && parts.local.tracks.video?.persistentTrack) {
+        const localTrack = parts.local?.tracks?.video?.persistentTrack || parts.local?.tracks?.video?.track;
+        if (localTrack) {
           const localVid = document.getElementById('local-video');
           const currentLocalTrack = localVid.srcObject?.getVideoTracks()[0];
-          if (currentLocalTrack !== parts.local.tracks.video.persistentTrack) {
-            localVid.srcObject = new MediaStream([parts.local.tracks.video.persistentTrack]);
+          if (currentLocalTrack !== localTrack) {
+            localVid.srcObject = new MediaStream([localTrack]);
+            localVid.play().catch(() => {});
           }
         }
 
@@ -3069,21 +2948,24 @@
           if (p.local) return;
           hadRemote = true;
           clearTimeout(emptyTimer);
-          banner.style.display = 'none';
 
-          if (p.tracks.video?.persistentTrack) {
+          const remVidTrack = p.tracks?.video?.persistentTrack || p.tracks?.video?.track;
+          const remAudTrack = p.tracks?.audio?.persistentTrack || p.tracks?.audio?.track;
+
+          if (remVidTrack && p.tracks?.video?.state === 'playable') {
+            banner.style.display = 'none';
             const remVid = document.getElementById('remote-video');
             const curVidTrack = remVid.srcObject?.getVideoTracks()[0];
-            if (!curVidTrack || curVidTrack.readyState === 'ended') {
-              remVid.srcObject = new MediaStream([p.tracks.video.persistentTrack]);
+            if (curVidTrack !== remVidTrack) {
+              remVid.srcObject = new MediaStream([remVidTrack]);
               playEl(remVid);
             }
           }
-          if (p.tracks.audio?.persistentTrack) {
+          if (remAudTrack && p.tracks?.audio?.state === 'playable') {
             const remAud = document.getElementById('remote-audio');
             const curAudTrack = remAud.srcObject?.getAudioTracks()[0];
-            if (!curAudTrack || curAudTrack.readyState === 'ended') {
-              remAud.srcObject = new MediaStream([p.tracks.audio.persistentTrack]);
+            if (curAudTrack !== remAudTrack) {
+              remAud.srcObject = new MediaStream([remAudTrack]);
               playEl(remAud);
             }
           }
@@ -3196,8 +3078,6 @@
         targetId: activeFamilyMember.id,
         timestamp: Date.now()
       });
-      showScreen('call-screen');
-      await joinDailyRoom();
     };
 
     window.startCallFromFamily = async () => {
@@ -3248,8 +3128,6 @@
         targetId: 'nana',
         timestamp: Date.now()
       });
-      showScreen('call-screen');
-      await joinDailyRoom();
     };
 
     window.endCall = async () => {
