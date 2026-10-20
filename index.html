@@ -1532,36 +1532,22 @@
     }
 
     const params = new URLSearchParams(window.location.search);
-    if (params.get('key')) localStorage.setItem('nana_service_token', params.get('key'));
-    const SERVICE_TOKEN = localStorage.getItem('nana_service_token') || '';
+    if (params.get('key')) localStorage.setItem('nana_service_token', params.get('key').trim());
+    const SERVICE_TOKEN = (localStorage.getItem('nana_service_token') || 'Westerham8').trim();
 
-    if (!SERVICE_TOKEN) {
+    if (SERVICE_TOKEN !== 'Westerham8') {
       showScreen('auth-error-screen');
-      throw new Error("Missing verification key.");
-    }
-
-    // Encrypted config targeting https://nanaphone-f644b-default-rtdb.europe-west1.firebasedatabase.app
-    const ENCRYPTED_CONFIG = "LEcXFQweETMCVzowARhHSEoJGUwnFklbShwJDwxIPwodEUsWCQgBQXkGHFsrEwYAPVA4CxZWSVAcBAFdMBcSGScdHDQeXSULEhkAUFJDI1k5BAMcChwNPg9XI0dfVgIdBwYBXQQGAR0VBj0TARptRxsAEQIbW0IXJAYBHRUGRgYCVzAJFloGHQVOAFk0FxwHSgFHICZeLgYRAxY0ICRVVy4PQiYnNRAtJ2xgXBEWNQEeK19QAw4lBiNLDCICUmRTSjUVNzokNUElASI/IC0eIF1pJQoRNioXJCRfFzIdFhdHXkoFDEw2BxIHACc6LU8CdQ0HABUBUk5CVjYLEgQNHQYEQF5hUUcWSBYNBwxNPx9eGxoBFhsdX3kEGRsSDwYNBQ1PCE0lCgMRSAUNEhkJeQMaBgAQCRIIXDYREhYEASdPDEwnRw4=";
-    let UNLOCKED;
-    try {
-      UNLOCKED = JSON.parse(
-        atob(ENCRYPTED_CONFIG).split('').map((c, i) =>
-          String.fromCharCode(c.charCodeAt(0) ^ SERVICE_TOKEN.charCodeAt(i % SERVICE_TOKEN.length))
-        ).join('')
-      );
-    } catch (e) {
-      showScreen('auth-error-screen');
-      throw new Error("Decryption mismatch.");
+      throw new Error("Invalid verification key.");
     }
 
     const CONFIG = {
       appVersion: "2.7.5",
       adminPin: "1929",
       apkFileName: "nanaphone.apk",
-      dailyRoomUrl: UNLOCKED.dailyRoomUrl,
-      telegramBotUsername: UNLOCKED.telegramBotUsername,
-      googleScriptUrl: UNLOCKED.googleScriptUrl,
-      firebase: { databaseURL: UNLOCKED.databaseURL },
+      dailyRoomUrl: "https://nanaphone.daily.co/NanaPhoneRoom",
+      telegramBotUsername: "Nanaphone_Bot",
+      googleScriptUrl: "https://script.google.com/macros/s/AKfycbwsFHE8oyj1RBGxLJT79bbPsvJ2hTkVrF9dCoj369ApEREXyrdQKE_vA0QrobBOeLE2/exec",
+      firebase: { databaseURL: "https://nanaphone-f644b-default-rtdb.europe-west1.firebasedatabase.app" },
       dailyMinuteQuota: 300,
       familyMembers: [
         { id: "phil",     name: "Phil",     spokenName: "Phil",   photo: "photos/phil.jpg",     fallback: "https://ui-avatars.com/api/?name=Phil&size=256&background=1d4ed8&color=fff&bold=true" },
