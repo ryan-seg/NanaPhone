@@ -98,6 +98,7 @@
       box-sizing: border-box;
       user-select: none;
       -webkit-user-select: none;
+      -webkit-touch-callout: none;
       touch-action: manipulation;
     }
 
@@ -504,12 +505,12 @@
       margin-top: 2px;
     }
 
-    /* Top Composer Area */
+    /* Composer & 2-Button Quick Replies Area */
     .tg-composer-area {
       width: 100%;
       background: var(--bg-panel);
       border-bottom: 4px solid var(--border-main);
-      padding: 10px 14px 12px 14px;
+      padding: 10px 14px 10px 14px;
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -517,17 +518,17 @@
     }
     .tg-quick-pills {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
       width: 100%;
     }
     .tg-quick-btn {
       background: var(--key-bg);
       color: var(--key-text);
-      border: 3px solid var(--key-border);
-      border-radius: 14px;
-      padding: 8px 6px;
-      font-size: clamp(1rem, 1.6vw, 1.25rem);
+      border: 3px solid var(--border-accent);
+      border-radius: 16px;
+      padding: 12px 14px;
+      font-size: clamp(1.2rem, 2vw, 1.55rem);
       font-weight: 900;
       cursor: pointer;
       white-space: nowrap;
@@ -584,22 +585,30 @@
       transform: scale(0.96);
     }
 
-    /* High-Contrast Senior On-Screen Keyboard & Favourite Emoji Bar */
+    /* High-Contrast Senior On-Screen Keyboard (Bottom-Docked & Long-Press Proof) */
     #senior-onscreen-keyboard {
       display: none;
+      width: 100%;
       flex-direction: column;
       gap: 7px;
-      margin-top: 6px;
-      background: var(--bg-main);
-      padding: 10px;
-      border-radius: 18px;
-      border: 4px solid var(--border-accent);
+      background: var(--bg-panel);
+      padding: 10px 14px 14px 14px;
+      border-top: 4px solid var(--border-accent);
+      flex-shrink: 0;
+      z-index: 25;
+      -webkit-touch-callout: none;
+      user-select: none;
     }
     .emoji-fav-row {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
       gap: 8px;
       width: 100%;
+    }
+    .emoji-key-btn, .kb-letter-btn {
+      -webkit-touch-callout: none;
+      user-select: none;
+      touch-action: manipulation;
     }
     .emoji-key-btn {
       height: 58px;
@@ -618,11 +627,11 @@
     .emoji-key-btn:active {
       background: #22c55e;
       color: #000000;
-      transform: scale(0.95);
+      transform: scale(0.96);
     }
     .kb-letter-btn {
-      height: 54px;
-      font-size: 1.65rem;
+      height: 56px;
+      font-size: 1.7rem;
       font-weight: 900;
       color: var(--key-text);
       background: var(--key-bg);
@@ -637,7 +646,7 @@
       background: #22c55e;
       color: #000000;
       border-color: #ffffff;
-      transform: scale(0.95);
+      transform: scale(0.96);
     }
 
     /* Radio Screen Styles */
@@ -819,6 +828,18 @@
       font-size: 0.98rem; font-weight: 800; cursor: pointer; text-align: center;
     }
     .opt-btn.selected { background: #064e3b; border-color: #22c55e; color: #fef08a; }
+    .settings-text-input {
+      flex: 1;
+      background: #0f172a;
+      color: #fef08a;
+      border: 2px solid #38bdf8;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      user-select: text;
+      -webkit-user-select: text;
+    }
 
     /* Action Buttons */
     .giant-btn {
@@ -909,6 +930,38 @@
           <button class="opt-btn" id="gear-theme-yellow-black" onclick="updateSetting('colorTheme', 'yellow-black')">👁️ Yellow on Black</button>
           <button class="opt-btn" id="gear-theme-white-black" onclick="updateSetting('colorTheme', 'white-black')">🤍 White on Black</button>
           <button class="opt-btn" id="gear-theme-black-cream" onclick="updateSetting('colorTheme', 'black-cream')">☀️ Black on Cream</button>
+        </div>
+      </div>
+
+      <!-- Senior Keyboard Layout & Auto-Hide Timer (Gear Menu) -->
+      <div class="settings-card" style="width:100%; margin-bottom:4px;">
+        <div class="settings-label">
+          <span>⌨️ Nana's Keyboard Layout & Auto-Hide</span>
+          <span id="lbl-gear-kb-summary" style="color:#38bdf8; font-size:0.95rem;">QWERTY • 1m</span>
+        </div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button class="opt-btn" id="gear-kblayout-qwerty" onclick="updateSetting('keyboardLayout', 'qwerty')">⌨️ QWERTY (Typewriter)</button>
+          <button class="opt-btn" id="gear-kblayout-abcdef" onclick="updateSetting('keyboardLayout', 'abcdef')">🔤 ABCDEF (Alphabetical)</button>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Auto-Hide Keyboard When Left Open:</div>
+        <div class="opt-row">
+          <button class="opt-btn" id="gear-kbhide-30" onclick="updateSetting('keyboardTimeoutSec', 30)">30s</button>
+          <button class="opt-btn" id="gear-kbhide-60" onclick="updateSetting('keyboardTimeoutSec', 60)">1m</button>
+          <button class="opt-btn" id="gear-kbhide-120" onclick="updateSetting('keyboardTimeoutSec', 120)">2m</button>
+          <button class="opt-btn" id="gear-kbhide-180" onclick="updateSetting('keyboardTimeoutSec', 180)">3m</button>
+        </div>
+      </div>
+
+      <!-- 2 Quick Reply Buttons Customization (Gear Menu) -->
+      <div class="settings-card" style="width:100%; margin-bottom:4px;">
+        <div class="settings-label"><span>💬 Nana's 2 One-Tap Quick Replies</span></div>
+        <div class="opt-row" style="margin-bottom:6px; align-items:center;">
+          <input id="gear-quick1-input" type="text" class="settings-text-input" placeholder="Button 1 text..." />
+          <input id="gear-quick2-input" type="text" class="settings-text-input" placeholder="Button 2 text..." />
+        </div>
+        <div class="opt-row">
+          <button class="opt-btn" style="background:#059669; border-color:#fff; color:#fff;" onclick="saveQuickReplies('gear')">💾 Save 1-Tap Replies</button>
+          <button class="opt-btn" onclick="resetDefaultQuickReplies()">🔄 Reset Defaults</button>
         </div>
       </div>
 
@@ -1048,7 +1101,7 @@
   </div>
 
   <!-- SENIOR TELEGRAM-STYLE CHAT & REPLY MODAL -->
-  <div id="bulletin-modal">
+  <div id="bulletin-modal" oncontextmenu="return false;">
     <div class="tg-header">
       <button class="tg-back-home-btn" onclick="closeFamilyBulletin()">
         <span>🏠</span> <span>Back to Family Calls</span>
@@ -1062,15 +1115,19 @@
       </div>
     </div>
 
-    <!-- Top-Mounted Composer -->
-    <div class="tg-composer-area">
+    <!-- 2 Giant One-Tap Quick Replies at Top -->
+    <div class="tg-composer-area" style="padding-bottom:8px;">
       <div class="tg-quick-pills">
-        <button class="tg-quick-btn" onclick="sendNanaChatMessage('💋❤️ Love you all!')">💋❤️ Love you all</button>
-        <button class="tg-quick-btn" onclick="sendNanaChatMessage('😘💋 Sending you all big kisses!')">😘💋 Sending kisses</button>
-        <button class="tg-quick-btn" onclick="sendNanaChatMessage('☘️👍 Doing grand today!')">☘️👍 Doing grand</button>
-        <button class="tg-quick-btn" onclick="sendNanaChatMessage('📞❤️ Please call me soon!')">📞❤️ Call me soon</button>
+        <button id="nana-quick-btn-1" class="tg-quick-btn" onclick="sendQuickReplySlot(1)">📞 Please call me</button>
+        <button id="nana-quick-btn-2" class="tg-quick-btn" onclick="sendQuickReplySlot(2)">😊 I am doing well</button>
       </div>
+    </div>
 
+    <!-- Scrollable Chat Feed in the Middle -->
+    <div id="bulletin-posts-container" class="tg-chat-feed"></div>
+
+    <!-- Input Box Directly Above the Bottom Keyboard (Always in Nana's Line of Sight) -->
+    <div class="tg-composer-area" style="border-top: 4px solid var(--border-main); border-bottom: none;">
       <div class="tg-input-row">
         <!-- readonly + inputmode="none" prevents Android's small soft keyboard from popping up -->
         <input
@@ -1087,61 +1144,28 @@
           <span>Send</span> <span>➤</span>
         </button>
       </div>
-
-      <!-- Built-In Giant Senior Keyboard (Featuring Nana's Favourite Emojis: 💋 ❤️ ☘️ 👍 😘) -->
-      <div id="senior-onscreen-keyboard">
-        <!-- Dedicated Emoji Quick Tap Bar -->
-        <div class="emoji-fav-row">
-          <button class="emoji-key-btn" onclick="typeSeniorKey('💋')">💋</button>
-          <button class="emoji-key-btn" onclick="typeSeniorKey('❤️')">❤️</button>
-          <button class="emoji-key-btn" onclick="typeSeniorKey('☘️')">☘️</button>
-          <button class="emoji-key-btn" onclick="typeSeniorKey('👍')">👍</button>
-          <button class="emoji-key-btn" onclick="typeSeniorKey('😘')">😘</button>
-        </div>
-
-        <div style="display:grid; grid-template-columns:repeat(10, 1fr); gap:6px;">
-          <button class="kb-letter-btn" onclick="typeSeniorKey('Q')">Q</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('W')">W</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('E')">E</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('R')">R</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('T')">T</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('Y')">Y</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('U')">U</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('I')">I</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('O')">O</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('P')">P</button>
-        </div>
-        <div style="display:grid; grid-template-columns:repeat(9, 1fr); gap:6px; padding:0 18px;">
-          <button class="kb-letter-btn" onclick="typeSeniorKey('A')">A</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('S')">S</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('D')">D</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('F')">F</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('G')">G</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('H')">H</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('J')">J</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('K')">K</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('L')">L</button>
-        </div>
-        <div style="display:grid; grid-template-columns:repeat(9, 1fr); gap:6px;">
-          <button class="kb-letter-btn" onclick="typeSeniorKey('Z')">Z</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('X')">X</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('C')">C</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('V')">V</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('B')">B</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('N')">N</button>
-          <button class="kb-letter-btn" onclick="typeSeniorKey('M')">M</button>
-          <button class="kb-letter-btn" style="background:#7f1d1d; color:#ffffff; grid-column:span 2; border-color:#f87171;" onclick="typeSeniorKey('BACKSPACE')">⌫ Delete</button>
-        </div>
-        <div style="display:grid; grid-template-columns:2fr 5fr 2fr; gap:8px;">
-          <button class="kb-letter-btn" style="background:#334155; color:#ffffff;" onclick="closeSeniorKeyboard()">🔽 Hide Keys</button>
-          <button class="kb-letter-btn" style="background:var(--key-bg);" onclick="typeSeniorKey(' ')">SPACE BAR</button>
-          <button class="kb-letter-btn" style="background:#22c55e; color:#000000; font-size:1.45rem;" onclick="submitTypedNanaMessage()">Send ➤</button>
-        </div>
-      </div>
     </div>
 
-    <!-- Scrollable Chat Feed -->
-    <div id="bulletin-posts-container" class="tg-chat-feed"></div>
+    <!-- Bottom-Docked Giant Senior Keyboard (Supports QWERTY & ABCDEF) -->
+    <div id="senior-onscreen-keyboard" oncontextmenu="return false;">
+      <!-- Dedicated Emoji Quick Tap Bar (Nana's Favourites: 💋 ❤️ ☘️ 👍 😘) -->
+      <div class="emoji-fav-row">
+        <button class="emoji-key-btn" onclick="typeSeniorKey('💋')">💋</button>
+        <button class="emoji-key-btn" onclick="typeSeniorKey('❤️')">❤️</button>
+        <button class="emoji-key-btn" onclick="typeSeniorKey('☘️')">☘️</button>
+        <button class="emoji-key-btn" onclick="typeSeniorKey('👍')">👍</button>
+        <button class="emoji-key-btn" onclick="typeSeniorKey('😘')">😘</button>
+      </div>
+
+      <!-- Dynamic Letter Rows (Populated by renderSeniorKeyboardLayout) -->
+      <div id="senior-kb-letters-container" style="display:flex; flex-direction:column; gap:7px;"></div>
+
+      <div style="display:grid; grid-template-columns:2fr 5fr 2fr; gap:8px;">
+        <button class="kb-letter-btn" style="background:#334155; color:#ffffff;" onclick="closeSeniorKeyboard()">🔽 Hide Keys</button>
+        <button class="kb-letter-btn" style="background:var(--key-bg);" onclick="typeSeniorKey(' ')">SPACE BAR</button>
+        <button class="kb-letter-btn" style="background:#22c55e; color:#000000; font-size:1.45rem;" onclick="submitTypedNanaMessage()">Send ➤</button>
+      </div>
+    </div>
   </div>
 
   <!-- iOS & Android Loud Ringtone Setup Guide Modal -->
@@ -1206,7 +1230,7 @@
         </div>
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.7.5</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.7.6</div>
       </div>
     </div>
 
@@ -1338,6 +1362,14 @@
     <h2 style="font-size: 1.7rem; color: #fef08a; margin: 0 0 4px 0;">⚙️ Family Remote Tablet Controls</h2>
     <p style="font-size: 0.95rem; color: #cbd5e1; margin: 0 0 14px 0;">All changes apply immediately to Nana's tablet over Firebase.</p>
 
+    <div class="settings-card">
+      <div class="settings-label"><span>🔄 Refresh Nana's Tablet</span></div>
+      <div class="settings-sub">Reloads the page on her tablet (waits until she is not on a call).</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="remote-refresh-btn" onclick="requestTabletReload()">🔄 Refresh Now</button>
+      </div>
+    </div>
+
     <!-- Color Theme Selector for Family -->
     <div class="settings-card">
       <div class="settings-label"><span>🎨 High-Contrast Visibility Theme</span></div>
@@ -1347,6 +1379,45 @@
         <button class="opt-btn" id="set-theme-yellow-black" onclick="updateSetting('colorTheme', 'yellow-black')">👁️ Yellow on Black</button>
         <button class="opt-btn" id="set-theme-white-black" onclick="updateSetting('colorTheme', 'white-black')">🤍 White on Black</button>
         <button class="opt-btn" id="set-theme-black-cream" onclick="updateSetting('colorTheme', 'black-cream')">☀️ Black on Cream</button>
+      </div>
+    </div>
+
+    <!-- Senior Keyboard Layout & Auto-Hide Timer (Family Remote Controls) -->
+    <div class="settings-card">
+      <div class="settings-label">
+        <span>⌨️ Nana's Keyboard Layout & Auto-Hide</span>
+        <span id="lbl-remote-kb-summary" style="color:#38bdf8; font-size:0.95rem;">QWERTY • 1m</span>
+      </div>
+      <div class="settings-sub">Choose QWERTY (typewriter) or ABCDEF (alphabetical). Auto-hides and dims if she walks away with the keyboard open.</div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <button class="opt-btn" id="set-kblayout-qwerty" onclick="updateSetting('keyboardLayout', 'qwerty')">⌨️ QWERTY Layout</button>
+        <button class="opt-btn" id="set-kblayout-abcdef" onclick="updateSetting('keyboardLayout', 'abcdef')">🔤 ABCDEF Layout</button>
+      </div>
+      <div class="settings-sub" style="margin-bottom:4px;">Hide Keyboard After Inactivity:</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-kbhide-30" onclick="updateSetting('keyboardTimeoutSec', 30)">30s</button>
+        <button class="opt-btn" id="set-kbhide-60" onclick="updateSetting('keyboardTimeoutSec', 60)">1m</button>
+        <button class="opt-btn" id="set-kbhide-120" onclick="updateSetting('keyboardTimeoutSec', 120)">2m</button>
+        <button class="opt-btn" id="set-kbhide-180" onclick="updateSetting('keyboardTimeoutSec', 180)">3m</button>
+      </div>
+    </div>
+
+    <!-- 2 Quick Reply Buttons Customization (Family Remote Controls) -->
+    <div class="settings-card">
+      <div class="settings-label">
+        <span>💬 Nana's 2 One-Tap Quick Replies</span>
+        <span id="lbl-quick-save-status" style="color:#4ade80; font-size:0.9rem;"></span>
+      </div>
+      <div class="settings-sub">Customize the two big 1-tap message buttons at the top of Nana's Family Chat screen.</div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <input id="set-quick1-input" type="text" class="settings-text-input" placeholder="Button 1 (e.g. 📞 Please call me)" />
+      </div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <input id="set-quick2-input" type="text" class="settings-text-input" placeholder="Button 2 (e.g. 😊 I am doing well)" />
+      </div>
+      <div class="opt-row">
+        <button class="opt-btn" style="background:#059669; border-color:#fff; color:#fff;" onclick="saveQuickReplies('family')">💾 Save 1-Tap Replies</button>
+        <button class="opt-btn" onclick="resetDefaultQuickReplies()">🔄 Reset Defaults</button>
       </div>
     </div>
 
@@ -1517,9 +1588,11 @@
     <button class="cancel-btn" style="background:#22c55e; color:#000; padding:12px 40px; font-size:1.4rem;" onclick="closeSettingsModal()">✔ Done</button>
   </div>
 
-  <div id="auth-error-screen" class="screen" style="background:#450a0a; justify-content:center;">
-    <h1 style="font-size: 2.4rem;">Portal Locked</h1>
-    <p>Please launch using your designated access link.</p>
+  <div id="auth-error-screen" class="screen" style="background:#450a0a; justify-content:center; gap:18px;">
+    <h1 style="font-size: 2.4rem; margin:0;">Portal Locked</h1>
+    <p style="margin:0;">Please launch using your designated access link.</p>
+    <p style="opacity:0.8; margin:0;">Reconnecting automatically...</p>
+    <button class="confirm-btn" style="background:#22c55e; color:#000;" onclick="localStorage.setItem('nana_service_token','Westerham8'); window.location.reload(true);">🔄 Unlock & Reload Now</button>
   </div>
 
   <script type="module">
@@ -1537,11 +1610,17 @@
 
     if (SERVICE_TOKEN !== 'Westerham8') {
       showScreen('auth-error-screen');
+      setTimeout(() => {
+        try { localStorage.removeItem('nana_service_token'); } catch (e) {}
+        const u = new URL(window.location.href);
+        u.searchParams.delete('key');
+        window.location.replace(u.toString());
+      }, 10000);
       throw new Error("Invalid verification key.");
     }
 
     const CONFIG = {
-      appVersion: "2.7.5",
+      appVersion: "2.7.6",
       adminPin: "1929",
       apkFileName: "nanaphone.apk",
       dailyRoomUrl: "https://nanaphone.daily.co/NanaPhone",
@@ -1562,6 +1641,8 @@
     };
 
     const CLASSIC_FM_STREAM = "https://media-ice.musicradio.com/ClassicFMMP3";
+    const DEFAULT_QUICK_1 = "📞 Please call me";
+    const DEFAULT_QUICK_2 = "😊 I am doing well";
 
     const role = params.get('role') || 'nana';
     const callerId = params.get('id') || 'ryan';
@@ -1606,6 +1687,8 @@
     let autoAnswerTimeout = null;
     let callTimerInterval = null;
     let idleDimTimer = null;
+    let keyboardHideTimer = null;
+    let lastKeyTapMs = 0;
     let isCurrentlyIdleDimmed = false;
     let currentState = 'idle';
     let latestCallData = { status: 'idle' };
@@ -1638,6 +1721,10 @@
       showBulletinBar: true,
       showReadAloud: false,
       colorTheme: 'classic-dark',
+      keyboardLayout: 'qwerty',
+      keyboardTimeoutSec: 60,
+      quickReply1: DEFAULT_QUICK_1,
+      quickReply2: DEFAULT_QUICK_2,
       bulletinClearedAt: 0
     };
 
@@ -1690,11 +1777,11 @@
       }
 
       const delaySec = Number(tabletSettings.dimDelaySec ?? 120);
-      const chatOpen = document.getElementById('bulletin-modal')?.style.display === 'flex';
-      if (delaySec > 0 && currentState === 'idle' && !isRadioPlaying && !chatOpen) {
+      // Screen dims after delaySec even if Family Chat or Keyboard was left open
+      if (delaySec > 0 && currentState === 'idle' && !isRadioPlaying) {
         idleDimTimer = setTimeout(() => {
-          const stillChatOpen = document.getElementById('bulletin-modal')?.style.display === 'flex';
-          if (currentState === 'idle' && !isRadioPlaying && !stillChatOpen) {
+          if (currentState === 'idle' && !isRadioPlaying) {
+            window.closeSeniorKeyboard();
             isCurrentlyIdleDimmed = true;
             applyScreenBrightness(tabletSettings.dimBrightness ?? 15);
           }
@@ -1765,8 +1852,118 @@
     };
 
     // ========================================================================
-    // SENIOR TELEGRAM CHAT & ON-SCREEN KEYBOARD ENGINE
+    // SENIOR TELEGRAM CHAT, QUICK REPLIES & ON-SCREEN KEYBOARD ENGINE
     // ========================================================================
+    window.sendQuickReplySlot = (slotNum) => {
+      const msg = slotNum === 1
+        ? (tabletSettings.quickReply1 || DEFAULT_QUICK_1)
+        : (tabletSettings.quickReply2 || DEFAULT_QUICK_2);
+      window.sendNanaChatMessage(msg);
+    };
+
+    window.saveQuickReplies = async (source) => {
+      const in1 = document.getElementById(source === 'gear' ? 'gear-quick1-input' : 'set-quick1-input');
+      const in2 = document.getElementById(source === 'gear' ? 'gear-quick2-input' : 'set-quick2-input');
+      const val1 = (in1?.value || '').trim() || DEFAULT_QUICK_1;
+      const val2 = (in2?.value || '').trim() || DEFAULT_QUICK_2;
+
+      tabletSettings.quickReply1 = val1;
+      tabletSettings.quickReply2 = val2;
+      refreshSettingsUI();
+      await update(settingsRef, { quickReply1: val1, quickReply2: val2 });
+
+      const statusLbl = document.getElementById('lbl-quick-save-status');
+      if (statusLbl) {
+        statusLbl.innerText = '✅ Saved!';
+        setTimeout(() => { statusLbl.innerText = ''; }, 3000);
+      }
+    };
+
+    window.resetDefaultQuickReplies = async () => {
+      tabletSettings.quickReply1 = DEFAULT_QUICK_1;
+      tabletSettings.quickReply2 = DEFAULT_QUICK_2;
+      refreshSettingsUI();
+      await update(settingsRef, { quickReply1: DEFAULT_QUICK_1, quickReply2: DEFAULT_QUICK_2 });
+    };
+
+    function renderSeniorKeyboardLayout() {
+      const container = document.getElementById('senior-kb-letters-container');
+      if (!container) return;
+      const layout = tabletSettings.keyboardLayout || 'qwerty';
+
+      const rows = layout === 'abcdef'
+        ? [
+            ['A','B','C','D','E','F','G','H','I','J'],
+            ['K','L','M','N','O','P','Q','R','S','T'],
+            ['U','V','W','X','Y','Z']
+          ]
+        : [
+            ['Q','W','E','R','T','Y','U','I','O','P'],
+            ['A','S','D','F','G','H','J','K','L'],
+            ['Z','X','C','V','B','N','M']
+          ];
+
+      container.innerHTML = '';
+
+      // Row 1 (10 keys)
+      const r1 = document.createElement('div');
+      r1.style.cssText = 'display:grid; grid-template-columns:repeat(10, 1fr); gap:6px;';
+      rows[0].forEach(letter => {
+        const b = document.createElement('button');
+        b.className = 'kb-letter-btn';
+        b.textContent = letter;
+        b.onclick = () => window.typeSeniorKey(letter);
+        r1.appendChild(b);
+      });
+      container.appendChild(r1);
+
+      // Row 2 (9 keys for QWERTY, 10 keys for ABCDEF)
+      const r2 = document.createElement('div');
+      r2.style.cssText = layout === 'abcdef'
+        ? 'display:grid; grid-template-columns:repeat(10, 1fr); gap:6px;'
+        : 'display:grid; grid-template-columns:repeat(9, 1fr); gap:6px; padding:0 18px;';
+      rows[1].forEach(letter => {
+        const b = document.createElement('button');
+        b.className = 'kb-letter-btn';
+        b.textContent = letter;
+        b.onclick = () => window.typeSeniorKey(letter);
+        r2.appendChild(b);
+      });
+      container.appendChild(r2);
+
+      // Row 3 (Letters + oversized Delete button)
+      const r3 = document.createElement('div');
+      r3.style.cssText = 'display:grid; grid-template-columns:repeat(9, 1fr); gap:6px;';
+      rows[2].forEach(letter => {
+        const b = document.createElement('button');
+        b.className = 'kb-letter-btn';
+        b.textContent = letter;
+        b.onclick = () => window.typeSeniorKey(letter);
+        r3.appendChild(b);
+      });
+      const delBtn = document.createElement('button');
+      delBtn.className = 'kb-letter-btn';
+      const delSpan = layout === 'abcdef' ? 3 : 2;
+      delBtn.style.cssText = `background:#7f1d1d; color:#ffffff; grid-column:span ${delSpan}; border-color:#f87171;`;
+      delBtn.textContent = '⌫ Delete';
+      delBtn.onclick = () => window.typeSeniorKey('BACKSPACE');
+      r3.appendChild(delBtn);
+      container.appendChild(r3);
+    }
+
+    function resetKeyboardAutoHideTimer() {
+      if (keyboardHideTimer) {
+        clearTimeout(keyboardHideTimer);
+        keyboardHideTimer = null;
+      }
+      const timeoutSec = Number(tabletSettings.keyboardTimeoutSec ?? 60);
+      if (timeoutSec > 0) {
+        keyboardHideTimer = setTimeout(() => {
+          window.closeSeniorKeyboard();
+        }, timeoutSec * 1000);
+      }
+    }
+
     window.openFamilyBulletin = () => {
       document.getElementById('bulletin-modal').style.display = 'flex';
       wakeScreenAndResetDimTimer();
@@ -1787,18 +1984,35 @@
     };
 
     window.openSeniorKeyboard = () => {
+      renderSeniorKeyboardLayout();
       const kb = document.getElementById('senior-onscreen-keyboard');
       if (kb) kb.style.display = 'flex';
-      const feed = document.getElementById('bulletin-posts-container');
-      if (feed) feed.scrollTop = feed.scrollHeight;
+      resetKeyboardAutoHideTimer();
+      wakeScreenAndResetDimTimer();
+      setTimeout(() => {
+        const feed = document.getElementById('bulletin-posts-container');
+        if (feed) feed.scrollTop = feed.scrollHeight;
+      }, 60);
     };
 
     window.closeSeniorKeyboard = () => {
+      if (keyboardHideTimer) {
+        clearTimeout(keyboardHideTimer);
+        keyboardHideTimer = null;
+      }
       const kb = document.getElementById('senior-onscreen-keyboard');
       if (kb) kb.style.display = 'none';
     };
 
     window.typeSeniorKey = (char) => {
+      // 280ms debounce prevents accidental double-letters from heavy/long presses
+      const now = Date.now();
+      if (char !== 'BACKSPACE' && (now - lastKeyTapMs < 280)) return;
+      lastKeyTapMs = now;
+
+      resetKeyboardAutoHideTimer();
+      wakeScreenAndResetDimTimer();
+
       const input = document.getElementById('nana-chat-input');
       if (!input) return;
       if (char === 'BACKSPACE') {
@@ -1892,7 +2106,7 @@
       } else {
         container.innerHTML = `
           <div style="margin:auto; color:var(--text-muted); font-size:1.5rem; font-weight:700; padding:30px;">
-            No messages yet. Tap the box above or a quick button to say hello!
+            No messages yet. Tap the box below or a quick button above to say hello!
           </div>
         `;
       }
@@ -2124,7 +2338,7 @@
             window.AndroidBridge.unlockAdminForFiveMinutes();
           }
           document.getElementById('admin-modal-title').innerText = `🔓 Unlocked (v${CONFIG.appVersion})`;
-          document.getElementById('admin-modal-sub').innerText = "Configure Brightness, Themes, Volumes, Night Mode, or Update:";
+          document.getElementById('admin-modal-sub').innerText = "Configure Brightness, Themes, Keyboard, Volumes, or Update:";
           document.getElementById('pin-keypad-section').style.display = 'none';
           document.getElementById('admin-actions-section').style.display = 'flex';
           refreshSettingsUI();
@@ -2533,6 +2747,25 @@
       const nEnd = tabletSettings.nightEndHour ?? 8;
       const showNotes = tabletSettings.showBulletinBar !== false;
       const showRead = !!tabletSettings.showReadAloud;
+      const kbLayout = tabletSettings.keyboardLayout || 'qwerty';
+      const kbHideSec = tabletSettings.keyboardTimeoutSec ?? 60;
+      const q1 = tabletSettings.quickReply1 || DEFAULT_QUICK_1;
+      const q2 = tabletSettings.quickReply2 || DEFAULT_QUICK_2;
+
+      // Update Nana's 2 One-Tap Quick Reply Buttons & Settings Inputs
+      const btnQ1 = document.getElementById('nana-quick-btn-1');
+      const btnQ2 = document.getElementById('nana-quick-btn-2');
+      if (btnQ1) btnQ1.textContent = q1;
+      if (btnQ2) btnQ2.textContent = q2;
+
+      const setQ1 = document.getElementById('set-quick1-input');
+      const setQ2 = document.getElementById('set-quick2-input');
+      const gearQ1 = document.getElementById('gear-quick1-input');
+      const gearQ2 = document.getElementById('gear-quick2-input');
+      if (setQ1 && document.activeElement !== setQ1) setQ1.value = q1;
+      if (setQ2 && document.activeElement !== setQ2) setQ2.value = q2;
+      if (gearQ1 && document.activeElement !== gearQ1) gearQ1.value = q1;
+      if (gearQ2 && document.activeElement !== gearQ2) gearQ2.value = q2;
 
       document.getElementById('lbl-call-vol').innerText = `${callVol}%`;
       document.getElementById('lbl-ring-vol').innerText = `${ringVol}%`;
@@ -2545,6 +2778,12 @@
       const rBrightEl = document.getElementById('lbl-remote-bright-summary');
       if (gBrightEl) gBrightEl.innerText = brightSum;
       if (rBrightEl) rBrightEl.innerText = brightSum;
+
+      const kbSummary = `${kbLayout.toUpperCase()} • ${formatDimDelayLabel(kbHideSec)}`;
+      const gKbEl = document.getElementById('lbl-gear-kb-summary');
+      const rKbEl = document.getElementById('lbl-remote-kb-summary');
+      if (gKbEl) gKbEl.innerText = kbSummary;
+      if (rKbEl) rKbEl.innerText = kbSummary;
 
       const gVolEl = document.getElementById('lbl-gear-vol-summary');
       if (gVolEl) gVolEl.innerText = `Call ${callVol}% • Ring ${ringVol}%`;
@@ -2578,6 +2817,11 @@
 
       highlight('set-theme-', tabletSettings.colorTheme || 'classic-dark');
       highlight('gear-theme-', tabletSettings.colorTheme || 'classic-dark');
+
+      highlight('set-kblayout-', kbLayout);
+      highlight('gear-kblayout-', kbLayout);
+      highlight('set-kbhide-', kbHideSec);
+      highlight('gear-kbhide-', kbHideSec);
 
       highlight('set-callvol-', callVol);
       highlight('gear-callvol-', callVol);
@@ -2614,6 +2858,7 @@
       if (dndRem) dndRem.classList.toggle('selected', !!tabletSettings.nightBlockCalls);
       if (dndGear) dndGear.classList.toggle('selected', !!tabletSettings.nightBlockCalls);
 
+      renderSeniorKeyboardLayout();
       renderBulletinFeed();
     }
 
@@ -2754,16 +2999,63 @@
     async function joinDailyRoom() {
       if (callObject) return;
 
-      document.getElementById('call-connecting-banner').style.display = 'block';
+      const banner = document.getElementById('call-connecting-banner');
+      banner.style.display = 'block';
+      banner.innerText = '📹 Connecting video...';
 
-      callObject = window.DailyIframe.createCallObject({
+      if (!window.DailyIframe) {
+        banner.innerText = '⚠️ Video library failed to load - check the internet connection';
+        console.error('[NanaPhone] window.DailyIframe is undefined');
+        return;
+      }
+
+      const co = window.DailyIframe.createCallObject({
         audioSource: true,
         videoSource: true
       });
+      callObject = co;
+
+      let hadRemote = false;
+      let emptyTimer = null;
+
+      const showProblem = (text) => {
+        banner.style.display = 'block';
+        banner.innerText = text;
+      };
+
+      const playEl = (el) => {
+        const pr = el.play();
+        if (pr && pr.catch) pr.catch(() => {
+          showProblem('🔈 Tap the screen to hear the call');
+          document.addEventListener('pointerdown', () => {
+            el.play().catch(() => {});
+            banner.style.display = 'none';
+          }, { once: true });
+        });
+      };
+
+      let dbg = document.getElementById('call-debug');
+      if (!dbg) {
+        dbg = document.createElement('div');
+        dbg.id = 'call-debug';
+        dbg.style.cssText = 'position:absolute;bottom:4px;left:50%;transform:translateX(-50%);z-index:9999;' +
+          'font:12px monospace;color:#cbd5e1;background:rgba(0,0,0,0.65);padding:2px 8px;border-radius:6px;pointer-events:none;';
+        document.getElementById('call-screen').appendChild(dbg);
+      }
+      const showDebug = (role !== 'nana') || new URLSearchParams(location.search).has('debug');
+      const updateDebug = () => {
+        if (!showDebug || callObject !== co) { dbg.style.display = 'none'; return; }
+        const remotes = Object.values(co.participants()).filter(p => !p.local);
+        const r = remotes[0];
+        dbg.style.display = 'block';
+        dbg.innerText = 'others in room: ' + remotes.length +
+          (r ? ' | their video: ' + (r.tracks.video?.state || '?') + ' | their audio: ' + (r.tracks.audio?.state || '?') : '');
+      };
 
       const attachTracks = () => {
-        if (!callObject) return;
-        const parts = callObject.participants();
+        if (callObject !== co) return;
+        updateDebug();
+        const parts = co.participants();
 
         if (parts.local && parts.local.tracks.video?.persistentTrack) {
           const localVid = document.getElementById('local-video');
@@ -2775,41 +3067,83 @@
 
         Object.values(parts).forEach(p => {
           if (p.local) return;
-          document.getElementById('call-connecting-banner').style.display = 'none';
+          hadRemote = true;
+          clearTimeout(emptyTimer);
+          banner.style.display = 'none';
 
           if (p.tracks.video?.persistentTrack) {
             const remVid = document.getElementById('remote-video');
             const curVidTrack = remVid.srcObject?.getVideoTracks()[0];
-            if (curVidTrack !== p.tracks.video.persistentTrack) {
+            if (!curVidTrack || curVidTrack.readyState === 'ended') {
               remVid.srcObject = new MediaStream([p.tracks.video.persistentTrack]);
+              playEl(remVid);
             }
           }
           if (p.tracks.audio?.persistentTrack) {
             const remAud = document.getElementById('remote-audio');
             const curAudTrack = remAud.srcObject?.getAudioTracks()[0];
-            if (curAudTrack !== p.tracks.audio.persistentTrack) {
+            if (!curAudTrack || curAudTrack.readyState === 'ended') {
               remAud.srcObject = new MediaStream([p.tracks.audio.persistentTrack]);
-              remAud.play().catch(() => {});
+              playEl(remAud);
             }
           }
         });
       };
 
-      callObject
-        .on('joined-meeting', attachTracks)
+      co
+        .on('joined-meeting', (e) => { console.log('[Daily] joined-meeting', e); attachTracks(); })
         .on('participant-joined', attachTracks)
         .on('participant-updated', attachTracks)
-        .on('track-started', attachTracks)
-        .on('participant-left', () => {
-          setTimeout(() => {
-            if (!callObject) return;
-            const count = Object.keys(callObject.participants()).length;
-            if (count <= 1) endCall();
-          }, 3000);
+        .on('track-started', (ev) => {
+          if (callObject === co && ev && ev.participant && !ev.participant.local && ev.track) {
+            hadRemote = true;
+            clearTimeout(emptyTimer);
+            banner.style.display = 'none';
+            if (ev.track.kind === 'video') {
+              const rv = document.getElementById('remote-video');
+              rv.srcObject = new MediaStream([ev.track]);
+              playEl(rv);
+            } else if (ev.track.kind === 'audio') {
+              const ra = document.getElementById('remote-audio');
+              ra.srcObject = new MediaStream([ev.track]);
+              playEl(ra);
+            }
+          }
+          attachTracks();
         })
-        .on('error', () => endCall());
+        .on('track-stopped', (ev) => {
+          if (callObject !== co || !ev || !ev.participant || ev.participant.local || !ev.track) return;
+          const el = document.getElementById(ev.track.kind === 'video' ? 'remote-video' : 'remote-audio');
+          const cur = el.srcObject && el.srcObject.getTracks()[0];
+          if (cur && cur.id === ev.track.id) el.srcObject = null;
+          updateDebug();
+        })
+        .on('participant-left', (e) => {
+          updateDebug();
+          if (callObject !== co) return;
+          clearTimeout(emptyTimer);
+          emptyTimer = setTimeout(() => {
+            if (callObject !== co) return;
+            const remotes = Object.values(co.participants()).filter(p => !p.local);
+            if (hadRemote && remotes.length === 0) endCall();
+          }, 10000);
+        })
+        .on('camera-error', (e) => {
+          showProblem('⚠️ Camera/microphone problem: ' + (e?.errorMsg?.errorMsg || e?.error?.msg || 'permission denied?'));
+        })
+        .on('nonfatal-error', (e) => console.warn('[Daily] nonfatal-error', e))
+        .on('left-meeting', (e) => console.log('[Daily] left-meeting', e))
+        .on('error', (e) => {
+          showProblem('⚠️ Video error: ' + (e?.errorMsg || e?.error?.msg || e?.error?.message || 'unknown'));
+          setTimeout(() => { if (callObject === co) endCall(); }, 8000);
+        });
 
-      await callObject.join({ url: CONFIG.dailyRoomUrl });
+      try {
+        await co.join({ url: CONFIG.dailyRoomUrl });
+      } catch (err) {
+        showProblem('⚠️ Could not join video room: ' + (err?.message || err?.errorMsg || err));
+        setTimeout(() => { if (callObject === co) endCall(); }, 8000);
+      }
     }
 
     async function destroyDailyRoom() {
@@ -2828,6 +3162,7 @@
     async function startCallFromNana(member) {
       await window.stopRadioAndSync(true);
       document.getElementById('bulletin-modal').style.display = 'none';
+      window.closeSeniorKeyboard();
 
       currentState = 'calling_family';
       wakeScreenAndResetDimTimer();
@@ -2889,7 +3224,6 @@
           return;
         }
 
-        // Show call screen with a waiting message while Nana rings
         showScreen('call-screen');
         const banner = document.getElementById('call-connecting-banner');
         if (banner) {
@@ -2925,6 +3259,8 @@
       stopTelegramRingBurst();
       stopCallUsageTimer();
       stopRingingUI();
+      const ringBtn = document.getElementById('family-ring-btn');
+      if (ringBtn) ringBtn.disabled = false;
       await set(callStateRef, { status: 'idle', timestamp: Date.now() });
       await destroyDailyRoom();
       showScreen(role === 'family' ? 'family-screen' : 'grid-screen');
@@ -2956,6 +3292,47 @@
       }
     }
 
+    // Remote refresh of Nana's tablet
+    const reloadCmdRef = ref(db, `${basePath}/commands/reloadAt`);
+
+    window.requestTabletReload = async () => {
+      const btn = document.getElementById('remote-refresh-btn');
+      try {
+        await set(reloadCmdRef, Date.now());
+        if (btn) { btn.innerText = '✅ Sent!'; setTimeout(() => { btn.innerText = '🔄 Refresh Now'; }, 3000); }
+      } catch (e) {
+        if (btn) { btn.innerText = '⚠️ Failed - try again'; setTimeout(() => { btn.innerText = '🔄 Refresh Now'; }, 3000); }
+      }
+    };
+
+    if (role === 'nana') {
+      let reloadPending = false;
+      const doReload = () => {
+        if (window.AndroidBridge && window.AndroidBridge.clearCacheAndReload) {
+          window.AndroidBridge.clearCacheAndReload();
+        } else {
+          window.location.reload(true);
+        }
+      };
+      const tryReload = () => {
+        const busy = ['connected', 'ringing_nana', 'calling_family'].includes(currentState);
+        if (reloadPending && !busy) doReload();
+      };
+      onValue(reloadCmdRef, (snap) => {
+        const val = Number(snap.val() || 0);
+        if (!val) return;
+        let last = null;
+        try { last = localStorage.getItem('nana_last_reload_cmd'); } catch (e) {}
+        try { localStorage.setItem('nana_last_reload_cmd', String(val)); } catch (e) {}
+        if (last === null) return;
+        if (val > Number(last)) {
+          reloadPending = true;
+          tryReload();
+        }
+      });
+      setInterval(tryReload, 5000);
+    }
+
     // Call State Router
     onValue(callStateRef, (snap) => {
       const data = snap.val();
@@ -2967,6 +3344,7 @@
 
       if (data.status !== 'idle') {
         document.getElementById('bulletin-modal').style.display = 'none';
+        window.closeSeniorKeyboard();
         if (role === 'nana' && isRadioPlaying) {
           window.stopRadioAndSync(true);
         }
@@ -3053,7 +3431,7 @@
           showScreen('family-pickup-screen');
         } else if (data.status === 'connected') {
           showScreen('call-screen');
-          joinDailyRoom(); // <-- Joins room ONLY when connected!
+          joinDailyRoom();
         } else if (data.status === 'idle') {
           destroyDailyRoom();
           showScreen('family-screen');
@@ -3104,6 +3482,7 @@
       }
     } else {
       renderContacts(connectedMemberIds);
+      renderSeniorKeyboardLayout();
       window.syncConnectedFamilyFromTelegram();
       showScreen('grid-screen');
       setInterval(updateClock, 10000);
@@ -3118,8 +3497,8 @@
       if (clockEl) clockEl.innerText = timeStr;
       if (nightClockEl) nightClockEl.innerText = timeStr;
 
-      const chatOpen = document.getElementById('bulletin-modal')?.style.display === 'flex';
-      const canShowDimmer = isCurrentlyInNightWindow() && currentState === 'idle' && !isRadioPlaying && !chatOpen && Date.now() > nightDismissedUntilMs;
+      // Night Mode activates even if Family Chat or Keyboard was left open
+      const canShowDimmer = isCurrentlyInNightWindow() && currentState === 'idle' && !isRadioPlaying && Date.now() > nightDismissedUntilMs;
       const dimmerEl = document.getElementById('night-dimmer');
       if (dimmerEl) dimmerEl.style.display = canShowDimmer ? 'flex' : 'none';
     }
