@@ -2871,7 +2871,8 @@
 
       try {
         const result = await runTransaction(callStateRef, (current) => {
-          if (current && current.status !== 'idle') {
+          const isStale = current && current.timestamp && (Date.now() - current.timestamp > 90000);
+          if (current && current.status !== 'idle' && !isStale) {
             return;
           }
           return {
@@ -2888,8 +2889,13 @@
           return;
         }
 
+        // Show call screen with a waiting message while Nana rings
         showScreen('call-screen');
-        await joinDailyRoom();
+        const banner = document.getElementById('call-connecting-banner');
+        if (banner) {
+          banner.style.display = 'block';
+          banner.innerText = '🔔 Ringing Nana... Waiting for her to answer...';
+        }
       } catch (e) {
         if (ringBtn) ringBtn.disabled = false;
       }
@@ -3047,7 +3053,7 @@
           showScreen('family-pickup-screen');
         } else if (data.status === 'connected') {
           showScreen('call-screen');
-          joinDailyRoom();
+          joinDailyRoom(); // <-- Joins room ONLY when connected!
         } else if (data.status === 'idle') {
           destroyDailyRoom();
           showScreen('family-screen');
