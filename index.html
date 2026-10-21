@@ -587,8 +587,8 @@
       touch-action: manipulation;
     }
     .emoji-key-btn {
-      height: 58px;
-      font-size: 2.1rem;
+      height: 62px;
+      font-size: 2.25rem;
       font-weight: 900;
       background: var(--key-bg);
       color: var(--key-text);
@@ -749,14 +749,14 @@
     }
     #call-connecting-banner {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      z-index: 20; font-size: 2.2rem; font-weight: 900; color: #fef08a;
-      background: rgba(15, 23, 42, 0.9); padding: 18px 32px; border-radius: 20px;
-      border: 3px solid #facc15; pointer-events: none;
+      z-index: 20; font-size: 2rem; font-weight: 900; color: #fef08a;
+      background: rgba(15, 23, 42, 0.92); padding: 18px 32px; border-radius: 20px;
+      border: 3px solid #facc15; pointer-events: none; max-width: 88vw;
     }
     #call-status-pill {
-      position: absolute; top: 68px; left: 20px; z-index: 50;
+      position: absolute; bottom: 200px; left: 24px; z-index: 50;
       background: rgba(6, 78, 59, 0.9); border: 2px solid #22c55e;
-      padding: 8px 16px; border-radius: 14px; font-size: 1.25rem; font-weight: 800; color: #fef08a;
+      padding: 6px 14px; border-radius: 14px; font-size: 1.05rem; font-weight: 800; color: #fef08a;
     }
 
     /* Giant Love / Wave Toast Banner on Nana's Screen */
@@ -901,13 +901,14 @@
       <div class="settings-card" style="width:100%; margin-bottom:4px;">
         <div class="settings-label">
           <span>⌨️ Nana's Keyboard Layout & Auto-Hide</span>
-          <span id="lbl-gear-kb-summary" style="color:#38bdf8; font-size:0.95rem;">QWERTY • 1m</span>
+          <span id="lbl-gear-kb-summary" style="color:#38bdf8; font-size:0.95rem;">EMOJIS • 1m</span>
         </div>
         <div class="opt-row" style="margin-bottom:8px;">
-          <button class="opt-btn" id="gear-kblayout-qwerty" onclick="updateSetting('keyboardLayout', 'qwerty')">⌨️ QWERTY (Typewriter)</button>
-          <button class="opt-btn" id="gear-kblayout-abcdef" onclick="updateSetting('keyboardLayout', 'abcdef')">🔤 ABCDEF (Alphabetical)</button>
+          <button class="opt-btn" id="gear-kblayout-emojis" onclick="updateSetting('keyboardLayout', 'emojis')">😘 Emojis Only</button>
+          <button class="opt-btn" id="gear-kblayout-qwerty" onclick="updateSetting('keyboardLayout', 'qwerty')">⌨️ QWERTY</button>
+          <button class="opt-btn" id="gear-kblayout-abcdef" onclick="updateSetting('keyboardLayout', 'abcdef')">🔤 ABCDEF</button>
         </div>
-        <div class="settings-sub" style="margin-bottom:4px;">Auto-Hide Keyboard When Left Open:</div>
+        <div class="settings-sub" style="margin-bottom:4px;">Auto-Hide & Clear Unsent Text After:</div>
         <div class="opt-row">
           <button class="opt-btn" id="gear-kbhide-30" onclick="updateSetting('keyboardTimeoutSec', 30)">30s</button>
           <button class="opt-btn" id="gear-kbhide-60" onclick="updateSetting('keyboardTimeoutSec', 60)">1m</button>
@@ -1089,7 +1090,7 @@
       </div>
     </div>
 
-    <!-- Bottom-Docked Giant Senior Keyboard (Supports QWERTY & ABCDEF) -->
+    <!-- Bottom-Docked Giant Senior Keyboard (Supports Emojis-Only, QWERTY & ABCDEF) -->
     <div id="senior-onscreen-keyboard" oncontextmenu="return false;">
       <!-- Dedicated Emoji Quick Tap Bar (Nana's Favourites: 💋 ❤️ ☘️ 👍 😘) -->
       <div class="emoji-fav-row">
@@ -1103,10 +1104,9 @@
       <!-- Dynamic Letter Rows (Populated by renderSeniorKeyboardLayout) -->
       <div id="senior-kb-letters-container" style="display:flex; flex-direction:column; gap:7px;"></div>
 
-      <div style="display:grid; grid-template-columns:2fr 5fr 2fr; gap:8px;">
+      <div id="senior-kb-bottom-row" style="display:grid; grid-template-columns:1fr 2fr; gap:8px;">
         <button class="kb-letter-btn" style="background:#334155; color:#ffffff;" onclick="closeSeniorKeyboard()">🔽 Hide Keys</button>
-        <button class="kb-letter-btn" style="background:var(--key-bg);" onclick="typeSeniorKey(' ')">SPACE BAR</button>
-        <button class="kb-letter-btn" style="background:#22c55e; color:#000000; font-size:1.45rem;" onclick="submitTypedNanaMessage()">Send ➤</button>
+        <button id="senior-kb-space-btn" class="kb-letter-btn" style="background:var(--key-bg);" onclick="typeSeniorKey(' ')">SPACE BAR</button>
       </div>
     </div>
   </div>
@@ -1173,7 +1173,7 @@
         </div>
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.7.7</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.7.8</div>
       </div>
     </div>
 
@@ -1249,8 +1249,9 @@
       <button class="vol-step-btn" style="background:#334155;" onclick="openSettingsModal()">⚙️</button>
     </div>
 
-    <video id="remote-video" autoplay playsinline></video>
-    <audio id="remote-audio" autoplay></audio>
+    <!-- muted on remote-video prevents Chrome autoplay block; audio plays via remote-audio -->
+    <video id="remote-video" autoplay playsinline muted></video>
+    <audio id="remote-audio" autoplay playsinline></audio>
     <video id="local-video" autoplay playsinline muted></video>
 
     <button class="hangup-btn" onclick="endCall()">End Call</button>
@@ -1329,14 +1330,15 @@
     <div class="settings-card">
       <div class="settings-label">
         <span>⌨️ Nana's Keyboard Layout & Auto-Hide</span>
-        <span id="lbl-remote-kb-summary" style="color:#38bdf8; font-size:0.95rem;">QWERTY • 1m</span>
+        <span id="lbl-remote-kb-summary" style="color:#38bdf8; font-size:0.95rem;">EMOJIS • 1m</span>
       </div>
-      <div class="settings-sub">Choose QWERTY (typewriter) or ABCDEF (alphabetical). Auto-hides and dims if she walks away with the keyboard open.</div>
+      <div class="settings-sub">Choose Emojis Only (stops accidental letter mashing), QWERTY, or ABCDEF. Auto-hides and clears unsent text when idle.</div>
       <div class="opt-row" style="margin-bottom:8px;">
-        <button class="opt-btn" id="set-kblayout-qwerty" onclick="updateSetting('keyboardLayout', 'qwerty')">⌨️ QWERTY Layout</button>
-        <button class="opt-btn" id="set-kblayout-abcdef" onclick="updateSetting('keyboardLayout', 'abcdef')">🔤 ABCDEF Layout</button>
+        <button class="opt-btn" id="set-kblayout-emojis" onclick="updateSetting('keyboardLayout', 'emojis')">😘 Emojis Only</button>
+        <button class="opt-btn" id="set-kblayout-qwerty" onclick="updateSetting('keyboardLayout', 'qwerty')">⌨️ QWERTY</button>
+        <button class="opt-btn" id="set-kblayout-abcdef" onclick="updateSetting('keyboardLayout', 'abcdef')">🔤 ABCDEF</button>
       </div>
-      <div class="settings-sub" style="margin-bottom:4px;">Hide Keyboard After Inactivity:</div>
+      <div class="settings-sub" style="margin-bottom:4px;">Hide Keyboard & Clear Unsent Text After:</div>
       <div class="opt-row">
         <button class="opt-btn" id="set-kbhide-30" onclick="updateSetting('keyboardTimeoutSec', 30)">30s</button>
         <button class="opt-btn" id="set-kbhide-60" onclick="updateSetting('keyboardTimeoutSec', 60)">1m</button>
@@ -1544,7 +1546,7 @@
     }
 
     const CONFIG = {
-      appVersion: "2.7.7",
+      appVersion: "2.7.8",
       adminPin: "1929",
       apkFileName: "nanaphone.apk",
       dailyRoomUrl: "https://nanaphone.daily.co/NanaPhone",
@@ -1570,6 +1572,7 @@
     const callerId = params.get('id') || 'ryan';
     const autoAnswerFromTelegram = params.get('answer') === 'true';
     const activeFamilyMember = CONFIG.familyMembers.find(m => m.id === callerId) || CONFIG.familyMembers[4];
+    const isRealAndroidTablet = !!(window.AndroidBridge || /Lenovo|TB-|Tab/i.test(navigator.userAgent));
 
     const app = initializeApp(CONFIG.firebase);
     const db = getDatabase(app);
@@ -1592,6 +1595,8 @@
     }
 
     let callObject = null;
+    let isJoiningOrInRoom = false;
+    let didManuallyInitiateOrAnswerOnThisTab = false;
     let isRadioPlaying = false;
     let latestEntState = { activeKey: "off", title: "Off" };
     let pendingCallContact = null;
@@ -1644,7 +1649,7 @@
       showBulletinBar: true,
       showReadAloud: false,
       colorTheme: 'classic-dark',
-      keyboardLayout: 'qwerty',
+      keyboardLayout: 'emojis',
       keyboardTimeoutSec: 60,
       bulletinClearedAt: 0
     };
@@ -1698,7 +1703,6 @@
       }
 
       const delaySec = Number(tabletSettings.dimDelaySec ?? 120);
-      // Screen dims after delaySec even if Family Chat or Keyboard was left open
       if (delaySec > 0 && currentState === 'idle' && !isRadioPlaying) {
         idleDimTimer = setTimeout(() => {
           if (currentState === 'idle' && !isRadioPlaying) {
@@ -1777,8 +1781,28 @@
     // ========================================================================
     function renderSeniorKeyboardLayout() {
       const container = document.getElementById('senior-kb-letters-container');
+      const spaceBtn = document.getElementById('senior-kb-space-btn');
       if (!container) return;
-      const layout = tabletSettings.keyboardLayout || 'qwerty';
+      const layout = tabletSettings.keyboardLayout || 'emojis';
+
+      container.innerHTML = '';
+
+      // EMOJIS-ONLY MODE: Giant emoji buttons + Delete button (zero accidental letter mashing)
+      if (layout === 'emojis') {
+        if (spaceBtn) spaceBtn.style.display = 'none';
+        const delRow = document.createElement('div');
+        delRow.style.cssText = 'display:grid; grid-template-columns:1fr; gap:6px;';
+        const delBtn = document.createElement('button');
+        delBtn.className = 'kb-letter-btn';
+        delBtn.style.cssText = 'background:#7f1d1d; color:#ffffff; border-color:#f87171;';
+        delBtn.textContent = '⌫ Delete Last Emoji';
+        delBtn.onclick = () => window.typeSeniorKey('BACKSPACE');
+        delRow.appendChild(delBtn);
+        container.appendChild(delRow);
+        return;
+      }
+
+      if (spaceBtn) spaceBtn.style.display = 'flex';
 
       const rows = layout === 'abcdef'
         ? [
@@ -1792,8 +1816,6 @@
             ['Z','X','C','V','B','N','M']
           ];
 
-      container.innerHTML = '';
-
       // Row 1 (10 keys)
       const r1 = document.createElement('div');
       r1.style.cssText = 'display:grid; grid-template-columns:repeat(10, 1fr); gap:6px;';
@@ -1806,7 +1828,7 @@
       });
       container.appendChild(r1);
 
-      // Row 2 (9 keys for QWERTY, 10 keys for ABCDEF)
+      // Row 2
       const r2 = document.createElement('div');
       r2.style.cssText = layout === 'abcdef'
         ? 'display:grid; grid-template-columns:repeat(10, 1fr); gap:6px;'
@@ -1848,6 +1870,8 @@
       const timeoutSec = Number(tabletSettings.keyboardTimeoutSec ?? 60);
       if (timeoutSec > 0) {
         keyboardHideTimer = setTimeout(() => {
+          const input = document.getElementById('nana-chat-input');
+          if (input) input.value = '';
           window.closeSeniorKeyboard();
         }, timeoutSec * 1000);
       }
@@ -1894,9 +1918,9 @@
     };
 
     window.typeSeniorKey = (char) => {
-      // 280ms debounce prevents accidental double-letters from heavy/long presses
+      // 400ms debounce prevents accidental double-letters from heavy/long presses
       const now = Date.now();
-      if (char !== 'BACKSPACE' && (now - lastKeyTapMs < 280)) return;
+      if (char !== 'BACKSPACE' && (now - lastKeyTapMs < 400)) return;
       lastKeyTapMs = now;
 
       resetKeyboardAutoHideTimer();
@@ -1909,7 +1933,15 @@
       } else if (['💋', '❤️', '☘️', '👍', '😘'].includes(char)) {
         input.value += char;
       } else {
-        const nextChar = input.value.length === 0 ? char : char.toLowerCase();
+        // Prevent palm-resting from typing 3+ identical letters in a row (e.g. "ggggggggg")
+        const currentVal = input.value;
+        if (currentVal.length >= 2) {
+          const lastTwo = currentVal.slice(-2).toLowerCase();
+          if (lastTwo === (char.toLowerCase() + char.toLowerCase())) {
+            return;
+          }
+        }
+        const nextChar = currentVal.length === 0 ? char : char.toLowerCase();
         input.value += nextChar;
       }
     };
@@ -1928,7 +1960,6 @@
       const text = (rawText || "").trim();
       if (!text) return;
 
-      // 5-second cooldown prevents accidental rapid multi-sends
       const now = Date.now();
       if (now - lastChatSendMs < 5000) return;
       lastChatSendMs = now;
@@ -2293,7 +2324,7 @@
     }, { passive: true });
 
     function recordHeartbeat(customActivity = null) {
-      if (role !== 'nana') return;
+      if (role !== 'nana' || !isRealAndroidTablet) return;
       let batteryLevel = null;
       let isCharging = null;
       if (window.AndroidBridge && window.AndroidBridge.getBatteryStatusJson) {
@@ -2315,7 +2346,7 @@
       update(presenceRef, payload);
     }
 
-    if (role === 'nana') {
+    if (role === 'nana' && isRealAndroidTablet) {
       setTimeout(() => {
         wakeScreenAndResetDimTimer();
         recordHeartbeat("Tablet Online");
@@ -2641,7 +2672,7 @@
       const nEnd = tabletSettings.nightEndHour ?? 8;
       const showNotes = tabletSettings.showBulletinBar !== false;
       const showRead = !!tabletSettings.showReadAloud;
-      const kbLayout = tabletSettings.keyboardLayout || 'qwerty';
+      const kbLayout = tabletSettings.keyboardLayout || 'emojis';
       const kbHideSec = tabletSettings.keyboardTimeoutSec ?? 60;
 
       document.getElementById('lbl-call-vol').innerText = `${callVol}%`;
@@ -2872,9 +2903,31 @@
       }
     }
 
-    // Custom WebRTC Video Engine
+    // Pre-unlocks mobile Chrome / Android WebView audio on user gesture
+    function unlockCallAudio() {
+      try {
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        const ra = document.getElementById('remote-audio');
+        const rv = document.getElementById('remote-video');
+        if (rv) {
+          rv.muted = true;
+          rv.play().catch(() => {});
+        }
+        if (ra) {
+          ra.muted = false;
+          const p = ra.play();
+          if (p && p.catch) p.catch(() => {});
+        }
+      } catch (e) {}
+    }
+
+    // ========================================================================
+    // STRICT 1-ON-1 WEBRTC VIDEO ENGINE (Prevents Multi-Tab & Rear-Cam Bugs)
+    // ========================================================================
     async function joinDailyRoom() {
-      if (callObject) return;
+      // Synchronous lock prevents any double-join race condition
+      if (isJoiningOrInRoom || callObject) return;
+      isJoiningOrInRoom = true;
 
       const banner = document.getElementById('call-connecting-banner');
       banner.style.display = 'block';
@@ -2882,13 +2935,13 @@
 
       if (!window.DailyIframe) {
         banner.innerText = '⚠️ Video library failed to load - check the internet connection';
-        console.error('[NanaPhone] window.DailyIframe is undefined');
+        isJoiningOrInRoom = false;
         return;
       }
 
       const co = window.DailyIframe.createCallObject({
         audioSource: true,
-        videoSource: true
+        videoSource: { facingMode: 'user' } // Always use front-facing selfie camera
       });
       callObject = co;
 
@@ -2903,11 +2956,14 @@
       const playEl = (el) => {
         const pr = el.play();
         if (pr && pr.catch) pr.catch(() => {
-          showProblem('🔈 Tap the screen to hear the call');
-          document.addEventListener('pointerdown', () => {
-            el.play().catch(() => {});
+          showProblem('🔈 Tap anywhere on screen to hear the call');
+          const resumeBoth = () => {
+            document.getElementById('remote-video')?.play().catch(() => {});
+            document.getElementById('remote-audio')?.play().catch(() => {});
             banner.style.display = 'none';
-          }, { once: true });
+          };
+          document.addEventListener('pointerdown', resumeBoth, { once: true });
+          document.addEventListener('touchstart', resumeBoth, { once: true });
         });
       };
 
@@ -2920,13 +2976,27 @@
         document.getElementById('call-screen').appendChild(dbg);
       }
       const showDebug = (role !== 'nana') || new URLSearchParams(location.search).has('debug');
+
+      // Pick the right remote participant (Prioritize Nana_Tablet for family, and Family_* for Nana)
+      const pickBestRemoteParticipant = () => {
+        const remotes = Object.values(co.participants()).filter(p => !p.local);
+        if (remotes.length === 0) return null;
+        if (role === 'family') {
+          return remotes.find(p => p.user_name === 'Nana_Tablet')
+              || remotes.find(p => (p.user_name || '').startsWith('Nana'))
+              || remotes[0];
+        } else {
+          return remotes.find(p => (p.user_name || '').startsWith('Family_'))
+              || remotes[0];
+        }
+      };
+
       const updateDebug = () => {
         if (!showDebug || callObject !== co) { dbg.style.display = 'none'; return; }
         const remotes = Object.values(co.participants()).filter(p => !p.local);
-        const r = remotes[0];
+        const r = pickBestRemoteParticipant();
         dbg.style.display = 'block';
-        dbg.innerText = 'others in room: ' + remotes.length +
-          (r ? ' | their video: ' + (r.tracks.video?.state || '?') + ' | their audio: ' + (r.tracks.audio?.state || '?') : '');
+        dbg.innerText = `remotes: ${remotes.length} (${r?.user_name || 'none'}) | vid: ${r?.tracks?.video?.state || '?'} | aud: ${r?.tracks?.audio?.state || '?'}`;
       };
 
       const attachTracks = () => {
@@ -2944,63 +3014,44 @@
           }
         }
 
-        Object.values(parts).forEach(p => {
-          if (p.local) return;
-          hadRemote = true;
-          clearTimeout(emptyTimer);
+        const targetRemote = pickBestRemoteParticipant();
+        if (!targetRemote) return;
 
-          const remVidTrack = p.tracks?.video?.persistentTrack || p.tracks?.video?.track;
-          const remAudTrack = p.tracks?.audio?.persistentTrack || p.tracks?.audio?.track;
+        hadRemote = true;
+        clearTimeout(emptyTimer);
 
-          if (remVidTrack && p.tracks?.video?.state === 'playable') {
-            banner.style.display = 'none';
-            const remVid = document.getElementById('remote-video');
-            const curVidTrack = remVid.srcObject?.getVideoTracks()[0];
-            if (curVidTrack !== remVidTrack) {
-              remVid.srcObject = new MediaStream([remVidTrack]);
-              playEl(remVid);
-            }
+        const remVidTrack = targetRemote.tracks?.video?.persistentTrack || targetRemote.tracks?.video?.track;
+        const remAudTrack = targetRemote.tracks?.audio?.persistentTrack || targetRemote.tracks?.audio?.track;
+
+        if (remVidTrack) {
+          banner.style.display = 'none';
+          const remVid = document.getElementById('remote-video');
+          const curVidTrack = remVid.srcObject?.getVideoTracks()[0];
+          if (curVidTrack !== remVidTrack) {
+            remVid.muted = true;
+            remVid.srcObject = new MediaStream([remVidTrack]);
+            playEl(remVid);
           }
-          if (remAudTrack && p.tracks?.audio?.state === 'playable') {
-            const remAud = document.getElementById('remote-audio');
-            const curAudTrack = remAud.srcObject?.getAudioTracks()[0];
-            if (curAudTrack !== remAudTrack) {
-              remAud.srcObject = new MediaStream([remAudTrack]);
-              playEl(remAud);
-            }
+        }
+
+        if (remAudTrack) {
+          const remAud = document.getElementById('remote-audio');
+          const curAudTrack = remAud.srcObject?.getAudioTracks()[0];
+          if (curAudTrack !== remAudTrack) {
+            remAud.muted = false;
+            remAud.srcObject = new MediaStream([remAudTrack]);
+            playEl(remAud);
           }
-        });
+        }
       };
 
       co
-        .on('joined-meeting', (e) => { console.log('[Daily] joined-meeting', e); attachTracks(); })
+        .on('joined-meeting', attachTracks)
         .on('participant-joined', attachTracks)
         .on('participant-updated', attachTracks)
-        .on('track-started', (ev) => {
-          if (callObject === co && ev && ev.participant && !ev.participant.local && ev.track) {
-            hadRemote = true;
-            clearTimeout(emptyTimer);
-            banner.style.display = 'none';
-            if (ev.track.kind === 'video') {
-              const rv = document.getElementById('remote-video');
-              rv.srcObject = new MediaStream([ev.track]);
-              playEl(rv);
-            } else if (ev.track.kind === 'audio') {
-              const ra = document.getElementById('remote-audio');
-              ra.srcObject = new MediaStream([ev.track]);
-              playEl(ra);
-            }
-          }
-          attachTracks();
-        })
-        .on('track-stopped', (ev) => {
-          if (callObject !== co || !ev || !ev.participant || ev.participant.local || !ev.track) return;
-          const el = document.getElementById(ev.track.kind === 'video' ? 'remote-video' : 'remote-audio');
-          const cur = el.srcObject && el.srcObject.getTracks()[0];
-          if (cur && cur.id === ev.track.id) el.srcObject = null;
-          updateDebug();
-        })
-        .on('participant-left', (e) => {
+        .on('track-started', attachTracks)
+        .on('track-stopped', attachTracks)
+        .on('participant-left', () => {
           updateDebug();
           if (callObject !== co) return;
           clearTimeout(emptyTimer);
@@ -3013,28 +3064,40 @@
         .on('camera-error', (e) => {
           showProblem('⚠️ Camera/microphone problem: ' + (e?.errorMsg?.errorMsg || e?.error?.msg || 'permission denied?'));
         })
-        .on('nonfatal-error', (e) => console.warn('[Daily] nonfatal-error', e))
-        .on('left-meeting', (e) => console.log('[Daily] left-meeting', e))
         .on('error', (e) => {
           showProblem('⚠️ Video error: ' + (e?.errorMsg || e?.error?.msg || e?.error?.message || 'unknown'));
           setTimeout(() => { if (callObject === co) endCall(); }, 8000);
         });
 
+      const participantTag = role === 'nana'
+        ? (isRealAndroidTablet ? 'Nana_Tablet' : 'Nana_Browser')
+        : `Family_${activeFamilyMember.id}`;
+
       try {
-        await co.join({ url: CONFIG.dailyRoomUrl });
+        await co.join({
+          url: CONFIG.dailyRoomUrl,
+          userName: participantTag
+        });
+        // Explicitly ensure local camera & mic are enabled on join
+        co.setLocalVideo(true);
+        co.setLocalAudio(true);
       } catch (err) {
         showProblem('⚠️ Could not join video room: ' + (err?.message || err?.errorMsg || err));
+        isJoiningOrInRoom = false;
         setTimeout(() => { if (callObject === co) endCall(); }, 8000);
       }
     }
 
     async function destroyDailyRoom() {
+      isJoiningOrInRoom = false;
+      didManuallyInitiateOrAnswerOnThisTab = false;
       if (callObject) {
-        try {
-          await callObject.leave();
-          await callObject.destroy();
-        } catch (e) {}
+        const co = callObject;
         callObject = null;
+        try {
+          await co.leave();
+          await co.destroy();
+        } catch (e) {}
       }
       document.getElementById('remote-video').srcObject = null;
       document.getElementById('remote-audio').srcObject = null;
@@ -3042,6 +3105,8 @@
     }
 
     async function startCallFromNana(member) {
+      unlockCallAudio();
+      didManuallyInitiateOrAnswerOnThisTab = true;
       await window.stopRadioAndSync(true);
       document.getElementById('bulletin-modal').style.display = 'none';
       window.closeSeniorKeyboard();
@@ -3071,6 +3136,8 @@
     }
 
     window.confirmFamilyPickupFromTelegram = async () => {
+      unlockCallAudio();
+      didManuallyInitiateOrAnswerOnThisTab = true;
       await clearMissedCallsForMember(activeFamilyMember.id);
       await set(callStateRef, {
         status: 'connected',
@@ -3081,6 +3148,8 @@
     };
 
     window.startCallFromFamily = async () => {
+      unlockCallAudio();
+      didManuallyInitiateOrAnswerOnThisTab = true;
       const ringBtn = document.getElementById('family-ring-btn');
       if (ringBtn) ringBtn.disabled = true;
 
@@ -3116,6 +3185,8 @@
     };
 
     window.answerCallAsNana = async () => {
+      unlockCallAudio();
+      didManuallyInitiateOrAnswerOnThisTab = true;
       clearTimeout(autoAnswerTimeout);
       stopRingingUI();
       const activeCallerId = latestCallData?.callerId;
@@ -3211,7 +3282,7 @@
       setInterval(tryReload, 5000);
     }
 
-    // Call State Router
+    // Call State Router (Strict Isolation: Only the active tablet & active caller join)
     onValue(callStateRef, (snap) => {
       const data = snap.val();
       if (!data) return;
@@ -3229,10 +3300,13 @@
       }
 
       if (role === 'nana') {
+        // Prevent a laptop/PC browser tab with ?role=nana from hijacking the tablet's calls
+        const shouldActAsNanaDevice = isRealAndroidTablet || didManuallyInitiateOrAnswerOnThisTab;
+
         if (data.status === 'ringing_nana') {
           const caller = CONFIG.familyMembers.find(m => m.id === data.callerId) || CONFIG.familyMembers[0];
 
-          if (isCurrentlyInNightWindow() && tabletSettings.nightBlockCalls) {
+          if (isRealAndroidTablet && isCurrentlyInNightWindow() && tabletSettings.nightBlockCalls) {
             incrementMissedCallForMember(caller.id);
             endCall();
             return;
@@ -3247,31 +3321,33 @@
           showScreen('ringing-screen');
 
           stopRingingUI();
-          playSelectedRingtoneAudio(tabletSettings.ringtone, tabletSettings.ringVolume || 85);
-
-          if (tabletSettings.autoAnswer) {
-            speakMsg(`${caller.spokenName} is calling you. Connecting automatically.`);
-            clearTimeout(autoAnswerTimeout);
-            autoAnswerTimeout = setTimeout(() => {
-              if (currentState === 'ringing_nana') window.answerCallAsNana();
-            }, 10000);
-          } else {
-            speakMsg(`${caller.spokenName} is calling you. Touch anywhere on the screen to answer.`);
-          }
-
-          ringInterval = setInterval(() => {
+          if (isRealAndroidTablet) {
             playSelectedRingtoneAudio(tabletSettings.ringtone, tabletSettings.ringVolume || 85);
-            speakMsg(`${caller.spokenName} is calling you.`);
-          }, 6000);
 
-          const ringTimeoutMs = (Number(tabletSettings.ringDurationSec) || 60) * 1000;
-          clearTimeout(incomingRingTimeout);
-          incomingRingTimeout = setTimeout(async () => {
-            if (currentState === 'ringing_nana') {
-              await incrementMissedCallForMember(caller.id);
-              await endCall();
+            if (tabletSettings.autoAnswer) {
+              speakMsg(`${caller.spokenName} is calling you. Connecting automatically.`);
+              clearTimeout(autoAnswerTimeout);
+              autoAnswerTimeout = setTimeout(() => {
+                if (currentState === 'ringing_nana') window.answerCallAsNana();
+              }, 10000);
+            } else {
+              speakMsg(`${caller.spokenName} is calling you. Touch anywhere on the screen to answer.`);
             }
-          }, ringTimeoutMs);
+
+            ringInterval = setInterval(() => {
+              playSelectedRingtoneAudio(tabletSettings.ringtone, tabletSettings.ringVolume || 85);
+              speakMsg(`${caller.spokenName} is calling you.`);
+            }, 6000);
+
+            const ringTimeoutMs = (Number(tabletSettings.ringDurationSec) || 60) * 1000;
+            clearTimeout(incomingRingTimeout);
+            incomingRingTimeout = setTimeout(async () => {
+              if (currentState === 'ringing_nana') {
+                await incrementMissedCallForMember(caller.id);
+                await endCall();
+              }
+            }, ringTimeoutMs);
+          }
 
         } else if (data.status === 'connected') {
           document.getElementById('night-dimmer').style.display = 'none';
@@ -3283,13 +3359,18 @@
           stopRingingUI();
 
           const connectedPartnerId = data.callerId === 'nana' ? data.targetId : data.callerId;
-          if (connectedPartnerId) {
+          if (connectedPartnerId && isRealAndroidTablet) {
             clearMissedCallsForMember(connectedPartnerId);
           }
 
-          showScreen('call-screen');
-          joinDailyRoom();
-          startCallUsageTimer();
+          // Only join Daily room if this is Nana's real Android tablet OR the user clicked Answer/Call on this tab!
+          if (shouldActAsNanaDevice) {
+            showScreen('call-screen');
+            joinDailyRoom();
+            startCallUsageTimer();
+          } else {
+            showScreen('grid-screen');
+          }
         } else if (data.status === 'idle') {
           clearTimeout(outboundTimeout);
           clearTimeout(incomingRingTimeout);
@@ -3305,12 +3386,14 @@
           updateClock();
         }
       } else if (role === 'family') {
+        const isMyCall = (data.callerId === activeFamilyMember.id || data.targetId === activeFamilyMember.id);
+
         if (data.status === 'calling_family' && data.targetId === activeFamilyMember.id) {
           showScreen('family-pickup-screen');
-        } else if (data.status === 'connected') {
+        } else if (data.status === 'connected' && isMyCall && didManuallyInitiateOrAnswerOnThisTab) {
           showScreen('call-screen');
           joinDailyRoom();
-        } else if (data.status === 'idle') {
+        } else if (data.status === 'idle' || !isMyCall) {
           destroyDailyRoom();
           showScreen('family-screen');
         }
@@ -3375,7 +3458,6 @@
       if (clockEl) clockEl.innerText = timeStr;
       if (nightClockEl) nightClockEl.innerText = timeStr;
 
-      // Night Mode activates even if Family Chat or Keyboard was left open
       const canShowDimmer = isCurrentlyInNightWindow() && currentState === 'idle' && !isRadioPlaying && Date.now() > nightDismissedUntilMs;
       const dimmerEl = document.getElementById('night-dimmer');
       if (dimmerEl) dimmerEl.style.display = canShowDimmer ? 'flex' : 'none';
