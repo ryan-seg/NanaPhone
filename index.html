@@ -469,6 +469,35 @@
       border: 3px solid var(--bubble-out-border);
       border-bottom-right-radius: 4px;
     }
+    .tg-bubble.unread-msg {
+      border-width: 4px;
+      border-color: #ffff00;
+      box-shadow: 0 0 18px rgba(254, 240, 138, 0.5);
+    }
+    .tg-new-tag {
+      background: #dc2626;
+      color: #ffff00;
+      border: 2px solid #ffffff;
+      border-radius: 8px;
+      padding: 1px 8px;
+      font-size: 0.95rem;
+      font-weight: 900;
+      margin-left: 8px;
+    }
+    .tg-unread-divider {
+      width: 100%;
+      background: #dc2626;
+      color: #ffff00;
+      border: 4px solid #ffffff;
+      border-radius: 16px;
+      padding: 10px 16px;
+      font-size: clamp(1.3rem, 2.2vw, 1.7rem);
+      font-weight: 900;
+      text-align: center;
+      margin: 8px 0;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+      animation: pulseMissed 1.5s infinite;
+    }
     .tg-sender-row {
       display: flex;
       justify-content: space-between;
@@ -505,16 +534,19 @@
       margin-top: 2px;
     }
 
-    /* Composer Input Area */
+    /* Composer Input Area - 68px bottom padding clears bottom touch blocker */
     .tg-composer-area {
       width: 100%;
       background: var(--bg-panel);
-      border-bottom: 4px solid var(--border-main);
-      padding: 10px 14px 10px 14px;
+      border-top: 4px solid var(--border-main);
+      padding: 12px 18px 68px 18px;
       display: flex;
       flex-direction: column;
       gap: 8px;
       flex-shrink: 0;
+    }
+    .tg-composer-area.kb-open {
+      padding-bottom: 10px;
     }
     .tg-input-row {
       display: flex;
@@ -561,14 +593,14 @@
       transform: scale(0.96);
     }
 
-    /* High-Contrast Senior On-Screen Keyboard (Bottom-Docked & Long-Press Proof) */
+    /* High-Contrast Senior On-Screen Keyboard (68px bottom clearance) */
     #senior-onscreen-keyboard {
       display: none;
       width: 100%;
       flex-direction: column;
       gap: 7px;
       background: var(--bg-panel);
-      padding: 10px 14px 14px 14px;
+      padding: 10px 16px 68px 16px;
       border-top: 4px solid var(--border-accent);
       flex-shrink: 0;
       z-index: 25;
@@ -587,8 +619,8 @@
       touch-action: manipulation;
     }
     .emoji-key-btn {
-      height: 62px;
-      font-size: 2.25rem;
+      height: 58px;
+      font-size: 2.1rem;
       font-weight: 900;
       background: var(--key-bg);
       color: var(--key-text);
@@ -749,9 +781,9 @@
     }
     #call-connecting-banner {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      z-index: 20; font-size: 2rem; font-weight: 900; color: #fef08a;
-      background: rgba(15, 23, 42, 0.92); padding: 18px 32px; border-radius: 20px;
-      border: 3px solid #facc15; pointer-events: none; max-width: 88vw;
+      z-index: 20; font-size: 2.2rem; font-weight: 900; color: #fef08a;
+      background: rgba(15, 23, 42, 0.9); padding: 18px 32px; border-radius: 20px;
+      border: 3px solid #facc15; pointer-events: none;
     }
     #call-status-pill {
       position: absolute; bottom: 200px; left: 24px; z-index: 50;
@@ -831,16 +863,16 @@
       cursor: pointer; text-decoration: none; display: inline-block;
     }
 
-    /* Screen Brightness & Idle Dimming Overlay */
+    /* Screen Brightness & Idle Dimming Overlay (z-index 145 sits above Family Chat) */
     #brightness-overlay {
       position: fixed; inset: 0; background: #000000;
-      pointer-events: none; z-index: 88; opacity: 0;
+      pointer-events: none; z-index: 145; opacity: 0;
       transition: opacity 0.6s ease;
     }
 
     #night-dimmer {
       display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.96);
-      z-index: 90; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 150; flex-direction: column; align-items: center; justify-content: center;
       color: #94a3b8; font-size: 2.2rem;
     }
   </style>
@@ -901,14 +933,13 @@
       <div class="settings-card" style="width:100%; margin-bottom:4px;">
         <div class="settings-label">
           <span>⌨️ Nana's Keyboard Layout & Auto-Hide</span>
-          <span id="lbl-gear-kb-summary" style="color:#38bdf8; font-size:0.95rem;">EMOJIS • 1m</span>
+          <span id="lbl-gear-kb-summary" style="color:#38bdf8; font-size:0.95rem;">QWERTY • 1m</span>
         </div>
         <div class="opt-row" style="margin-bottom:8px;">
-          <button class="opt-btn" id="gear-kblayout-emojis" onclick="updateSetting('keyboardLayout', 'emojis')">😘 Emojis Only</button>
-          <button class="opt-btn" id="gear-kblayout-qwerty" onclick="updateSetting('keyboardLayout', 'qwerty')">⌨️ QWERTY</button>
-          <button class="opt-btn" id="gear-kblayout-abcdef" onclick="updateSetting('keyboardLayout', 'abcdef')">🔤 ABCDEF</button>
+          <button class="opt-btn" id="gear-kblayout-qwerty" onclick="updateSetting('keyboardLayout', 'qwerty')">⌨️ QWERTY (Typewriter)</button>
+          <button class="opt-btn" id="gear-kblayout-abcdef" onclick="updateSetting('keyboardLayout', 'abcdef')">🔤 ABCDEF (Alphabetical)</button>
         </div>
-        <div class="settings-sub" style="margin-bottom:4px;">Auto-Hide & Clear Unsent Text After:</div>
+        <div class="settings-sub" style="margin-bottom:4px;">Auto-Hide Keyboard When Left Open:</div>
         <div class="opt-row">
           <button class="opt-btn" id="gear-kbhide-30" onclick="updateSetting('keyboardTimeoutSec', 30)">30s</button>
           <button class="opt-btn" id="gear-kbhide-60" onclick="updateSetting('keyboardTimeoutSec', 60)">1m</button>
@@ -993,7 +1024,7 @@
         <div class="opt-row" style="margin-bottom:6px;">
           <button class="opt-btn" id="gear-notes-on" onclick="updateSetting('showBulletinBar', true)">💬 Show on New Notes</button>
           <button class="opt-btn" id="gear-notes-off" onclick="updateSetting('showBulletinBar', false)">🙈 Hide Alert Bar</button>
-          <button class="opt-btn" style="background:#0284c7; border-color:#fff; color:#fff;" onclick="dismissCurrentBulletinBar()">🧹 Mark Read</button>
+          <button class="opt-btn" style="background:#0284c7; border-color:#fff; color:#fff;" onclick="dismissCurrentBulletinBar(true)">🧹 Mark Read</button>
         </div>
         <div class="opt-row">
           <button class="opt-btn" id="gear-readaloud-off" onclick="updateSetting('showReadAloud', false)">🙈 Hide "Read Aloud" Button</button>
@@ -1052,7 +1083,7 @@
     </div>
   </div>
 
-  <!-- SENIOR TELEGRAM-STYLE CHAT & REPLY MODAL (No 1-Tap Quick Reply Spam) -->
+  <!-- SENIOR TELEGRAM-STYLE CHAT & REPLY MODAL -->
   <div id="bulletin-modal" oncontextmenu="return false;">
     <div class="tg-header">
       <button class="tg-back-home-btn" onclick="closeFamilyBulletin()">
@@ -1067,13 +1098,12 @@
       </div>
     </div>
 
-    <!-- Scrollable Chat Feed -->
-    <div id="bulletin-posts-container" class="tg-chat-feed"></div>
+    <!-- Scrollable Chat Feed (Scroll-to-bottom marks read for Nana) -->
+    <div id="bulletin-posts-container" class="tg-chat-feed" onscroll="handleChatScroll(this)"></div>
 
-    <!-- Input Box Directly Above the Bottom Keyboard (Always in Nana's Line of Sight) -->
-    <div class="tg-composer-area" style="border-top: 4px solid var(--border-main); border-bottom: none;">
+    <!-- Input Box Directly Above Bottom Keyboard -->
+    <div class="tg-composer-area">
       <div class="tg-input-row">
-        <!-- readonly + inputmode="none" prevents Android's small soft keyboard from popping up -->
         <input
           id="nana-chat-input"
           type="text"
@@ -1090,9 +1120,8 @@
       </div>
     </div>
 
-    <!-- Bottom-Docked Giant Senior Keyboard (Supports Emojis-Only, QWERTY & ABCDEF) -->
+    <!-- Bottom-Docked Giant Senior Keyboard -->
     <div id="senior-onscreen-keyboard" oncontextmenu="return false;">
-      <!-- Dedicated Emoji Quick Tap Bar (Nana's Favourites: 💋 ❤️ ☘️ 👍 😘) -->
       <div class="emoji-fav-row">
         <button class="emoji-key-btn" onclick="typeSeniorKey('💋')">💋</button>
         <button class="emoji-key-btn" onclick="typeSeniorKey('❤️')">❤️</button>
@@ -1101,12 +1130,12 @@
         <button class="emoji-key-btn" onclick="typeSeniorKey('😘')">😘</button>
       </div>
 
-      <!-- Dynamic Letter Rows (Populated by renderSeniorKeyboardLayout) -->
       <div id="senior-kb-letters-container" style="display:flex; flex-direction:column; gap:7px;"></div>
 
-      <div id="senior-kb-bottom-row" style="display:grid; grid-template-columns:1fr 2fr; gap:8px;">
+      <div style="display:grid; grid-template-columns:2fr 5fr 2fr; gap:8px;">
         <button class="kb-letter-btn" style="background:#334155; color:#ffffff;" onclick="closeSeniorKeyboard()">🔽 Hide Keys</button>
-        <button id="senior-kb-space-btn" class="kb-letter-btn" style="background:var(--key-bg);" onclick="typeSeniorKey(' ')">SPACE BAR</button>
+        <button class="kb-letter-btn" style="background:var(--key-bg);" onclick="typeSeniorKey(' ')">SPACE BAR</button>
+        <button class="kb-letter-btn" style="background:#22c55e; color:#000000; font-size:1.45rem;" onclick="submitTypedNanaMessage()">Send ➤</button>
       </div>
     </div>
   </div>
@@ -1173,7 +1202,7 @@
         </div>
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.7.8</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.7.9</div>
       </div>
     </div>
 
@@ -1249,7 +1278,6 @@
       <button class="vol-step-btn" style="background:#334155;" onclick="openSettingsModal()">⚙️</button>
     </div>
 
-    <!-- muted on remote-video prevents Chrome autoplay block; audio plays via remote-audio -->
     <video id="remote-video" autoplay playsinline muted></video>
     <audio id="remote-audio" autoplay playsinline></audio>
     <video id="local-video" autoplay playsinline muted></video>
@@ -1330,15 +1358,14 @@
     <div class="settings-card">
       <div class="settings-label">
         <span>⌨️ Nana's Keyboard Layout & Auto-Hide</span>
-        <span id="lbl-remote-kb-summary" style="color:#38bdf8; font-size:0.95rem;">EMOJIS • 1m</span>
+        <span id="lbl-remote-kb-summary" style="color:#38bdf8; font-size:0.95rem;">QWERTY • 1m</span>
       </div>
-      <div class="settings-sub">Choose Emojis Only (stops accidental letter mashing), QWERTY, or ABCDEF. Auto-hides and clears unsent text when idle.</div>
+      <div class="settings-sub">Choose QWERTY (typewriter) or ABCDEF (alphabetical). Auto-hides and dims if she walks away with the keyboard open.</div>
       <div class="opt-row" style="margin-bottom:8px;">
-        <button class="opt-btn" id="set-kblayout-emojis" onclick="updateSetting('keyboardLayout', 'emojis')">😘 Emojis Only</button>
-        <button class="opt-btn" id="set-kblayout-qwerty" onclick="updateSetting('keyboardLayout', 'qwerty')">⌨️ QWERTY</button>
-        <button class="opt-btn" id="set-kblayout-abcdef" onclick="updateSetting('keyboardLayout', 'abcdef')">🔤 ABCDEF</button>
+        <button class="opt-btn" id="set-kblayout-qwerty" onclick="updateSetting('keyboardLayout', 'qwerty')">⌨️ QWERTY Layout</button>
+        <button class="opt-btn" id="set-kblayout-abcdef" onclick="updateSetting('keyboardLayout', 'abcdef')">🔤 ABCDEF Layout</button>
       </div>
-      <div class="settings-sub" style="margin-bottom:4px;">Hide Keyboard & Clear Unsent Text After:</div>
+      <div class="settings-sub" style="margin-bottom:4px;">Hide Keyboard After Inactivity:</div>
       <div class="opt-row">
         <button class="opt-btn" id="set-kbhide-30" onclick="updateSetting('keyboardTimeoutSec', 30)">30s</button>
         <button class="opt-btn" id="set-kbhide-60" onclick="updateSetting('keyboardTimeoutSec', 60)">1m</button>
@@ -1460,7 +1487,7 @@
       <div class="opt-row" style="margin-bottom:6px;">
         <button class="opt-btn" id="set-notes-on" onclick="updateSetting('showBulletinBar', true)">💬 Show on New Notes</button>
         <button class="opt-btn" id="set-notes-off" onclick="updateSetting('showBulletinBar', false)">🙈 Hide Alert Bar</button>
-        <button class="opt-btn" style="background:#0284c7; border-color:#fff; color:#fff;" onclick="dismissCurrentBulletinBar()">🧹 Mark Read</button>
+        <button class="opt-btn" style="background:#0284c7; border-color:#fff; color:#fff;" onclick="dismissCurrentBulletinBar(true)">🧹 Mark Read</button>
       </div>
       <div class="opt-row">
         <button class="opt-btn" id="set-readaloud-off" onclick="updateSetting('showReadAloud', false)">🙈 Hide "Read Aloud" Button</button>
@@ -1546,7 +1573,7 @@
     }
 
     const CONFIG = {
-      appVersion: "2.7.8",
+      appVersion: "2.7.9",
       adminPin: "1929",
       apkFileName: "nanaphone.apk",
       dailyRoomUrl: "https://nanaphone.daily.co/NanaPhone",
@@ -1604,6 +1631,7 @@
     let latestBulletinPosts = {};
     let newestBulletinTimestamp = 0;
     let unreadBulletinCount = 0;
+    let chatSessionReadCutoff = null;
     let confirmTimer = null;
     let ringInterval = null;
     let telegramBurstInterval = null;
@@ -1649,7 +1677,7 @@
       showBulletinBar: true,
       showReadAloud: false,
       colorTheme: 'classic-dark',
-      keyboardLayout: 'emojis',
+      keyboardLayout: 'qwerty',
       keyboardTimeoutSec: 60,
       bulletinClearedAt: 0
     };
@@ -1707,6 +1735,10 @@
         idleDimTimer = setTimeout(() => {
           if (currentState === 'idle' && !isRadioPlaying) {
             window.closeSeniorKeyboard();
+            const chatOpen = document.getElementById('bulletin-modal')?.style.display === 'flex';
+            if (chatOpen) {
+              window.dismissCurrentBulletinBar(true);
+            }
             isCurrentlyIdleDimmed = true;
             applyScreenBrightness(tabletSettings.dimBrightness ?? 15);
           }
@@ -1735,9 +1767,11 @@
       if (role === 'nana') renderContacts(connectedMemberIds);
     };
 
-    window.dismissCurrentBulletinBar = async () => {
+    window.dismissCurrentBulletinBar = async (forceFromAdmin = false) => {
+      if (role !== 'nana' && !forceFromAdmin) return;
       const now = Date.now();
       tabletSettings.bulletinClearedAt = now;
+      chatSessionReadCutoff = now;
       updateBulletinTickerVisibility();
       await update(settingsRef, { bulletinClearedAt: now });
     };
@@ -1781,28 +1815,8 @@
     // ========================================================================
     function renderSeniorKeyboardLayout() {
       const container = document.getElementById('senior-kb-letters-container');
-      const spaceBtn = document.getElementById('senior-kb-space-btn');
       if (!container) return;
-      const layout = tabletSettings.keyboardLayout || 'emojis';
-
-      container.innerHTML = '';
-
-      // EMOJIS-ONLY MODE: Giant emoji buttons + Delete button (zero accidental letter mashing)
-      if (layout === 'emojis') {
-        if (spaceBtn) spaceBtn.style.display = 'none';
-        const delRow = document.createElement('div');
-        delRow.style.cssText = 'display:grid; grid-template-columns:1fr; gap:6px;';
-        const delBtn = document.createElement('button');
-        delBtn.className = 'kb-letter-btn';
-        delBtn.style.cssText = 'background:#7f1d1d; color:#ffffff; border-color:#f87171;';
-        delBtn.textContent = '⌫ Delete Last Emoji';
-        delBtn.onclick = () => window.typeSeniorKey('BACKSPACE');
-        delRow.appendChild(delBtn);
-        container.appendChild(delRow);
-        return;
-      }
-
-      if (spaceBtn) spaceBtn.style.display = 'flex';
+      const layout = tabletSettings.keyboardLayout || 'qwerty';
 
       const rows = layout === 'abcdef'
         ? [
@@ -1816,6 +1830,8 @@
             ['Z','X','C','V','B','N','M']
           ];
 
+      container.innerHTML = '';
+
       // Row 1 (10 keys)
       const r1 = document.createElement('div');
       r1.style.cssText = 'display:grid; grid-template-columns:repeat(10, 1fr); gap:6px;';
@@ -1828,7 +1844,7 @@
       });
       container.appendChild(r1);
 
-      // Row 2
+      // Row 2 (9 keys for QWERTY, 10 keys for ABCDEF)
       const r2 = document.createElement('div');
       r2.style.cssText = layout === 'abcdef'
         ? 'display:grid; grid-template-columns:repeat(10, 1fr); gap:6px;'
@@ -1878,13 +1894,21 @@
     }
 
     window.openFamilyBulletin = () => {
+      chatSessionReadCutoff = Number(tabletSettings.bulletinClearedAt) || 0;
       document.getElementById('bulletin-modal').style.display = 'flex';
+      renderBulletinFeed();
       wakeScreenAndResetDimTimer();
       recordHeartbeat("Opened Family Chat");
+
       setTimeout(() => {
+        const divider = document.getElementById('first-unread-divider');
         const feed = document.getElementById('bulletin-posts-container');
-        if (feed) feed.scrollTop = feed.scrollHeight;
-      }, 100);
+        if (divider) {
+          divider.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else if (feed) {
+          feed.scrollTop = feed.scrollHeight;
+        }
+      }, 120);
     };
 
     window.closeFamilyBulletin = async () => {
@@ -1893,13 +1917,18 @@
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       wakeScreenAndResetDimTimer();
       recordHeartbeat("On Home Grid");
-      await window.dismissCurrentBulletinBar();
+      if (role === 'nana') {
+        await window.dismissCurrentBulletinBar(true);
+      }
+      chatSessionReadCutoff = null;
     };
 
     window.openSeniorKeyboard = () => {
       renderSeniorKeyboardLayout();
       const kb = document.getElementById('senior-onscreen-keyboard');
+      const comp = document.querySelector('.tg-composer-area');
       if (kb) kb.style.display = 'flex';
+      if (comp) comp.classList.add('kb-open');
       resetKeyboardAutoHideTimer();
       wakeScreenAndResetDimTimer();
       setTimeout(() => {
@@ -1914,13 +1943,23 @@
         keyboardHideTimer = null;
       }
       const kb = document.getElementById('senior-onscreen-keyboard');
+      const comp = document.querySelector('.tg-composer-area');
       if (kb) kb.style.display = 'none';
+      if (comp) comp.classList.remove('kb-open');
+    };
+
+    window.handleChatScroll = (el) => {
+      if (role !== 'nana') return;
+      // If Nana scrolls all the way down to the bottom (viewing most recent messages), mark as read
+      const isAtBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 40;
+      if (isAtBottom && chatSessionReadCutoff !== null) {
+        window.dismissCurrentBulletinBar(true);
+      }
     };
 
     window.typeSeniorKey = (char) => {
-      // 400ms debounce prevents accidental double-letters from heavy/long presses
       const now = Date.now();
-      if (char !== 'BACKSPACE' && (now - lastKeyTapMs < 400)) return;
+      if (char !== 'BACKSPACE' && (now - lastKeyTapMs < 280)) return;
       lastKeyTapMs = now;
 
       resetKeyboardAutoHideTimer();
@@ -1933,15 +1972,7 @@
       } else if (['💋', '❤️', '☘️', '👍', '😘'].includes(char)) {
         input.value += char;
       } else {
-        // Prevent palm-resting from typing 3+ identical letters in a row (e.g. "ggggggggg")
-        const currentVal = input.value;
-        if (currentVal.length >= 2) {
-          const lastTwo = currentVal.slice(-2).toLowerCase();
-          if (lastTwo === (char.toLowerCase() + char.toLowerCase())) {
-            return;
-          }
-        }
-        const nextChar = currentVal.length === 0 ? char : char.toLowerCase();
+        const nextChar = input.value.length === 0 ? char : char.toLowerCase();
         input.value += nextChar;
       }
     };
@@ -1980,6 +2011,11 @@
           timestamp: Date.now()
         });
 
+        // Instantly mark read for Nana when she posts a message
+        if (role === 'nana') {
+          await window.dismissCurrentBulletinBar(true);
+        }
+
         const res = await fetch(CONFIG.googleScriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -1996,7 +2032,6 @@
             statusEl.style.color = "#4ade80";
             statusEl.innerText = `✅ Sent to Telegram (${data.broadcastCount} chat${data.broadcastCount === 1 ? '' : 's'})!`;
           }
-          if (role === 'nana') speakMsg("Message sent to the family.");
         } else {
           if (statusEl) {
             statusEl.style.color = "#f87171";
@@ -2023,6 +2058,10 @@
       container.innerHTML = "";
       const keys = Object.keys(latestBulletinPosts).slice(-25);
 
+      const clearedAt = (chatSessionReadCutoff !== null)
+        ? chatSessionReadCutoff
+        : (Number(tabletSettings.bulletinClearedAt) || 0);
+
       newestBulletinTimestamp = 0;
       if (keys.length > 0) {
         const newest = latestBulletinPosts[keys[keys.length - 1]];
@@ -2038,11 +2077,25 @@
 
       updateBulletinTickerVisibility();
 
+      let insertedUnreadDivider = false;
+
       keys.forEach(k => {
         const item = latestBulletinPosts[k];
         const isOutgoing = !!item.fromNana || (item.author && item.author.toLowerCase() === 'nana');
+        const msgTime = Number(item.timestamp) || 0;
+        const isUnread = !isOutgoing && msgTime > clearedAt;
+
+        if (isUnread && !insertedUnreadDivider) {
+          insertedUnreadDivider = true;
+          const divider = document.createElement('div');
+          divider.id = 'first-unread-divider';
+          divider.className = 'tg-unread-divider';
+          divider.textContent = '⬇️ NEW UNREAD MESSAGES BELOW ⬇️';
+          container.appendChild(divider);
+        }
+
         const bubble = document.createElement('div');
-        bubble.className = isOutgoing ? 'tg-bubble outgoing' : 'tg-bubble incoming';
+        bubble.className = (isOutgoing ? 'tg-bubble outgoing' : 'tg-bubble incoming') + (isUnread ? ' unread-msg' : '');
 
         const topRow = document.createElement('div');
         topRow.className = 'tg-sender-row';
@@ -2050,6 +2103,12 @@
         const authorEl = document.createElement('span');
         authorEl.className = 'tg-sender-name';
         authorEl.textContent = isOutgoing ? '👵 Nana (You)' : `👤 ${item.author || 'Family'}`;
+        if (isUnread) {
+          const newTag = document.createElement('span');
+          newTag.className = 'tg-new-tag';
+          newTag.textContent = 'NEW';
+          authorEl.appendChild(newTag);
+        }
         topRow.appendChild(authorEl);
 
         if (item.timestamp) {
@@ -2084,10 +2143,6 @@
 
         container.appendChild(bubble);
       });
-
-      setTimeout(() => {
-        container.scrollTop = container.scrollHeight;
-      }, 60);
     }
 
     onValue(bulletinRef, (snap) => {
@@ -2324,7 +2379,7 @@
     }, { passive: true });
 
     function recordHeartbeat(customActivity = null) {
-      if (role !== 'nana' || !isRealAndroidTablet) return;
+      if (role !== 'nana') return;
       let batteryLevel = null;
       let isCharging = null;
       if (window.AndroidBridge && window.AndroidBridge.getBatteryStatusJson) {
@@ -2346,7 +2401,7 @@
       update(presenceRef, payload);
     }
 
-    if (role === 'nana' && isRealAndroidTablet) {
+    if (role === 'nana') {
       setTimeout(() => {
         wakeScreenAndResetDimTimer();
         recordHeartbeat("Tablet Online");
@@ -2672,7 +2727,7 @@
       const nEnd = tabletSettings.nightEndHour ?? 8;
       const showNotes = tabletSettings.showBulletinBar !== false;
       const showRead = !!tabletSettings.showReadAloud;
-      const kbLayout = tabletSettings.keyboardLayout || 'emojis';
+      const kbLayout = tabletSettings.keyboardLayout || 'qwerty';
       const kbHideSec = tabletSettings.keyboardTimeoutSec ?? 60;
 
       document.getElementById('lbl-call-vol').innerText = `${callVol}%`;
@@ -2921,11 +2976,8 @@
       } catch (e) {}
     }
 
-    // ========================================================================
-    // STRICT 1-ON-1 WEBRTC VIDEO ENGINE (Prevents Multi-Tab & Rear-Cam Bugs)
-    // ========================================================================
+    // Custom WebRTC Video Engine
     async function joinDailyRoom() {
-      // Synchronous lock prevents any double-join race condition
       if (isJoiningOrInRoom || callObject) return;
       isJoiningOrInRoom = true;
 
@@ -2934,14 +2986,14 @@
       banner.innerText = '📹 Connecting video...';
 
       if (!window.DailyIframe) {
-        banner.innerText = '⚠️ Video library failed to load - check the internet connection';
+        banner.innerText = '⚠️ Video library failed to load - check connection';
         isJoiningOrInRoom = false;
         return;
       }
 
       const co = window.DailyIframe.createCallObject({
         audioSource: true,
-        videoSource: { facingMode: 'user' } // Always use front-facing selfie camera
+        videoSource: true
       });
       callObject = co;
 
@@ -2977,7 +3029,6 @@
       }
       const showDebug = (role !== 'nana') || new URLSearchParams(location.search).has('debug');
 
-      // Pick the right remote participant (Prioritize Nana_Tablet for family, and Family_* for Nana)
       const pickBestRemoteParticipant = () => {
         const remotes = Object.values(co.participants()).filter(p => !p.local);
         if (remotes.length === 0) return null;
@@ -3078,7 +3129,6 @@
           url: CONFIG.dailyRoomUrl,
           userName: participantTag
         });
-        // Explicitly ensure local camera & mic are enabled on join
         co.setLocalVideo(true);
         co.setLocalAudio(true);
       } catch (err) {
@@ -3138,6 +3188,8 @@
     window.confirmFamilyPickupFromTelegram = async () => {
       unlockCallAudio();
       didManuallyInitiateOrAnswerOnThisTab = true;
+      showScreen('call-screen');
+      joinDailyRoom();
       await clearMissedCallsForMember(activeFamilyMember.id);
       await set(callStateRef, {
         status: 'connected',
@@ -3189,6 +3241,8 @@
       didManuallyInitiateOrAnswerOnThisTab = true;
       clearTimeout(autoAnswerTimeout);
       stopRingingUI();
+      showScreen('call-screen');
+      joinDailyRoom();
       const activeCallerId = latestCallData?.callerId;
       if (activeCallerId && activeCallerId !== 'nana') {
         await clearMissedCallsForMember(activeCallerId);
@@ -3282,7 +3336,7 @@
       setInterval(tryReload, 5000);
     }
 
-    // Call State Router (Strict Isolation: Only the active tablet & active caller join)
+    // Call State Router
     onValue(callStateRef, (snap) => {
       const data = snap.val();
       if (!data) return;
@@ -3300,7 +3354,6 @@
       }
 
       if (role === 'nana') {
-        // Prevent a laptop/PC browser tab with ?role=nana from hijacking the tablet's calls
         const shouldActAsNanaDevice = isRealAndroidTablet || didManuallyInitiateOrAnswerOnThisTab;
 
         if (data.status === 'ringing_nana') {
@@ -3363,7 +3416,6 @@
             clearMissedCallsForMember(connectedPartnerId);
           }
 
-          // Only join Daily room if this is Nana's real Android tablet OR the user clicked Answer/Call on this tab!
           if (shouldActAsNanaDevice) {
             showScreen('call-screen');
             joinDailyRoom();
@@ -3390,7 +3442,7 @@
 
         if (data.status === 'calling_family' && data.targetId === activeFamilyMember.id) {
           showScreen('family-pickup-screen');
-        } else if (data.status === 'connected' && isMyCall && didManuallyInitiateOrAnswerOnThisTab) {
+        } else if (data.status === 'connected' && isMyCall) {
           showScreen('call-screen');
           joinDailyRoom();
         } else if (data.status === 'idle' || !isMyCall) {
@@ -3436,7 +3488,7 @@
       window.syncConnectedFamilyFromTelegram();
 
       if (autoAnswerFromTelegram) {
-        window.history.replaceState({}, document.title, `${window.location.pathname}?role=family&id=${encodeURIComponent(activeFamilyMember.id)}&key=${encodeURIComponent(SERVICE_TOKEN)}`);
+        window.history.replaceState({}, document.title, `${window.location.pathname}?role=family&id=${encodeURIComponent(activeFamilyMember.id)}&key=${encodeURIComponent(SERVICE_TOKEN)}&answer=true`);
         showScreen('family-pickup-screen');
       } else {
         showScreen('family-screen');
