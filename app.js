@@ -1,11 +1,11 @@
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getDatabase, ref, set, update, push, onValue, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
     // =====================================================================
-    // NanaPhone app.js  --  VERSION 2.8.5
+    // NanaPhone app.js  --  VERSION 2.8.7
     // VERSION MUST MATCH: index.html (2 places), styles.css (2 places), app.js (APP_VERSION below)
     // =====================================================================
-    const APP_VERSION = "2.8.5";
+    const APP_VERSION = "2.8.7";
 
     // If the page (index.html) is an old cached copy, reload it once with a fresh address.
     (function versionGuard() {
@@ -130,6 +130,24 @@
       }, true);
       const kb = document.getElementById('senior-onscreen-keyboard');
       if (kb) kb.addEventListener('touchstart', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+    })();
+
+    // Any tap on the call screen restarts the incoming sound if the browser had paused it.
+    (function callScreenTapToHear() {
+      const cs = document.getElementById('call-screen');
+      if (!cs) return;
+      cs.addEventListener('pointerdown', () => {
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        const ra = document.getElementById('remote-audio');
+        if (ra && ra.srcObject) {
+          ra.muted = false;
+          ra.play().catch(() => {});
+        }
+        const rv = document.getElementById('remote-video');
+        if (rv && rv.srcObject && rv.paused) {
+          rv.play().catch(() => {});
+        }
+      }, { passive: true });
     })();
 
     const CLASSIC_FM_STREAM = "https://media-ice.musicradio.com/ClassicFMMP3";
@@ -1484,7 +1502,7 @@
 
       const scaledVol = Math.min(1.0, Math.max(0.2, callVol / 100));
       const remAudio = document.getElementById('remote-audio');
-      if (remAudio && role === 'nana') remAudio.volume = scaledVol;
+      if (remAudio) remAudio.volume = (role === 'nana') ? scaledVol : 1.0;
       if (radioPlayer && role === 'nana') radioPlayer.volume = scaledVol;
 
       const highlight = (prefix, val) => {
@@ -1675,20 +1693,30 @@
       }
     }
 
+    // Tiny silent WAV primes mobile audio elements during a real tap so WebRTC audio is never blocked
+    const SILENT_WAV = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+
     // Pre-unlocks mobile Chrome / Android WebView audio on user gesture
     function unlockCallAudio() {
       try {
         if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
         const ra = document.getElementById('remote-audio');
         const rv = document.getElementById('remote-video');
+        if (ra) {
+          ra.muted = false;
+          ra.volume = (role === 'nana')
+            ? Math.min(1.0, Math.max(0.2, (Number(tabletSettings.callVolume) || 85) / 100))
+            : 1.0;
+          if (!ra.srcObject) {
+            ra.src = SILENT_WAV;
+            ra.play().catch(() => {});
+          } else {
+            ra.play().catch(() => {});
+          }
+        }
         if (rv) {
           rv.muted = true;
           rv.play().catch(() => {});
-        }
-        if (ra) {
-          ra.muted = false;
-          const p = ra.play();
-          if (p && p.catch) p.catch(() => {});
         }
       } catch (e) {}
     }
@@ -1716,6 +1744,9 @@
 
       let hadRemote = false;
       let emptyTimer = null;
+      let soundBlocked = false;      // browser refused to start the sound until the screen is tapped
+      let lastMicLevel = 0;          // my microphone level (0-1)
+      let lastIncomingLevel = 0;     // loudest incoming voice level (0-1)
 
       const showProblem = (text) => {
         banner.style.display = 'block';
@@ -1725,10 +1756,18 @@
       const playEl = (el) => {
         const pr = el.play();
         if (pr && pr.catch) pr.catch(() => {
+          soundBlocked = true;
           showProblem('🔈 Tap anywhere on screen to hear the call');
           const resumeBoth = () => {
-            document.getElementById('remote-video')?.play().catch(() => {});
-            document.getElementById('remote-audio')?.play().catch(() => {});
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            const rv = document.getElementById('remote-video');
+            const ra = document.getElementById('remote-audio');
+            if (rv) rv.play().catch(() => {});
+            if (ra) {
+              ra.muted = false;
+              ra.play().catch(() => {});
+            }
+            soundBlocked = false;
             banner.style.display = 'none';
           };
           document.addEventListener('pointerdown', resumeBoth, { once: true });
@@ -1740,7 +1779,7 @@
       if (!dbg) {
         dbg = document.createElement('div');
         dbg.id = 'call-debug';
-        dbg.style.cssText = 'position:absolute;bottom:4px;left:50%;transform:translateX(-50%);z-index:9999;' +
+        dbg.style.cssText = 'position:fixed;bottom:4px;left:50%;transform:translateX(-50%);z-index:9999;' +
           'font:12px monospace;color:#cbd5e1;background:rgba(0,0,0,0.65);padding:2px 8px;border-radius:6px;pointer-events:none;';
         document.getElementById('call-screen').appendChild(dbg);
       }
@@ -1764,7 +1803,12 @@
         const remotes = Object.values(co.participants()).filter(p => !p.local);
         const r = pickBestRemoteParticipant();
         dbg.style.display = 'block';
-        dbg.innerText = `remotes: ${remotes.length} (${r?.user_name || 'none'}) | vid: ${r?.tracks?.video?.state || '?'} | aud: ${r?.tracks?.audio?.state || '?'}`;
+        const raEl = document.getElementById('remote-audio');
+        const hasAud = !!(raEl && raEl.srcObject && raEl.srcObject.getAudioTracks()[0]);
+        dbg.style.whiteSpace = 'pre';
+        dbg.style.textAlign = 'center';
+        dbg.innerText = `remotes: ${remotes.length} (${r?.user_name || 'none'}) | vid: ${r?.tracks?.video?.state || '?'} | aud: ${r?.tracks?.audio?.state || '?'}` +
+          `\nmy mic: ${Math.round(lastMicLevel * 100)}% | their voice arriving: ${Math.round(lastIncomingLevel * 100)}% | speaker: ${hasAud ? (raEl.paused ? 'PAUSED' : 'playing') : 'no audio track'}`;
       };
 
       const attachTracks = () => {
@@ -1791,23 +1835,30 @@
         const remVidTrack = targetRemote.tracks?.video?.persistentTrack || targetRemote.tracks?.video?.track;
         const remAudTrack = targetRemote.tracks?.audio?.persistentTrack || targetRemote.tracks?.audio?.track;
 
-        if (remVidTrack) {
-          banner.style.display = 'none';
-          const remVid = document.getElementById('remote-video');
+        const remVid = document.getElementById('remote-video');
+        const remAud = document.getElementById('remote-audio');
+
+        if (remVidTrack && remVid) {
+          if (!soundBlocked) banner.style.display = 'none';
           const curVidTrack = remVid.srcObject?.getVideoTracks()[0];
           if (curVidTrack !== remVidTrack) {
             remVid.muted = true;
             remVid.srcObject = new MediaStream([remVidTrack]);
-            playEl(remVid);
+            remVid.play().catch(() => {});
           }
         }
 
-        if (remAudTrack) {
-          const remAud = document.getElementById('remote-audio');
+        if (remAudTrack && remAud) {
           const curAudTrack = remAud.srcObject?.getAudioTracks()[0];
           if (curAudTrack !== remAudTrack) {
+            remAud.removeAttribute('src');
             remAud.muted = false;
+            remAud.volume = (role === 'nana')
+              ? Math.min(1.0, Math.max(0.2, (Number(tabletSettings.callVolume) || 85) / 100))
+              : 1.0;
             remAud.srcObject = new MediaStream([remAudTrack]);
+            playEl(remAud);
+          } else if (remAud.paused) {
             playEl(remAud);
           }
         }
@@ -1848,6 +1899,19 @@
         });
         co.setLocalVideo(true);
         co.setLocalAudio(true);
+        try {
+          co.startLocalAudioLevelObserver(300);
+          co.startRemoteParticipantsAudioLevelObserver(300);
+          co.on('local-audio-level', (ev) => { lastMicLevel = Number(ev && ev.audioLevel) || 0; });
+          co.on('remote-participants-audio-level', (ev) => {
+            const lv = Object.values((ev && ev.participantsAudioLevel) || {}).map(Number);
+            lastIncomingLevel = lv.length ? Math.max(...lv) : 0;
+          });
+        } catch (e) { /* meters are optional */ }
+        const dbgTimer = setInterval(() => {
+          if (callObject !== co) { clearInterval(dbgTimer); return; }
+          updateDebug();
+        }, 1000);
       } catch (err) {
         showProblem('⚠️ Could not join video room: ' + (err?.message || err?.errorMsg || err));
         isJoiningOrInRoom = false;
@@ -1926,12 +1990,13 @@
     };
 
     window.startCallFromFamily = async () => {
+      // Unlock audio BEFORE confirm() so mobile Chrome/Safari keeps the user-gesture token active!
+      unlockCallAudio();
       if (!tabletSettings.callingEnabled) {
         alert("Video calling is switched off for now. Turn it on in ⚙️ Controls when you're ready.");
         return;
       }
       if (!confirm("Ring Nana's tablet now?\n\nPress OK only if you want to video call her.")) return;
-      unlockCallAudio();
       didManuallyInitiateOrAnswerOnThisTab = true;
       const ringBtn = document.getElementById('family-ring-btn');
       if (ringBtn) ringBtn.disabled = true;
@@ -2257,4 +2322,3 @@
       document.getElementById('night-dimmer').style.display = 'none';
       wakeScreenAndResetDimTimer();
     };
-  
