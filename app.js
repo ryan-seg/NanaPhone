@@ -1722,6 +1722,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
     }
 
     // Custom WebRTC Video Engine
+// Custom WebRTC Video Engine
     async function joinDailyRoom() {
       if (isJoiningOrInRoom || callObject) return;
       isJoiningOrInRoom = true;
@@ -1744,35 +1745,41 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 
       let hadRemote = false;
       let emptyTimer = null;
-      let soundBlocked = false;      // browser refused to start the sound until the screen is tapped
-      let lastMicLevel = 0;          // my microphone level (0-1)
-      let lastIncomingLevel = 0;     // loudest incoming voice level (0-1)
+      let soundBlocked = false;
+      let lastMicLevel = 0;
+      let lastIncomingLevel = 0;
 
       const showProblem = (text) => {
         banner.style.display = 'block';
         banner.innerText = text;
       };
 
-      const playEl = (el) => {
-        const pr = el.play();
-        if (pr && pr.catch) pr.catch(() => {
-          soundBlocked = true;
-          showProblem('🔈 Tap anywhere on screen to hear the call');
-          const resumeBoth = () => {
-            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-            const rv = document.getElementById('remote-video');
-            const ra = document.getElementById('remote-audio');
-            if (rv) rv.play().catch(() => {});
-            if (ra) {
-              ra.muted = false;
-              ra.play().catch(() => {});
-            }
-            soundBlocked = false;
-            banner.style.display = 'none';
-          };
-          document.addEventListener('pointerdown', resumeBoth, { once: true });
-          document.addEventListener('touchstart', resumeBoth, { once: true });
-        });
+      const targetVol = () => (role === 'nana')
+        ? Math.min(1.0, Math.max(0.2, (Number(tabletSettings.callVolume) || 85) / 100))
+        : 1.0;
+
+      const promptTapToUnmute = () => {
+        soundBlocked = true;
+        showProblem('🔈 Tap anywhere on screen to hear the call');
+        const resumeAll = () => {
+          if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+          const rv = document.getElementById('remote-video');
+          const ra = document.getElementById('remote-audio');
+          if (rv) {
+            rv.muted = false;
+            rv.volume = targetVol();
+            rv.play().catch(() => {});
+          }
+          if (ra) {
+            ra.muted = false;
+            ra.volume = targetVol();
+            ra.play().catch(() => {});
+          }
+          soundBlocked = false;
+          banner.style.display = 'none';
+        };
+        document.addEventListener('pointerdown', resumeAll, { once: true });
+        document.addEventListener('touchstart', resumeAll, { once: true });
       };
 
       let dbg = document.getElementById('call-debug');
@@ -1783,7 +1790,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
           'font:12px monospace;color:#cbd5e1;background:rgba(0,0,0,0.65);padding:2px 8px;border-radius:6px;pointer-events:none;';
         document.getElementById('call-screen').appendChild(dbg);
       }
-      const showDebug = (role !== 'nana') || new URLSearchParams(location.search).has('debug');
+      // Show debug bar automatically on family phones AND on any TEST_MODE screen (including laptop!)
+      const showDebug = (role !== 'nana') || TEST_MODE || new URLSearchParams(location.search).has('debug');
 
       const pickBestRemoteParticipant = () => {
         const remotes = Object.values(co.participants()).filter(p => !p.local);
@@ -1800,15 +1808,18 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 
       const updateDebug = () => {
         if (!showDebug || callObject !== co) { dbg.style.display = 'none'; return; }
-        const remotes = Object.values(co.participants()).filter(p => !p.local);
+        const parts = co.participants();
+        const myAudState = parts.local?.tracks?.audio?.state || '?';
+        const remotes = Object.values(parts).filter(p => !p.local);
         const r = pickBestRemoteParticipant();
         dbg.style.display = 'block';
         const raEl = document.getElementById('remote-audio');
-        const hasAud = !!(raEl && raEl.srcObject && raEl.srcObject.getAudioTracks()[0]);
+        const rvEl = document.getElementById('remote-video');
+        const isPlaying = (raEl && !raEl.paused && raEl.srcObject) || (rvEl && !rvEl.paused && !rvEl.muted);
         dbg.style.whiteSpace = 'pre';
         dbg.style.textAlign = 'center';
-        dbg.innerText = `remotes: ${remotes.length} (${r?.user_name || 'none'}) | vid: ${r?.tracks?.video?.state || '?'} | aud: ${r?.tracks?.audio?.state || '?'}` +
-          `\nmy mic: ${Math.round(lastMicLevel * 100)}% | their voice arriving: ${Math.round(lastIncomingLevel * 100)}% | speaker: ${hasAud ? (raEl.paused ? 'PAUSED' : 'playing') : 'no audio track'}`;
+        dbg.innerText = `remotes: ${remotes.length} (${r?.user_name || 'none'}) | their vid: ${r?.tracks?.video?.state || '?'} | their aud: ${r?.tracks?.audio?.state || '?'}` +
+          `\nmy mic (${myAudState}): ${Math.round(lastMicLevel * 100)}% | their voice: ${Math.round(lastIncomingLevel * 100)}% | speaker: ${isPlaying ? 'PLAYING' : 'MUTED/TAP SCREEN'}`;
       };
 
       const attachTracks = () => {
@@ -1838,28 +1849,42 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
         const remVid = document.getElementById('remote-video');
         const remAud = document.getElementById('remote-audio');
 
+        // 1. Attach Video (and also bundle Audio into #remote-video so mobile hardware speaker routes properly)
         if (remVidTrack && remVid) {
           if (!soundBlocked) banner.style.display = 'none';
           const curVidTrack = remVid.srcObject?.getVideoTracks()[0];
-          if (curVidTrack !== remVidTrack) {
-            remVid.muted = true;
-            remVid.srcObject = new MediaStream([remVidTrack]);
-            remVid.play().catch(() => {});
+          const curVidAudTrack = remVid.srcObject?.getAudioTracks()[0];
+
+          if (curVidTrack !== remVidTrack || (remAudTrack && curVidAudTrack !== remAudTrack)) {
+            const combinedTracks = remAudTrack ? [remVidTrack, remAudTrack] : [remVidTrack];
+            remVid.srcObject = new MediaStream(combinedTracks);
+            remVid.volume = targetVol();
+            // Try playing unmuted first; if browser blocks unmuted video autoplay, play muted & use #remote-audio
+            remVid.muted = false;
+            const playPromise = remVid.play();
+            if (playPromise && playPromise.catch) {
+              playPromise.catch(() => {
+                remVid.muted = true;
+                remVid.play().catch(() => {});
+                promptTapToUnmute();
+              });
+            }
           }
         }
 
+        // 2. Also attach Audio to #remote-audio (handles audio-only or when #remote-video is muted)
         if (remAudTrack && remAud) {
           const curAudTrack = remAud.srcObject?.getAudioTracks()[0];
           if (curAudTrack !== remAudTrack) {
             remAud.removeAttribute('src');
-            remAud.muted = false;
-            remAud.volume = (role === 'nana')
-              ? Math.min(1.0, Math.max(0.2, (Number(tabletSettings.callVolume) || 85) / 100))
-              : 1.0;
             remAud.srcObject = new MediaStream([remAudTrack]);
-            playEl(remAud);
-          } else if (remAud.paused) {
-            playEl(remAud);
+            // Only unmute #remote-audio if #remote-video had to fall back to muted (prevents echo)
+            remAud.muted = (remVid && !remVid.muted);
+            remAud.volume = targetVol();
+            const audPromise = remAud.play();
+            if (audPromise && audPromise.catch) {
+              audPromise.catch(() => promptTapToUnmute());
+            }
           }
         }
       };
@@ -1907,7 +1932,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
             const lv = Object.values((ev && ev.participantsAudioLevel) || {}).map(Number);
             lastIncomingLevel = lv.length ? Math.max(...lv) : 0;
           });
-        } catch (e) { /* meters are optional */ }
+        } catch (e) {}
         const dbgTimer = setInterval(() => {
           if (callObject !== co) { clearInterval(dbgTimer); return; }
           updateDebug();
