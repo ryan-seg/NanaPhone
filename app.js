@@ -2,10 +2,10 @@
     import { getDatabase, ref, set, update, push, onValue, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
     // =====================================================================
-    // NanaPhone app.js  --  VERSION 2.8.4
+    // NanaPhone app.js  --  VERSION 2.8.5
     // VERSION MUST MATCH: index.html (2 places), styles.css (2 places), app.js (APP_VERSION below)
     // =====================================================================
-    const APP_VERSION = "2.8.4";
+    const APP_VERSION = "2.8.5";
 
     // If the page (index.html) is an old cached copy, reload it once with a fresh address.
     (function versionGuard() {
@@ -115,6 +115,23 @@
       window.addEventListener('resize', apply);
     })();
 
+    // Keyboard touch helpers: brief flash when a key press is registered; ignore multi-finger touches.
+    (function keyboardTouchHelpers() {
+      document.addEventListener('click', (e) => {
+        const b = e.target.closest && e.target.closest('.kb-letter-btn, .emoji-key-btn');
+        if (!b) return;
+        const before = keyAcceptCount;
+        setTimeout(() => {
+          if (keyAcceptCount !== before) {
+            b.classList.add('kb-flash');
+            setTimeout(() => b.classList.remove('kb-flash'), 180);
+          }
+        }, 0);
+      }, true);
+      const kb = document.getElementById('senior-onscreen-keyboard');
+      if (kb) kb.addEventListener('touchstart', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+    })();
+
     const CLASSIC_FM_STREAM = "https://media-ice.musicradio.com/ClassicFMMP3";
 
     const role = params.get('role') || 'nana';
@@ -191,6 +208,8 @@
     let idleDimTimer = null;
     let keyboardHideTimer = null;
     let lastKeyTapMs = 0;
+    let lastKeyChar = null;
+    let keyAcceptCount = 0;
     let lastChatSendMs = 0;
     let settingsLoaded = false;
     let latestHidden = {};
@@ -228,6 +247,7 @@
       colorTheme: 'classic-dark',
       keyboardLayout: 'qwerty',
       keyboardTimeoutSec: 60,
+      keyGuardMs: 700,
       bulletinClearedAt: 0,
       // Live portal starts with calling OFF until a family member switches it on. Test sandbox starts ON.
       callingEnabled: TEST_MODE
@@ -508,16 +528,33 @@
       }
     };
 
+    // Shaky-finger protection: the same key tapped again too soon is ignored, as are double spaces
+    // and a 3rd identical letter in a row. Strength is a setting (keyGuardMs; 0 = off).
     window.typeSeniorKey = (char) => {
       const now = Date.now();
-      if (char !== 'BACKSPACE' && (now - lastKeyTapMs < 280)) return;
+      const guardMs = Number(tabletSettings.keyGuardMs ?? 700);
+      const sameKey = (char === lastKeyChar);
+      let minGap;
+      if (char === 'BACKSPACE') minGap = (guardMs > 0 && sameKey) ? Math.min(guardMs, 450) : 0;
+      else minGap = (guardMs > 0 && sameKey) ? Math.max(guardMs, 280) : 280;
+      if (now - lastKeyTapMs < minGap) return;
+
+      const input = document.getElementById('nana-chat-input');
+      if (!input) return;
+      const cur = input.value;
+      if (char === ' ' && (cur.length === 0 || cur.endsWith(' '))) return;
+      if (guardMs > 0 && char.length === 1 && /[A-Za-z]/.test(char)) {
+        const c = char.toLowerCase();
+        if (cur.length >= 2 && cur.slice(-1).toLowerCase() === c && cur.slice(-2, -1).toLowerCase() === c) return;
+      }
+
       lastKeyTapMs = now;
+      lastKeyChar = char;
+      keyAcceptCount++;
 
       resetKeyboardAutoHideTimer();
       wakeScreenAndResetDimTimer();
 
-      const input = document.getElementById('nana-chat-input');
-      if (!input) return;
       if (char === 'BACKSPACE') {
         input.value = Array.from(input.value).slice(0, -1).join('');
       } else if (['💋', '❤️', '☘️', '👍', '😘'].includes(char)) {
@@ -528,9 +565,18 @@
       }
     };
 
+    // Hide Keys / Send ignore a tap that lands right after a letter (a finger sliding off a key).
+    window.kbHideTapped = () => {
+      const g = Number(tabletSettings.keyGuardMs ?? 700);
+      if (g > 0 && Date.now() - lastKeyTapMs < 500) return;
+      window.closeSeniorKeyboard();
+    };
+
     window.submitTypedNanaMessage = async () => {
       const input = document.getElementById('nana-chat-input');
       if (!input) return;
+      const sendGuard = Number(tabletSettings.keyGuardMs ?? 700);
+      if (sendGuard > 0 && Date.now() - lastKeyTapMs < 500) return;
       const text = input.value.trim();
       if (!text) return;
       input.value = "";
@@ -1415,6 +1461,8 @@
       const rKbEl = document.getElementById('lbl-remote-kb-summary');
       if (gKbEl) gKbEl.innerText = kbSummary;
       if (rKbEl) rKbEl.innerText = kbSummary;
+      const kgNow = Number(tabletSettings.keyGuardMs ?? 700);
+      document.querySelectorAll('.kg-btn').forEach(b => b.classList.toggle('selected', Number(b.dataset.ms) === kgNow));
 
       const gVolEl = document.getElementById('lbl-gear-vol-summary');
       if (gVolEl) gVolEl.innerText = `Call ${callVol}% • Ring ${ringVol}%`;

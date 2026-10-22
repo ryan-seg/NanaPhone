@@ -6,11 +6,11 @@
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <!-- NanaPhone PAGE (index.html)  --  VERSION 2.8.4
+  <!-- NanaPhone PAGE (index.html)  --  VERSION 2.8.5
        VERSION MUST MATCH: index.html (here + PAGE VERSION below + app.js/styles.css links), styles.css, app.js -->
-  <meta name="nanaphone-page-version" content="2.8.4">
+  <meta name="nanaphone-page-version" content="2.8.5">
   <script>
-    window.__NANA_PAGE_VERSION = "2.8.4";
+    window.__NANA_PAGE_VERSION = "2.8.5";
     // Safety net: if app.js or styles.css fail to load, say so after 15s and keep reloading every 60s until they do.
     (function () {
       function filesOk() {
@@ -21,7 +21,7 @@
         if (filesOk() || !document.body) return;
         var d = document.createElement('div');
         d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7c2d12;color:#fff;font:700 20px sans-serif;padding:14px;text-align:center;';
-        d.innerText = 'Loading NanaPhone... (page v2.8.4) - retrying';
+        d.innerText = 'Loading NanaPhone... (page v2.8.5) - retrying';
         document.body.appendChild(d);
       }, 15000);
       setInterval(function () { if (!filesOk()) window.location.reload(); }, 60000);
@@ -29,7 +29,7 @@
   </script>
   <title>NanaPhone Portal</title>
   <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
-  <link rel="stylesheet" href="styles.css?v=2.8.4">
+  <link rel="stylesheet" href="styles.css?v=2.8.5">
 </head>
 <body>
 
@@ -100,6 +100,13 @@
           <button class="opt-btn" id="gear-kbhide-60" onclick="updateSetting('keyboardTimeoutSec', 60)">1m</button>
           <button class="opt-btn" id="gear-kbhide-120" onclick="updateSetting('keyboardTimeoutSec', 120)">2m</button>
           <button class="opt-btn" id="gear-kbhide-180" onclick="updateSetting('keyboardTimeoutSec', 180)">3m</button>
+        </div>
+        <div class="settings-sub" style="margin:8px 0 4px 0;">🖐️ Shaky-finger protection (ignores repeat taps of the same key):</div>
+        <div class="opt-row">
+          <button class="opt-btn kg-btn" data-ms="0" onclick="updateSetting('keyGuardMs', 0)">Off</button>
+          <button class="opt-btn kg-btn" data-ms="450" onclick="updateSetting('keyGuardMs', 450)">Normal</button>
+          <button class="opt-btn kg-btn" data-ms="700" onclick="updateSetting('keyGuardMs', 700)">Strong</button>
+          <button class="opt-btn kg-btn" data-ms="1000" onclick="updateSetting('keyGuardMs', 1000)">Maximum</button>
         </div>
       </div>
 
@@ -299,7 +306,7 @@
       <div id="senior-kb-letters-container" style="display:flex; flex-direction:column; gap:7px;"></div>
 
       <div style="display:grid; grid-template-columns:2fr 5fr 2fr; gap:8px;">
-        <button class="kb-letter-btn" style="background:#334155; color:#ffffff;" onclick="closeSeniorKeyboard()">🔽 Hide Keys</button>
+        <button class="kb-letter-btn" style="background:#334155; color:#ffffff;" onclick="kbHideTapped()">🔽 Hide Keys</button>
         <button class="kb-letter-btn" style="background:var(--key-bg);" onclick="typeSeniorKey(' ')">SPACE BAR</button>
         <button class="kb-letter-btn" style="background:#22c55e; color:#000000; font-size:1.45rem;" onclick="submitTypedNanaMessage()">Send ➤</button>
       </div>
@@ -368,7 +375,7 @@
         </div>
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.8.4</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.8.5</div>
       </div>
     </div>
 
@@ -590,6 +597,13 @@
         <button class="opt-btn" id="set-kbhide-120" onclick="updateSetting('keyboardTimeoutSec', 120)">2m</button>
         <button class="opt-btn" id="set-kbhide-180" onclick="updateSetting('keyboardTimeoutSec', 180)">3m</button>
       </div>
+      <div class="settings-sub" style="margin:8px 0 4px 0;">🖐️ Shaky-finger protection (ignores repeat taps of the same key):</div>
+      <div class="opt-row">
+        <button class="opt-btn kg-btn" data-ms="0" onclick="updateSetting('keyGuardMs', 0)">Off</button>
+        <button class="opt-btn kg-btn" data-ms="450" onclick="updateSetting('keyGuardMs', 450)">Normal</button>
+        <button class="opt-btn kg-btn" data-ms="700" onclick="updateSetting('keyGuardMs', 700)">Strong</button>
+        <button class="opt-btn kg-btn" data-ms="1000" onclick="updateSetting('keyGuardMs', 1000)">Maximum</button>
+      </div>
     </div>
 
     <!-- Normal Brightness, Idle Dimming Level & Time Till Dimming -->
@@ -766,6 +780,6 @@
     <button class="confirm-btn" style="background:#22c55e; color:#000;" onclick="localStorage.setItem('nana_service_token','Westerham8'); window.location.reload(true);">🔄 Unlock & Reload Now</button>
   </div>
 
-  <script type="module" src="app.js?v=2.8.4"></script>
+  <script type="module" src="app.js?v=2.8.5"></script>
 </body>
 </html>
