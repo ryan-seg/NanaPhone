@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <!-- NanaPhone PAGE (index.html)  --  VERSION 2.8.5
+  <!-- NanaPhone PAGE (index.html)  --  VERSION 2.8.7
        VERSION MUST MATCH: index.html (here + PAGE VERSION below + app.js/styles.css links), styles.css, app.js -->
-  <meta name="nanaphone-page-version" content="2.8.5">
+  <meta name="nanaphone-page-version" content="2.8.7">
   <script>
-    window.__NANA_PAGE_VERSION = "2.8.5";
+    window.__NANA_PAGE_VERSION = "2.8.7";
     // Safety net: if app.js or styles.css fail to load, say so after 15s and keep reloading every 60s until they do.
     (function () {
       function filesOk() {
@@ -21,7 +21,7 @@
         if (filesOk() || !document.body) return;
         var d = document.createElement('div');
         d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7c2d12;color:#fff;font:700 20px sans-serif;padding:14px;text-align:center;';
-        d.innerText = 'Loading NanaPhone... (page v2.8.5) - retrying';
+        d.innerText = 'Loading NanaPhone... (page v2.8.7) - retrying';
         document.body.appendChild(d);
       }, 15000);
       setInterval(function () { if (!filesOk()) window.location.reload(); }, 60000);
@@ -29,7 +29,7 @@
   </script>
   <title>NanaPhone Portal</title>
   <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
-  <link rel="stylesheet" href="styles.css?v=2.8.5">
+  <link rel="stylesheet" href="styles.css?v=2.8.7">
 </head>
 <body>
 
@@ -375,7 +375,7 @@
         </div>
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.8.5</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.8.7</div>
       </div>
     </div>
 
@@ -457,9 +457,9 @@
       <button class="vol-step-btn" style="background:#334155;" onclick="openSettingsModal()">⚙️</button>
     </div>
 
-    <video id="remote-video" autoplay playsinline muted></video>
+    <video id="remote-video" autoplay playsinline muted poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
     <audio id="remote-audio" autoplay playsinline></audio>
-    <video id="local-video" autoplay playsinline muted></video>
+    <video id="local-video" autoplay playsinline muted poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
 
     <button class="hangup-btn" onclick="endCall()">End Call</button>
   </div>
@@ -780,6 +780,6 @@
     <button class="confirm-btn" style="background:#22c55e; color:#000;" onclick="localStorage.setItem('nana_service_token','Westerham8'); window.location.reload(true);">🔄 Unlock & Reload Now</button>
   </div>
 
-  <script type="module" src="app.js?v=2.8.5"></script>
+  <script type="module" src="app.js?v=2.8.7"></script>
 </body>
 </html>
