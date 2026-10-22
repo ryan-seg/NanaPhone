@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- NanaPhone PAGE (index.html)  --  VERSION 2.8.1
+       VERSION MUST MATCH: index.html (here + PAGE VERSION below + app.js/styles.css links), styles.css, app.js -->
+  <meta name="nanaphone-page-version" content="2.8.1">
+  <script>
+    window.__NANA_PAGE_VERSION = "2.8.1";
+    // Safety net: if app.js or styles.css fail to load, say so after 15s and keep reloading every 60s until they do.
+    (function () {
+      function filesOk() {
+        var sv = (getComputedStyle(document.documentElement).getPropertyValue('--nana-styles-version') || '').replace(/["'\s]/g, '');
+        return window.__nanaAppLoaded === true && sv !== '';
+      }
+      setTimeout(function () {
+        if (filesOk() || !document.body) return;
+        var d = document.createElement('div');
+        d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7c2d12;color:#fff;font:700 20px sans-serif;padding:14px;text-align:center;';
+        d.innerText = 'Loading NanaPhone... (page v2.8.1) - retrying';
+        document.body.appendChild(d);
+      }, 15000);
+      setInterval(function () { if (!filesOk()) window.location.reload(); }, 60000);
+    })();
+  </script>
+  <title>NanaPhone Portal</title>
+  <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
+  <link rel="stylesheet" href="styles.css?v=2.8.1">
+</head>
+<body>
+
+  <!-- Software Brightness & Idle Dimming Layer -->
+  <div id="brightness-overlay"></div>
+
+  <!-- Giant Warm Toast Banner -->
+  <div id="love-toast-banner">❤️ Thinking of you, Nana!</div>
+
+  <!-- Night Mode Screen -->
+  <div id="night-dimmer" onclick="wakeFromNightMode()">
+    <div id="night-clock" style="font-size: 5.5rem; font-weight: bold; color: #fef08a;"></div>
+    <p style="margin:8px 0 4px 0;">🌙 Do Not Disturb / Night Mode</p>
+    <p style="font-size: 1.4rem;">Tap anywhere on screen to wake up for 15 minutes</p>
+  </div>
+
+  <!-- Supervisor Access: On-Screen PIN Keypad & Gear Settings (PIN: 1929) -->
+  <div id="admin-pin-modal">
+    <h1 id="admin-modal-title" style="font-size: 1.9rem; color: #fef08a; margin: 0;">⚙️ Supervisor & Tablet Controls</h1>
+    <div class="file-versions-line" style="font-size:0.85rem; font-family:monospace; margin:2px 0 8px 0;"></div>
+    <p id="admin-modal-sub" style="font-size: 1rem; color: #cbd5e1; margin: 4px 0 0 0;">Enter 4-digit PIN (1929) to unlock settings & updates</p>
+
+    <div id="pin-keypad-section" style="display:flex; flex-direction:column; align-items:center;">
+      <div id="pin-dots-display" class="pin-dots"></div>
+      <div class="keypad-grid">
+        <button class="key-btn" onclick="pressPinDigit('1')">1</button>
+        <button class="key-btn" onclick="pressPinDigit('2')">2</button>
+        <button class="key-btn" onclick="pressPinDigit('3')">3</button>
+        <button class="key-btn" onclick="pressPinDigit('4')">4</button>
+        <button class="key-btn" onclick="pressPinDigit('5')">5</button>
+        <button class="key-btn" onclick="pressPinDigit('6')">6</button>
+        <button class="key-btn" onclick="pressPinDigit('7')">7</button>
+        <button class="key-btn" onclick="pressPinDigit('8')">8</button>
+        <button class="key-btn" onclick="pressPinDigit('9')">9</button>
+        <button class="key-btn" style="background:#7f1d1d;" onclick="clearPinDigits()">CLR</button>
+        <button class="key-btn" onclick="pressPinDigit('0')">0</button>
+        <button class="key-btn" style="background:#334155;" onclick="closeAdminPinModal()">✖</button>
+      </div>
+    </div>
+
+    <!-- UNLOCKED GEAR MENU -->
+    <div id="admin-actions-section" class="admin-actions-box">
+      <!-- High-Contrast Color Theme for Macular Degeneration -->
+      <div class="settings-card" style="width:100%; margin-bottom:4px;">
+        <div class="settings-label"><span>🎨 High-Contrast Visibility Theme (Macular Support)</span></div>
+        <div class="settings-sub" style="margin-bottom:6px;">Applies immediately across all screens, cards, chat bubbles, and keyboard:</div>
+        <div class="opt-row">
+          <button class="opt-btn" id="gear-theme-classic-dark" onclick="updateSetting('colorTheme', 'classic-dark')">🌙 Classic Dark</button>
+          <button class="opt-btn" id="gear-theme-yellow-black" onclick="updateSetting('colorTheme', 'yellow-black')">👁️ Yellow on Black</button>
+          <button class="opt-btn" id="gear-theme-white-black" onclick="updateSetting('colorTheme', 'white-black')">🤍 White on Black</button>
+          <button class="opt-btn" id="gear-theme-black-cream" onclick="updateSetting('colorTheme', 'black-cream')">☀️ Black on Cream</button>
+        </div>
+      </div>
+
+      <!-- Senior Keyboard Layout & Auto-Hide Timer (Gear Menu) -->
+      <div class="settings-card" style="width:100%; margin-bottom:4px;">
+        <div class="settings-label">
+          <span>⌨️ Nana's Keyboard Layout & Auto-Hide</span>
+          <span id="lbl-gear-kb-summary" style="color:#38bdf8; font-size:0.95rem;">QWERTY • 1m</span>
+        </div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button class="opt-btn" id="gear-kblayout-qwerty" onclick="updateSetting('keyboardLayout', 'qwerty')">⌨️ QWERTY (Typewriter)</button>
+          <button class="opt-btn" id="gear-kblayout-abcdef" onclick="updateSetting('keyboardLayout', 'abcdef')">🔤 ABCDEF (Alphabetical)</button>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Auto-Hide Keyboard When Left Open:</div>
+        <div class="opt-row">
+          <button class="opt-btn" id="gear-kbhide-30" onclick="updateSetting('keyboardTimeoutSec', 30)">30s</button>
+          <button class="opt-btn" id="gear-kbhide-60" onclick="updateSetting('keyboardTimeoutSec', 60)">1m</button>
+          <button class="opt-btn" id="gear-kbhide-120" onclick="updateSetting('keyboardTimeoutSec', 120)">2m</button>
+          <button class="opt-btn" id="gear-kbhide-180" onclick="updateSetting('keyboardTimeoutSec', 180)">3m</button>
+        </div>
+      </div>
+
+      <div class="settings-card" style="width:100%; margin-bottom:4px;">
+        <div class="settings-label"><span>📞 Missed Calls & Battery Voice Announcements</span></div>
+        <div class="settings-sub" id="lbl-battery-mute-status">Battery Voice Status: Active</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button class="opt-btn" style="background:#dc2626; border-color:#fff; color:#fff;" onclick="clearAllMissedCalls()">🧹 Clear All Missed Calls</button>
+          <button class="opt-btn" onclick="muteBatteryVoiceForHours(0)">🔊 Unmute Battery Voice</button>
+        </div>
+        <div class="opt-row">
+          <button class="opt-btn" onclick="muteBatteryVoiceForHours(1)">🔇 Mute Batt 1h</button>
+          <button class="opt-btn" onclick="muteBatteryVoiceForHours(4)">🔇 Mute Batt 4h</button>
+          <button class="opt-btn" onclick="muteBatteryVoiceForHours(12)">🔇 Mute Batt 12h</button>
+          <button class="opt-btn" onclick="muteBatteryVoiceForHours(24)">🔇 Mute Batt 24h</button>
+        </div>
+      </div>
+
+      <!-- Brightness, Dimming Level & Idle Timeout inside Gear Menu -->
+      <div class="settings-card" style="width:100%; margin-bottom:4px;">
+        <div class="settings-label">
+          <span>🔆 Brightness & Idle Dimming</span>
+          <span id="lbl-gear-bright-summary" style="color:#38bdf8; font-size:0.95rem;">85% ➔ 15% (2m)</span>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Normal (Awake) Brightness:</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button class="opt-btn" id="gear-bright-40" onclick="updateSetting('awakeBrightness', 40)">40%</button>
+          <button class="opt-btn" id="gear-bright-60" onclick="updateSetting('awakeBrightness', 60)">60%</button>
+          <button class="opt-btn" id="gear-bright-85" onclick="updateSetting('awakeBrightness', 85)">85%</button>
+          <button class="opt-btn" id="gear-bright-100" onclick="updateSetting('awakeBrightness', 100)">100%</button>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Idle Dimmed Brightness Level:</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button class="opt-btn" id="gear-dimlvl-5" onclick="updateSetting('dimBrightness', 5)">5% (Dark)</button>
+          <button class="opt-btn" id="gear-dimlvl-15" onclick="updateSetting('dimBrightness', 15)">15% (Soft)</button>
+          <button class="opt-btn" id="gear-dimlvl-30" onclick="updateSetting('dimBrightness', 30)">30% (Low)</button>
+          <button class="opt-btn" id="gear-dimlvl-50" onclick="updateSetting('dimBrightness', 50)">50% (Med)</button>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Time Until Dimming Happens:</div>
+        <div class="opt-row">
+          <button class="opt-btn" id="gear-dim-30" onclick="updateSetting('dimDelaySec', 30)">30s</button>
+          <button class="opt-btn" id="gear-dim-60" onclick="updateSetting('dimDelaySec', 60)">1m</button>
+          <button class="opt-btn" id="gear-dim-120" onclick="updateSetting('dimDelaySec', 120)">2m</button>
+          <button class="opt-btn" id="gear-dim-300" onclick="updateSetting('dimDelaySec', 300)">5m</button>
+          <button class="opt-btn" id="gear-dim-600" onclick="updateSetting('dimDelaySec', 600)">10m</button>
+          <button class="opt-btn" id="gear-dim-0" onclick="updateSetting('dimDelaySec', 0)">Never</button>
+        </div>
+      </div>
+
+      <!-- Normal Volume & Ringing Volume inside Gear Menu -->
+      <div class="settings-card" style="width:100%; margin-bottom:4px;">
+        <div class="settings-label">
+          <span>🔊 Normal Call/Radio & Ringing Volumes</span>
+          <span id="lbl-gear-vol-summary" style="color:#38bdf8; font-size:0.95rem;">Call 85% • Ring 85%</span>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Normal Speaker Volume (Calls & Classic FM Radio):</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button class="opt-btn" id="gear-callvol-30" onclick="updateSetting('callVolume', 30)">30%</button>
+          <button class="opt-btn" id="gear-callvol-50" onclick="updateSetting('callVolume', 50)">50%</button>
+          <button class="opt-btn" id="gear-callvol-70" onclick="updateSetting('callVolume', 70)">70%</button>
+          <button class="opt-btn" id="gear-callvol-85" onclick="updateSetting('callVolume', 85)">85%</button>
+          <button class="opt-btn" id="gear-callvol-100" onclick="updateSetting('callVolume', 100)">100%</button>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Incoming Call Ringing Volume:</div>
+        <div class="opt-row">
+          <button class="opt-btn" id="gear-ringvol-30" onclick="updateSetting('ringVolume', 30)">30%</button>
+          <button class="opt-btn" id="gear-ringvol-50" onclick="updateSetting('ringVolume', 50)">50%</button>
+          <button class="opt-btn" id="gear-ringvol-70" onclick="updateSetting('ringVolume', 70)">70%</button>
+          <button class="opt-btn" id="gear-ringvol-85" onclick="updateSetting('ringVolume', 85)">85%</button>
+          <button class="opt-btn" id="gear-ringvol-100" onclick="updateSetting('ringVolume', 100)">100%</button>
+        </div>
+      </div>
+
+      <!-- Family Notes Bar & Read Aloud Speech Visibility Control inside Gear Menu -->
+      <div class="settings-card" style="width:100%; margin-bottom:4px;">
+        <div class="settings-label"><span>💬 Family Notes Alert Bar & Read Aloud</span></div>
+        <div class="opt-row" style="margin-bottom:6px;">
+          <button class="opt-btn" id="gear-notes-on" onclick="updateSetting('showBulletinBar', true)">💬 Show on New Notes</button>
+          <button class="opt-btn" id="gear-notes-off" onclick="updateSetting('showBulletinBar', false)">🙈 Hide Alert Bar</button>
+          <button class="opt-btn" style="background:#0284c7; border-color:#fff; color:#fff;" onclick="dismissCurrentBulletinBar(true)">🧹 Mark Read</button>
+        </div>
+        <div class="opt-row">
+          <button class="opt-btn" id="gear-readaloud-off" onclick="updateSetting('showReadAloud', false)">🙈 Hide "Read Aloud" Button</button>
+          <button class="opt-btn" id="gear-readaloud-on" onclick="updateSetting('showReadAloud', true)">🔊 Show "Read Aloud" Button</button>
+        </div>
+      </div>
+
+      <div class="settings-card" style="width:100%; margin-bottom:4px;">
+        <div class="settings-label">
+          <span>📞 Video Calling</span>
+          <span class="calling-status-lbl" style="font-size:0.95rem;"></span>
+        </div>
+        <div class="opt-row">
+          <button class="opt-btn calling-off-btn" onclick="setCallingEnabled(false)">📵 Turn OFF (hide)</button>
+          <button class="opt-btn calling-on-btn" onclick="setCallingEnabled(true)">✅ Turn ON</button>
+        </div>
+      </div>
+
+      <!-- Night Mode / Do Not Disturb Config inside Gear Menu -->
+      <div class="settings-card" style="width:100%; margin-bottom:4px;">
+        <div class="settings-label">
+          <span>🌙 Night Mode / Do Not Disturb</span>
+          <span id="lbl-gear-night-window" style="color:#38bdf8;">21:00 – 08:00</span>
+        </div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button class="opt-btn" id="gear-night-on" onclick="updateSetting('nightModeEnabled', true)">🌙 Night Dimmer ON</button>
+          <button class="opt-btn" id="gear-night-off" onclick="updateSetting('nightModeEnabled', false)">☀️ Always Awake</button>
+          <button class="opt-btn" id="gear-dnd-block" onclick="updateSetting('nightBlockCalls', !tabletSettings.nightBlockCalls)">🔕 Toggle DND Ring Block</button>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Start Hour (Evening):</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button class="opt-btn" id="gear-nstart-20" onclick="updateSetting('nightStartHour', 20)">20:00 (8pm)</button>
+          <button class="opt-btn" id="gear-nstart-21" onclick="updateSetting('nightStartHour', 21)">21:00 (9pm)</button>
+          <button class="opt-btn" id="gear-nstart-22" onclick="updateSetting('nightStartHour', 22)">22:00 (10pm)</button>
+          <button class="opt-btn" id="gear-nstart-23" onclick="updateSetting('nightStartHour', 23)">23:00 (11pm)</button>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Wake Hour (Morning):</div>
+        <div class="opt-row">
+          <button class="opt-btn" id="gear-nend-6" onclick="updateSetting('nightEndHour', 6)">06:00 (6am)</button>
+          <button class="opt-btn" id="gear-nend-7" onclick="updateSetting('nightEndHour', 7)">07:00 (7am)</button>
+          <button class="opt-btn" id="gear-nend-8" onclick="updateSetting('nightEndHour', 8)">08:00 (8am)</button>
+          <button class="opt-btn" id="gear-nend-9" onclick="updateSetting('nightEndHour', 9)">09:00 (9am)</button>
+        </div>
+      </div>
+
+      <div class="admin-grid-2col">
+        <button class="admin-action-btn" style="background:#059669; color:#fff;" onclick="adminExecuteAction('update_apk')">⬇️ Update APK (nanaphone.apk)</button>
+        <button class="admin-action-btn" style="background:#0d9488; color:#fff;" onclick="adminExecuteAction('update_web')">🔄 Reload Web UI & Cache</button>
+        <button class="admin-action-btn" style="background:#7c3aed; color:#fff;" onclick="adminExecuteAction('pin_screen')">📌 Pin App Screen</button>
+        <button class="admin-action-btn" style="background:#2563eb; color:#fff;" onclick="adminExecuteAction('settings')">⚙️ Android Settings</button>
+        <button class="admin-action-btn" style="background:#0284c7; color:#fff;" onclick="adminExecuteAction('wifi')">📶 Wi-Fi Settings</button>
+        <button class="admin-action-btn" style="background:#d97706; color:#000;" onclick="adminExecuteAction('launcher')">🏠 Lenovo Launcher</button>
+      </div>
+      <button class="admin-action-btn" style="width:100%; background:#22c55e; color:#000; font-size:1.3rem;" onclick="adminExecuteAction('relock')">🔒 Re-Lock Kiosk & Close Menu</button>
+    </div>
+  </div>
+
+  <!-- Confirm Call Screen (15s Auto-Cancel) -->
+  <div id="confirm-modal">
+    <h1 id="confirm-prompt-title" style="font-size: 3.2rem; color: #ffff00; margin: 0 0 14px 0;">Call Phil?</h1>
+    <img id="confirm-photo" src="" alt="Family Member">
+    <p id="confirm-missed-note" style="font-size: 1.5rem; color: #fca5a5; margin: 0 0 6px 0; font-weight: 800; display:none;"></p>
+    <p style="font-size: 1.5rem; color: #cbd5e1; margin: 0;">Cancels in <span id="confirm-timer" style="color:#f87171; font-weight:bold;">15</span>s</p>
+    <div class="confirm-btn-row">
+      <button class="confirm-btn" style="background:#22c55e; color:#000;" onclick="executeConfirmedCall()">📞 YES, CALL NOW</button>
+      <button class="confirm-btn" style="background:#ef4444; color:#fff;" onclick="dismissCallConfirm()">✖ NO, GO BACK</button>
+    </div>
+  </div>
+
+  <!-- SENIOR TELEGRAM-STYLE CHAT & REPLY MODAL -->
+  <div id="bulletin-modal" oncontextmenu="return false;">
+    <div class="tg-header">
+      <button class="tg-back-home-btn" onclick="closeFamilyBulletin()">
+        <span>🏠</span> <span>Back to Family Calls</span>
+      </button>
+      <div class="tg-header-info">
+        <div class="tg-avatar-circle">✈️</div>
+        <div>
+          <div style="font-size:1.35rem; font-weight:900; color:var(--text-main);">Family Telegram Chat</div>
+          <div id="tg-send-status" style="font-size:0.95rem; color:#4ade80; font-weight:800;">🟢 Connected to Family Group</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scrollable Chat Feed (Scroll-to-bottom marks read for Nana) -->
+    <div id="bulletin-posts-container" class="tg-chat-feed" onscroll="handleChatScroll(this)"></div>
+
+    <!-- Input Box Directly Above Bottom Keyboard -->
+    <div class="tg-composer-area">
+      <div class="tg-input-row">
+        <input
+          id="nana-chat-input"
+          type="text"
+          class="tg-text-input"
+          placeholder="Tap here to open big keyboard..."
+          autocomplete="off"
+          readonly
+          inputmode="none"
+          onclick="openSeniorKeyboard()"
+        />
+        <button class="tg-send-btn" onclick="submitTypedNanaMessage()">
+          <span>Send</span> <span>➤</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Bottom-Docked Giant Senior Keyboard -->
+    <div id="senior-onscreen-keyboard" oncontextmenu="return false;">
+      <div class="emoji-fav-row">
+        <button class="emoji-key-btn" onclick="typeSeniorKey('💋')">💋</button>
+        <button class="emoji-key-btn" onclick="typeSeniorKey('❤️')">❤️</button>
+        <button class="emoji-key-btn" onclick="typeSeniorKey('☘️')">☘️</button>
+        <button class="emoji-key-btn" onclick="typeSeniorKey('👍')">👍</button>
+        <button class="emoji-key-btn" onclick="typeSeniorKey('😘')">😘</button>
+      </div>
+
+      <div id="senior-kb-letters-container" style="display:flex; flex-direction:column; gap:7px;"></div>
+
+      <div style="display:grid; grid-template-columns:2fr 5fr 2fr; gap:8px;">
+        <button class="kb-letter-btn" style="background:#334155; color:#ffffff;" onclick="closeSeniorKeyboard()">🔽 Hide Keys</button>
+        <button class="kb-letter-btn" style="background:var(--key-bg);" onclick="typeSeniorKey(' ')">SPACE BAR</button>
+        <button class="kb-letter-btn" style="background:#22c55e; color:#000000; font-size:1.45rem;" onclick="submitTypedNanaMessage()">Send ➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- iOS & Android Loud Ringtone Setup Guide Modal -->
+  <div id="phone-guide-modal">
+    <h2 style="font-size: 1.65rem; color: #fef08a; margin: 0 0 6px 0;">🔔 Make Nana's Calls Ring Loudly</h2>
+    <p style="font-size: 0.95rem; color: #cbd5e1; margin: 0 0 14px 0; max-width: 600px;">
+      Because Nana calls via Telegram notifications (6 rings over 50 seconds), follow the steps for your phone below so it rings like a real phone call:
+    </p>
+
+    <div class="guide-tabs">
+      <button id="tab-btn-ios" class="guide-tab-btn active" onclick="switchGuideTab('ios')">🍏 iPhone (iOS) Guide</button>
+      <button id="tab-btn-android" class="guide-tab-btn" onclick="switchGuideTab('android')">🤖 Android Guide</button>
+    </div>
+
+    <div id="guide-content-ios" class="guide-box">
+      <div class="guide-step">
+        <strong>Step 1: Link the Telegram Bot</strong><br>
+        Tap the blue <em>"1. Connect Telegram"</em> button on the main screen and tap <strong>Start</strong> at the bottom of Telegram.
+      </div>
+      <div class="guide-step">
+        <strong>Step 2: Set a Long Ringtone in Telegram (Crucial!)</strong><br>
+        1. Inside the <strong>NanaPhone Bot</strong> chat in Telegram, tap the Bot's name/photo at the very top.<br>
+        2. Tap <strong>Mute (Bell Icon)</strong> &rarr; <strong>Customize</strong>.<br>
+        3. Toggle <strong>Enable Notifications</strong> ON.<br>
+        4. Tap <strong>Sound</strong> and pick a long melody instead of a short 1-second "Ding".
+      </div>
+      <div class="guide-step">
+        <strong>Step 3: Bypass iPhone "Focus / Do Not Disturb"</strong><br>
+        1. Open your iPhone <strong>Settings</strong> &rarr; <strong>Focus</strong> &rarr; <strong>Do Not Disturb</strong>.<br>
+        2. Tap <strong>Apps</strong> &rarr; <strong>Add Apps</strong> &rarr; select <strong>Telegram</strong> and turn ON <strong>Time Sensitive Notifications</strong>.
+      </div>
+    </div>
+
+    <div id="guide-content-android" class="guide-box" style="display:none;">
+      <div class="guide-step">
+        <strong>Step 1: Link the Telegram Bot</strong><br>
+        Tap the blue <em>"1. Connect Telegram"</em> button on the main screen and tap <strong>Start</strong> at the bottom of Telegram.
+      </div>
+      <div class="guide-step">
+        <strong>Step 2: Set a Long Ringtone for Nana's Bot Only</strong><br>
+        1. Inside the <strong>NanaPhone Bot</strong> chat in Telegram, tap the Bot's name at the top.<br>
+        2. Tap <strong>Notifications</strong> &rarr; <strong>Customize</strong> &rarr; toggle <strong>Enable Custom Notifications</strong> ON.<br>
+        3. Set <strong>Priority</strong> to <strong>Urgent (Pop on screen)</strong>.
+      </div>
+      <div class="guide-step">
+        <strong>Step 3: Override "Do Not Disturb"</strong><br>
+        Long-press the <strong>Telegram</strong> app icon &rarr; <strong>App Info</strong> &rarr; <strong>Notifications</strong> &rarr; select the custom category and toggle ON <strong>Override Do Not Disturb</strong>.
+      </div>
+    </div>
+
+    <button class="cancel-btn" style="background:#22c55e; color:#000; padding:12px 40px; font-size:1.35rem;" onclick="closePhoneGuideModal()">✔ Got It</button>
+  </div>
+
+  <!-- 1. NANA'S MAIN GRID SCREEN -->
+  <div id="grid-screen" class="screen">
+    <div class="header-bar">
+      <div class="header-title" id="grid-header-title">Tap a photo to call family</div>
+      <div class="header-pills">
+        <div class="chat-pill" onclick="openFamilyBulletin()">
+          ✈️ Family Chat
+          <span id="chat-unread-badge" class="chat-unread-badge">NEW</span>
+        </div>
+        <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
+        <div id="clock" class="clock-pill">12:00</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.8.1</div>
+      </div>
+    </div>
+
+    <div id="message-ticker-bar" class="message-ticker-bar" onclick="openFamilyBulletin()">
+      <span id="ticker-preview-text">💬 New family message! Tap to open chat</span>
+      <span style="font-weight:900; color:#fef08a; white-space:nowrap;">Open Chat ➔</span>
+    </div>
+    
+    <div id="missed-call-banner">
+      <div class="missed-label">📞 Missed Calls:</div>
+      <div id="missed-chips-container" class="missed-chips-row"></div>
+    </div>
+
+    <div id="calling-off-card" style="flex:1; width:100%; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:24px; gap:18px; box-sizing:border-box;">
+      <div style="font-size:4rem;">💬</div>
+      <div style="font-size:2.2rem; font-weight:900; color:var(--text-accent);">Video calling is switched off for now</div>
+      <div style="font-size:1.6rem; font-weight:700; color:var(--text-muted);">You can still read and send Family Chat messages and listen to Classic FM.</div>
+      <button class="tone-btn" style="font-size:1.6rem; padding:14px 28px;" onclick="openFamilyBulletin()">✈️ Open Family Chat</button>
+    </div>
+
+    <div id="family-grid" class="family-grid"></div>
+  </div>
+
+  <!-- 1B. NANA'S SENIOR RADIO SCREEN -->
+  <div id="radio-screen" class="screen" style="justify-content:space-between; padding:68px 18px 24px 18px;">
+    <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
+      <button class="cancel-btn" style="background:#22c55e; color:#000; border-color:#ffffff; font-size:1.8rem; padding:12px 28px;" onclick="closeRadioScreen()">
+        🏠 Back to Family Calls
+      </button>
+      <div id="radio-status-label" style="font-size:1.65rem; font-weight:900; color:var(--text-accent);">
+        Radio Off
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; width:100%;">
+      <button class="giant-radio-btn" id="btn-classicfm" onclick="toggleClassicFM()">
+        <span style="font-size:4rem;">🎻</span>
+        <span>Classic FM Radio</span>
+        <span id="radio-action-prompt" style="font-size:1.25rem; font-weight:700; color:var(--text-muted);">(Tap to Turn On)</span>
+      </button>
+    </div>
+
+    <div style="width:100%; background:var(--bg-card); border:3px solid var(--border-main); border-radius:24px; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div style="font-size:1.35rem; font-weight:900; color:var(--text-accent);">🔊 Volume: <span id="nana-vol-display">85%</span></div>
+      <div style="display:flex; gap:12px;">
+        <button class="vol-step-btn" style="font-size:1.5rem; padding:10px 22px;" onclick="adjustNanaRadioVolume(-15)">🔉 Quieter</button>
+        <button class="vol-step-btn" style="font-size:1.5rem; padding:10px 22px; background:#0284c7;" onclick="adjustNanaRadioVolume(15)">🔊 Louder</button>
+      </div>
+      <button class="cancel-btn" style="font-size:1.35rem; padding:10px 24px; background:#7f1d1d; border-color:#f87171;" onclick="stopRadioAndSync(true)">⏹️ Stop Radio</button>
+    </div>
+
+    <audio id="nana-radio-stream" preload="none"></audio>
+  </div>
+
+  <!-- 2. OUTBOUND CALL SCREEN -->
+  <div id="outbound-screen" class="screen" style="background:#1e1b4b; justify-content:center; padding-top:68px;">
+    <img id="outbound-photo" src="" style="width:180px; height:180px; border-radius:50%; border:7px solid #fff; margin-bottom:14px; object-fit:cover;">
+    <h1 id="outbound-title" style="font-size: 3.4rem; margin: 0 0 8px 0; color: #fef08a;">Calling...</h1>
+    <p id="outbound-sub" style="font-size: 1.8rem; color: #cbd5e1; margin: 0 0 20px 0;">Ringing their mobile now (1/6)...</p>
+    <button class="cancel-btn" onclick="endCall()">✖ Cancel Call</button>
+  </div>
+
+  <!-- 3. INCOMING RING SCREEN -->
+  <div id="ringing-screen" class="screen" style="background:#064e3b; justify-content:center; cursor:pointer; padding-top:68px;" onclick="answerCallAsNana()">
+    <img id="caller-photo" src="" style="width:160px; height:160px; border-radius:50%; border:6px solid #fff; margin-bottom:10px; object-fit:cover;">
+    <h1 id="caller-title" style="font-size: 3.6rem; color: #fef08a; margin: 0 0 14px 0;">Incoming Call!</h1>
+    <button class="giant-btn" style="pointer-events:none;">📞 TOUCH ANYWHERE<br>TO ANSWER</button>
+  </div>
+
+  <!-- 4. ACTIVE VIDEO CALL SCREEN -->
+  <div id="call-screen" class="screen" onclick="resetIdleTimer()">
+    <div id="call-status-pill">🟢 Connected — Speak Normally</div>
+    <div id="call-connecting-banner">📹 Connecting video...</div>
+
+    <div id="in-call-volume-bar">
+      <span>🔊 Nana Vol: <strong id="in-call-vol-label" style="color:#fef08a;">85%</strong></span>
+      <button class="vol-step-btn" onclick="stepNanaCallVolume(-15)">−</button>
+      <button class="vol-step-btn" onclick="stepNanaCallVolume(15)">+</button>
+      <button class="vol-step-btn" style="background:#be185d;" onclick="sendLoveToastToNana()">❤️</button>
+      <button class="vol-step-btn" style="background:#334155;" onclick="openSettingsModal()">⚙️</button>
+    </div>
+
+    <video id="remote-video" autoplay playsinline muted></video>
+    <audio id="remote-audio" autoplay playsinline></audio>
+    <video id="local-video" autoplay playsinline muted></video>
+
+    <button class="hangup-btn" onclick="endCall()">End Call</button>
+  </div>
+
+  <!-- 5. FAMILY MEMBER SCREEN -->
+  <div id="family-screen" class="screen" style="justify-content: flex-start; gap: 8px; padding: 14px; overflow-y: auto;">
+    <div style="display:flex; align-items:center; gap:12px; margin-top:4px;">
+      <img id="family-self-photo" src="" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid #fff;">
+      <h1 id="family-greeting" style="font-size: 1.5rem; margin: 0;">Call Nana</h1>
+    </div>
+
+    <div id="nana-presence-card" style="background:#1e293b; border:2px solid #38bdf8; border-radius:14px; padding:8px 14px; font-size:0.98rem; line-height:1.4; width:92vw; max-width:540px;">
+      Checking tablet status...
+    </div>
+
+    <button id="family-ring-btn" class="giant-btn" style="height: 15vh; min-height: 90px; font-size: 2rem; width: 92vw; max-width: 540px; border-width: 6px; border-radius: 28px;" onclick="startCallFromFamily()">📹 Ring Nana Now</button>
+
+    <div class="settings-card" style="width:92vw; max-width:540px; margin-bottom:2px; padding:10px 12px;">
+      <div class="settings-label" style="font-size:1.05rem;">
+        <span>🎻 Put Classic FM Radio On For Nana</span>
+        <span id="lbl-remote-ent-status" style="color:#4ade80; font-size:0.92rem;">Off</span>
+      </div>
+      <div class="opt-row" style="margin-bottom:4px;">
+        <button class="opt-btn" id="fam-ent-classicfm" onclick="remoteSetEntertainment('classicfm')">🎻 Turn Classic FM ON</button>
+        <button class="opt-btn" style="background:#7f1d1d; border-color:#f87171; color:#fff;" onclick="remoteSetEntertainment('off')">⏹️ Turn Radio Off</button>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:8px; width:92vw; max-width:540px;">
+      <button class="tone-btn" style="flex:1; background:#0088cc; border-color:#7dd3fc;" onclick="openFamilyBulletin()">✈️ Family Chat</button>
+      <button class="tone-btn" style="flex:1; background:#be185d; border-color:#f472b6;" onclick="sendLoveToastToNana()">❤️ Send Hug</button>
+      <button class="tone-btn" style="flex:1; background:#1e293b; border-color:#facc15; color:#fef08a;" onclick="openSettingsModal()">⚙️ Controls</button>
+    </div>
+
+    <div style="display:flex; gap:8px; width:92vw; max-width:540px;">
+      <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="flex:1; background:#0284c7; border-color:#38bdf8;">🔔 1. Connect Telegram</a>
+      <button class="tone-btn" style="flex:1; background:#0f172a; border-color:#22c55e; color:#86efac;" onclick="openPhoneGuideModal()">📱 2. Ringtone Guide</button>
+    </div>
+  </div>
+
+  <!-- 6. FAMILY PICKUP CONFIRMATION SCREEN -->
+  <div id="family-pickup-screen" class="screen" style="background:#064e3b; justify-content:center; gap:20px; padding:24px;">
+    <h1 style="font-size: 2.6rem; color: #fef08a; margin: 0;">🚨 Nana is Calling You!</h1>
+    <p style="font-size: 1.25rem; color: #e2e8f0; margin: 0;">Tap the green button below to connect your camera and microphone:</p>
+    <button class="giant-btn" style="height: 36vh; font-size: 2.4rem;" onclick="confirmFamilyPickupFromTelegram()">📞 TAP TO CONNECT<br>WITH NANA</button>
+    <button class="cancel-btn" style="font-size: 1.4rem; padding: 12px 32px;" onclick="endCall()">✖ Decline</button>
+  </div>
+
+  <!-- REMOTE FAMILY SETTINGS MODAL -->
+  <div id="settings-modal">
+    <h2 style="font-size: 1.7rem; color: #fef08a; margin: 0 0 4px 0;">⚙️ Family Remote Tablet Controls</h2>
+    <p style="font-size: 0.95rem; color: #cbd5e1; margin: 0 0 14px 0;">All changes apply immediately to Nana's tablet over Firebase.</p>
+    <div class="file-versions-line" style="font-size:0.85rem; font-family:monospace; margin:2px 0 8px 0;"></div>
+
+    <div class="settings-card">
+      <div class="settings-label">
+        <span>📞 Video Calling on Nana's Tablet</span>
+        <span class="calling-status-lbl" style="font-size:0.95rem;"></span>
+      </div>
+      <div class="settings-sub">OFF hides the contact photos on her tablet, stops it ringing, and stops family ringing her. Chat and radio keep working. Turn ON when calls are tested and working.</div>
+      <div class="opt-row">
+        <button class="opt-btn calling-off-btn" onclick="setCallingEnabled(false)">📵 Turn OFF (hide)</button>
+        <button class="opt-btn calling-on-btn" onclick="setCallingEnabled(true)">✅ Turn ON</button>
+      </div>
+    </div>
+
+    <div class="settings-card" id="test-links-card">
+      <div class="settings-label"><span>🧪 Test Calls Without Nana</span></div>
+      <div class="settings-sub" id="test-links-sub">Practice calls between two of YOUR devices. Uses a separate private test area: Nana's tablet never rings and no Telegram alerts are sent. Open one link on each device (e.g. laptop + phone).</div>
+      <div class="opt-row" id="test-links-row">
+        <button class="opt-btn" onclick="copyTestLink('nana')">📋 Copy "Pretend Nana" link</button>
+        <button class="opt-btn" onclick="copyTestLink('family')">📋 Copy "Me" link</button>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-label"><span>🔄 Refresh Nana's Tablet</span></div>
+      <div class="settings-sub">Reloads the page on her tablet (waits until she is not on a call).</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="remote-refresh-btn" onclick="requestTabletReload()">🔄 Refresh Now</button>
+      </div>
+    </div>
+
+    <!-- Color Theme Selector for Family -->
+    <div class="settings-card">
+      <div class="settings-label"><span>🎨 High-Contrast Visibility Theme</span></div>
+      <div class="settings-sub">Optimized for Macular Degeneration (Pure Yellow on Pitch Black minimizes glare).</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-theme-classic-dark" onclick="updateSetting('colorTheme', 'classic-dark')">🌙 Classic Dark</button>
+        <button class="opt-btn" id="set-theme-yellow-black" onclick="updateSetting('colorTheme', 'yellow-black')">👁️ Yellow on Black</button>
+        <button class="opt-btn" id="set-theme-white-black" onclick="updateSetting('colorTheme', 'white-black')">🤍 White on Black</button>
+        <button class="opt-btn" id="set-theme-black-cream" onclick="updateSetting('colorTheme', 'black-cream')">☀️ Black on Cream</button>
+      </div>
+    </div>
+
+    <!-- Senior Keyboard Layout & Auto-Hide Timer (Family Remote Controls) -->
+    <div class="settings-card">
+      <div class="settings-label">
+        <span>⌨️ Nana's Keyboard Layout & Auto-Hide</span>
+        <span id="lbl-remote-kb-summary" style="color:#38bdf8; font-size:0.95rem;">QWERTY • 1m</span>
+      </div>
+      <div class="settings-sub">Choose QWERTY (typewriter) or ABCDEF (alphabetical). Auto-hides and dims if she walks away with the keyboard open.</div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <button class="opt-btn" id="set-kblayout-qwerty" onclick="updateSetting('keyboardLayout', 'qwerty')">⌨️ QWERTY Layout</button>
+        <button class="opt-btn" id="set-kblayout-abcdef" onclick="updateSetting('keyboardLayout', 'abcdef')">🔤 ABCDEF Layout</button>
+      </div>
+      <div class="settings-sub" style="margin-bottom:4px;">Hide Keyboard After Inactivity:</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-kbhide-30" onclick="updateSetting('keyboardTimeoutSec', 30)">30s</button>
+        <button class="opt-btn" id="set-kbhide-60" onclick="updateSetting('keyboardTimeoutSec', 60)">1m</button>
+        <button class="opt-btn" id="set-kbhide-120" onclick="updateSetting('keyboardTimeoutSec', 120)">2m</button>
+        <button class="opt-btn" id="set-kbhide-180" onclick="updateSetting('keyboardTimeoutSec', 180)">3m</button>
+      </div>
+    </div>
+
+    <!-- Normal Brightness, Idle Dimming Level & Time Till Dimming -->
+    <div class="settings-card">
+      <div class="settings-label">
+        <span>🔆 Screen Brightness & Idle Dimming</span>
+        <span id="lbl-remote-bright-summary" style="color:#38bdf8; font-size:0.95rem;">85% ➔ 15% (2m)</span>
+      </div>
+      <div class="settings-sub" style="margin-bottom:4px;">Normal (Awake) Brightness:</div>
+      <div class="opt-row" style="margin-bottom:10px;">
+        <button class="opt-btn" id="set-bright-40" onclick="updateSetting('awakeBrightness', 40)">40%</button>
+        <button class="opt-btn" id="set-bright-60" onclick="updateSetting('awakeBrightness', 60)">60%</button>
+        <button class="opt-btn" id="set-bright-85" onclick="updateSetting('awakeBrightness', 85)">85%</button>
+        <button class="opt-btn" id="set-bright-100" onclick="updateSetting('awakeBrightness', 100)">100%</button>
+      </div>
+      <div class="settings-sub" style="margin-bottom:4px;">Dimmed Brightness Level (When Idle):</div>
+      <div class="opt-row" style="margin-bottom:10px;">
+        <button class="opt-btn" id="set-dimlvl-5" onclick="updateSetting('dimBrightness', 5)">5% (Dark)</button>
+        <button class="opt-btn" id="set-dimlvl-15" onclick="updateSetting('dimBrightness', 15)">15% (Soft)</button>
+        <button class="opt-btn" id="set-dimlvl-30" onclick="updateSetting('dimBrightness', 30)">30% (Low)</button>
+        <button class="opt-btn" id="set-dimlvl-50" onclick="updateSetting('dimBrightness', 50)">50% (Med)</button>
+      </div>
+      <div class="settings-sub" style="margin-bottom:4px;">Time Until Dimming Happens:</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-dim-30" onclick="updateSetting('dimDelaySec', 30)">30s</button>
+        <button class="opt-btn" id="set-dim-60" onclick="updateSetting('dimDelaySec', 60)">1m</button>
+        <button class="opt-btn" id="set-dim-120" onclick="updateSetting('dimDelaySec', 120)">2m</button>
+        <button class="opt-btn" id="set-dim-300" onclick="updateSetting('dimDelaySec', 300)">5m</button>
+        <button class="opt-btn" id="set-dim-600" onclick="updateSetting('dimDelaySec', 600)">10m</button>
+        <button class="opt-btn" id="set-dim-0" onclick="updateSetting('dimDelaySec', 0)">Never</button>
+      </div>
+    </div>
+
+    <!-- Normal Speaker Volume & Incoming Ringing Volume -->
+    <div class="settings-card">
+      <div class="settings-label">
+        <span>🔊 Normal Speaker Volume (Calls & Radio)</span>
+        <span id="lbl-call-vol" style="color:#38bdf8;">85%</span>
+      </div>
+      <div class="settings-sub">Controls Nana's normal speaker volume during video calls, voice notes, and Classic FM radio.</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-callvol-30" onclick="updateSetting('callVolume', 30)">30%</button>
+        <button class="opt-btn" id="set-callvol-50" onclick="updateSetting('callVolume', 50)">50%</button>
+        <button class="opt-btn" id="set-callvol-70" onclick="updateSetting('callVolume', 70)">70%</button>
+        <button class="opt-btn" id="set-callvol-85" onclick="updateSetting('callVolume', 85)">85%</button>
+        <button class="opt-btn" id="set-callvol-100" onclick="updateSetting('callVolume', 100)">100%</button>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-label">
+        <span>🔔 Incoming Call Ringing Volume</span>
+        <span id="lbl-ring-vol" style="color:#38bdf8;">85%</span>
+      </div>
+      <div class="settings-sub">Controls how loud the tablet rings when a family member calls Nana.</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-ringvol-30" onclick="updateSetting('ringVolume', 30)">30%</button>
+        <button class="opt-btn" id="set-ringvol-50" onclick="updateSetting('ringVolume', 50)">50%</button>
+        <button class="opt-btn" id="set-ringvol-70" onclick="updateSetting('ringVolume', 70)">70%</button>
+        <button class="opt-btn" id="set-ringvol-85" onclick="updateSetting('ringVolume', 85)">85%</button>
+        <button class="opt-btn" id="set-ringvol-100" onclick="updateSetting('ringVolume', 100)">100%</button>
+      </div>
+    </div>
+
+    <!-- Do Not Disturb / Night Mode Schedule -->
+    <div class="settings-card">
+      <div class="settings-label">
+        <span>🌙 Do Not Disturb (Night Mode)</span>
+        <span id="lbl-remote-night-window" style="color:#38bdf8;">21:00 – 08:00</span>
+      </div>
+      <div class="settings-sub">Blackouts the screen with a soft night clock and optionally blocks incoming rings overnight.</div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <button class="opt-btn" id="set-night-on" onclick="updateSetting('nightModeEnabled', true)">🌙 Night Mode ON</button>
+        <button class="opt-btn" id="set-night-off" onclick="updateSetting('nightModeEnabled', false)">☀️ Off (Always Awake)</button>
+        <button class="opt-btn" id="set-dnd-block" onclick="updateSetting('nightBlockCalls', !tabletSettings.nightBlockCalls)">🔕 Block Night Rings</button>
+      </div>
+      <div class="settings-sub" style="margin-bottom:4px;">Evening Start Time:</div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <button class="opt-btn" id="set-nstart-20" onclick="updateSetting('nightStartHour', 20)">20:00</button>
+        <button class="opt-btn" id="set-nstart-21" onclick="updateSetting('nightStartHour', 21)">21:00</button>
+        <button class="opt-btn" id="set-nstart-22" onclick="updateSetting('nightStartHour', 22)">22:00</button>
+        <button class="opt-btn" id="set-nstart-23" onclick="updateSetting('nightStartHour', 23)">23:00</button>
+      </div>
+      <div class="settings-sub" style="margin-bottom:4px;">Morning Wake Time:</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-nend-6" onclick="updateSetting('nightEndHour', 6)">06:00</button>
+        <button class="opt-btn" id="set-nend-7" onclick="updateSetting('nightEndHour', 7)">07:00</button>
+        <button class="opt-btn" id="set-nend-8" onclick="updateSetting('nightEndHour', 8)">08:00</button>
+        <button class="opt-btn" id="set-nend-9" onclick="updateSetting('nightEndHour', 9)">09:00</button>
+      </div>
+    </div>
+
+    <!-- Missed Calls & Battery Voice Mute Card -->
+    <div class="settings-card">
+      <div class="settings-label"><span>🧹 Missed Calls & Battery Voice Mute</span></div>
+      <div class="settings-sub" id="lbl-remote-battery-mute">Battery Voice Status: Active</div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <button class="opt-btn" style="background:#dc2626; border-color:#fff; color:#fff;" onclick="clearAllMissedCalls()">🧹 Clear All Missed Calls</button>
+        <button class="opt-btn" onclick="muteBatteryVoiceForHours(0)">🔊 Unmute Battery Voice</button>
+      </div>
+      <div class="opt-row">
+        <button class="opt-btn" onclick="muteBatteryVoiceForHours(1)">🔇 Mute 1h</button>
+        <button class="opt-btn" onclick="muteBatteryVoiceForHours(4)">🔇 Mute 4h</button>
+        <button class="opt-btn" onclick="muteBatteryVoiceForHours(12)">🔇 Mute 12h</button>
+        <button class="opt-btn" onclick="muteBatteryVoiceForHours(24)">🔇 Mute 24h</button>
+      </div>
+    </div>
+
+    <!-- Family Notes Bar & Read Aloud Option Card -->
+    <div class="settings-card">
+      <div class="settings-label"><span>💬 Family Notes Alert Bar & Read Aloud</span></div>
+      <div class="settings-sub">Controls top alert banner and whether Nana sees the "Read Aloud" button on bubbles.</div>
+      <div class="opt-row" style="margin-bottom:6px;">
+        <button class="opt-btn" id="set-notes-on" onclick="updateSetting('showBulletinBar', true)">💬 Show on New Notes</button>
+        <button class="opt-btn" id="set-notes-off" onclick="updateSetting('showBulletinBar', false)">🙈 Hide Alert Bar</button>
+        <button class="opt-btn" style="background:#0284c7; border-color:#fff; color:#fff;" onclick="dismissCurrentBulletinBar(true)">🧹 Mark Read</button>
+      </div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-readaloud-off" onclick="updateSetting('showReadAloud', false)">🙈 Hide "Read Aloud" Button</button>
+        <button class="opt-btn" id="set-readaloud-on" onclick="updateSetting('showReadAloud', true)">🔊 Show "Read Aloud" Button</button>
+      </div>
+    </div>
+
+    <!-- Ringtone, Auto-Answer & Ring Duration -->
+    <div class="settings-card">
+      <div class="settings-label"><span>🎵 Nana's Ringtone</span></div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <button class="opt-btn" id="set-tone-uk-phone" onclick="previewAndSetTone('uk-phone')">☎️ Phone</button>
+        <button class="opt-btn" id="set-tone-westminster" onclick="previewAndSetTone('westminster')">🕰️ Chime</button>
+        <button class="opt-btn" id="set-tone-marimba" onclick="previewAndSetTone('marimba')">🎵 Marimba</button>
+        <button class="opt-btn" id="set-tone-bell" onclick="previewAndSetTone('bell')">🔔 Bell</button>
+      </div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-tone-nana_song1" onclick="previewAndSetTone('nana_song1.mp3')">🎶 Song 1</button>
+        <button class="opt-btn" id="set-tone-nana_song2" onclick="previewAndSetTone('nana_song2.mp3')">🎶 Song 2</button>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-label"><span>⚡ Hands-Free Auto-Answer & Spoken Caller-ID</span></div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <button class="opt-btn" id="set-autoans-off" onclick="updateSetting('autoAnswer', false)">👆 Tap to Answer (Normal)</button>
+        <button class="opt-btn" id="set-autoans-on" onclick="updateSetting('autoAnswer', true)">⚡ Auto-Answer (10s)</button>
+      </div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-voice-on" onclick="updateSetting('voicePrompts', true)">🗣️ Spoken ID: On</button>
+        <button class="opt-btn" id="set-voice-off" onclick="updateSetting('voicePrompts', false)">🔇 Spoken ID: Off</button>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-label"><span>⏳ Ring Duration</span><span id="lbl-ringtime">60s</span></div>
+      <div class="opt-row">
+        <button class="opt-btn" id="set-ring-30" onclick="updateSetting('ringDurationSec', 30)">30s</button>
+        <button class="opt-btn" id="set-ring-45" onclick="updateSetting('ringDurationSec', 45)">45s</button>
+        <button class="opt-btn" id="set-ring-60" onclick="updateSetting('ringDurationSec', 60)">60s</button>
+        <button class="opt-btn" id="set-ring-90" onclick="updateSetting('ringDurationSec', 90)">90s</button>
+        <button class="opt-btn" id="set-ring-120" onclick="updateSetting('ringDurationSec', 120)">2m</button>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-label"><span>🔧 Telegram Bot Sync & Webhook</span><span id="lbl-sync-status" style="font-size:0.9rem; color:#38bdf8;"></span></div>
+      <button class="opt-btn" style="width:100%; background:#0284c7; border-color:#38bdf8; color:#fff;" onclick="forceWebhookAndMemberSync()">🔄 Flush Telegram Queue & Sync Contacts Now</button>
+    </div>
+    
+    <button class="cancel-btn" style="background:#22c55e; color:#000; padding:12px 40px; font-size:1.4rem;" onclick="closeSettingsModal()">✔ Done</button>
+  </div>
+
+  <div id="auth-error-screen" class="screen" style="background:#450a0a; justify-content:center; gap:18px;">
+    <h1 style="font-size: 2.4rem; margin:0;">Portal Locked</h1>
+    <p style="margin:0;">Please launch using your designated access link.</p>
+    <p style="opacity:0.8; margin:0;">Reconnecting automatically...</p>
+    <button class="confirm-btn" style="background:#22c55e; color:#000;" onclick="localStorage.setItem('nana_service_token','Westerham8'); window.location.reload(true);">🔄 Unlock & Reload Now</button>
+  </div>
+
+  <script type="module" src="app.js?v=2.8.1"></script>
+</body>
+</html>
