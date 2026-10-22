@@ -2,10 +2,10 @@
     import { getDatabase, ref, set, update, push, onValue, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
     // =====================================================================
-    // NanaPhone app.js  --  VERSION 2.8.1
+    // NanaPhone app.js  --  VERSION 2.8.2
     // VERSION MUST MATCH: index.html (2 places), styles.css (2 places), app.js (APP_VERSION below)
     // =====================================================================
-    const APP_VERSION = "2.8.1";
+    const APP_VERSION = "2.8.2";
 
     // If the page (index.html) is an old cached copy, reload it once with a fresh address.
     (function versionGuard() {
@@ -120,7 +120,29 @@
     const connectedMembersRef = ref(db, `${basePath}/connectedMembers`);
     const loveToastRef = ref(db, `${basePath}/loveToast`);
     // Test sandbox: pretend every family member has connected Telegram so Nana's test grid is full.
-    if (TEST_MODE) set(connectedMembersRef, CONFIG.familyMembers.map(m => m.id)).catch(() => {});
+    if (TEST_MODE) {
+      // Visible status strip at the bottom: confirms the test database works and shows any error.
+      const testBar = document.createElement('div');
+      testBar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99998;font:700 14px monospace;padding:6px 10px;color:#fff;background:#334155;pointer-events:none;white-space:pre-wrap;';
+      testBar.innerText = '🧪 Checking test database...';
+      document.body.appendChild(testBar);
+      const setTestStatus = (txt, bad) => {
+        testBar.style.display = 'block';
+        testBar.innerText = txt;
+        testBar.style.background = bad ? '#b91c1c' : '#166534';
+      };
+      window.__setTestStatus = setTestStatus;
+      set(ref(db, `${basePath}/_ping`), Date.now())
+        .then(() => {
+          setTestStatus('🧪 Test database OK (' + role + ')', false);
+          setTimeout(() => { testBar.style.display = 'none'; }, 6000);
+        })
+        .catch((e) => setTestStatus('❌ TEST DATABASE BLOCKED: ' + (e && e.message ? e.message : e) +
+          '\nFirebase rules must allow portals/' + SERVICE_TOKEN + '__test', true));
+      window.addEventListener('error', (ev) => setTestStatus('❌ JS error: ' + ev.message + ' (line ' + ev.lineno + ')', true));
+      window.addEventListener('unhandledrejection', (ev) => setTestStatus('❌ ' + (ev.reason && ev.reason.message ? ev.reason.message : ev.reason), true));
+      set(connectedMembersRef, CONFIG.familyMembers.map(m => m.id)).catch(() => {});
+    }
     const entertainmentRef = ref(db, `${basePath}/entertainment`);
 
     function getMemberMissedCallRef(memberId) {
@@ -1733,8 +1755,15 @@
       showScreen('outbound-screen');
       speakMsg(`Calling ${member.spokenName} now. Please wait.`);
 
-      await clearMissedCallsForMember(member.id);
-      await set(callStateRef, { status: 'calling_family', callerId: 'nana', targetId: member.id, timestamp: Date.now() });
+      try {
+        await clearMissedCallsForMember(member.id);
+        await set(callStateRef, { status: 'calling_family', callerId: 'nana', targetId: member.id, timestamp: Date.now() });
+      } catch (e) {
+        currentState = 'idle';
+        showScreen('grid-screen');
+        alert('Could not start the call: ' + (e && e.message ? e.message : e));
+        return;
+      }
       startTelegramRingBurst(member);
 
       const ringTimeoutMs = (Number(tabletSettings.ringDurationSec) || 60) * 1000;
@@ -1799,7 +1828,8 @@
           banner.innerText = '🔔 Ringing Nana... Waiting for her to answer...';
         }
       } catch (e) {
-        if (ringBtn) ringBtn.disabled = false;
+        if (ringBtn) ringBtn.disabled = !tabletSettings.callingEnabled;
+        alert('Could not start the call: ' + (e && e.message ? e.message : e));
       }
     };
 

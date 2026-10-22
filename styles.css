@@ -1,8 +1,8 @@
 /* =====================================================================
-   NanaPhone styles.css  --  VERSION 2.8.1
+   NanaPhone styles.css  --  VERSION 2.8.2
    VERSION MUST MATCH: index.html (2 places), styles.css (here + the line below), app.js (top)
    ===================================================================== */
-:root { --nana-styles-version: "2.8.1"; }
+:root { --nana-styles-version: "2.8.2"; }
     :root {
       --bg-main: #090d16;
       --bg-panel: #17212b;
