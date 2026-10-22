@@ -2,10 +2,10 @@
     import { getDatabase, ref, set, update, push, onValue, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
     // =====================================================================
-    // NanaPhone app.js  --  VERSION 2.8.2
+    // NanaPhone app.js  --  VERSION 2.8.4
     // VERSION MUST MATCH: index.html (2 places), styles.css (2 places), app.js (APP_VERSION below)
     // =====================================================================
-    const APP_VERSION = "2.8.2";
+    const APP_VERSION = "2.8.4";
 
     // If the page (index.html) is an old cached copy, reload it once with a fresh address.
     (function versionGuard() {
@@ -101,6 +101,20 @@
       document.querySelectorAll('.gear-pill').forEach(e => { e.innerText = '⚙️ v' + APP_VERSION + (allMatch ? '' : ' ⚠️'); });
     })();
 
+    // Remote picture: show the WHOLE image (no zoomed-in crop) unless its shape already matches the screen.
+    (function adaptRemoteFit() {
+      const rv = document.getElementById('remote-video');
+      if (!rv) return;
+      const apply = () => {
+        if (!rv.videoWidth || !rv.videoHeight) return;
+        const videoAspect = rv.videoWidth / rv.videoHeight;
+        const screenAspect = (rv.clientWidth || window.innerWidth) / (rv.clientHeight || window.innerHeight);
+        rv.style.objectFit = (Math.abs(videoAspect / screenAspect - 1) < 0.2) ? 'cover' : 'contain';
+      };
+      ['loadedmetadata', 'resize'].forEach(ev => rv.addEventListener(ev, apply));
+      window.addEventListener('resize', apply);
+    })();
+
     const CLASSIC_FM_STREAM = "https://media-ice.musicradio.com/ClassicFMMP3";
 
     const role = params.get('role') || 'nana';
@@ -119,6 +133,7 @@
     const missedCallsMapRef = ref(db, `${basePath}/missedCalls`);
     const connectedMembersRef = ref(db, `${basePath}/connectedMembers`);
     const loveToastRef = ref(db, `${basePath}/loveToast`);
+    const hiddenRef = ref(db, `${basePath}/hiddenContacts`);
     // Test sandbox: pretend every family member has connected Telegram so Nana's test grid is full.
     if (TEST_MODE) {
       // Visible status strip at the bottom: confirms the test database works and shows any error.
@@ -178,6 +193,7 @@
     let lastKeyTapMs = 0;
     let lastChatSendMs = 0;
     let settingsLoaded = false;
+    let latestHidden = {};
     let isCurrentlyIdleDimmed = false;
     let currentState = 'idle';
     let latestCallData = { status: 'idle' };
@@ -723,6 +739,7 @@
     };
 
     window.remoteSetEntertainment = async (key) => {
+      if (key !== 'off' && !confirm("Turn Classic FM radio ON on Nana's tablet now?")) return;
       if (key === 'off') {
         await set(entertainmentRef, { activeKey: "off", title: "Off", timestamp: Date.now() });
       } else {
@@ -1138,12 +1155,80 @@
       banner.style.display = 'flex';
     }
 
+    // ---- Hide me from Nana's contacts (family) ----
+    const HIDE_FOREVER = 4102444800000; // year 2100 = "until I turn it back on"
+    function isHiddenFromNana(id) { return Number(latestHidden[id] || 0) > Date.now(); }
+    function fmtHiddenUntil(ts) {
+      if (ts >= HIDE_FOREVER) return 'until you turn it back on';
+      const d = new Date(ts);
+      const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      const sameDay = d.toDateString() === new Date().toDateString();
+      return 'until ' + (sameDay ? time : d.toLocaleDateString([], { weekday: 'short' }) + ' ' + time);
+    }
+    window.hideMeFromNana = async (choice) => {
+      if (role !== 'family' || !activeFamilyMember) return;
+      const mins = { '30m': 30, '1h': 60, '2h': 120, '5h': 300, '10h': 600 };
+      let until;
+      if (mins[choice]) {
+        until = Date.now() + mins[choice] * 60000;
+      } else if (choice === 'tomorrow') {
+        const d = new Date();
+        d.setHours(7, 0, 0, 0);
+        if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+        until = d.getTime();
+      } else {
+        until = HIDE_FOREVER;
+      }
+      try {
+        await set(ref(db, `${basePath}/hiddenContacts/${activeFamilyMember.id}`), until);
+      } catch (e) {
+        alert('Could not hide you: ' + (e && e.message ? e.message : e));
+      }
+    };
+    window.showMeToNana = async () => {
+      if (role !== 'family' || !activeFamilyMember) return;
+      try {
+        await remove(ref(db, `${basePath}/hiddenContacts/${activeFamilyMember.id}`));
+      } catch (e) {
+        alert('Could not turn you back on: ' + (e && e.message ? e.message : e));
+      }
+    };
+    function refreshHideUI() {
+      if (role !== 'family' || typeof activeFamilyMember === 'undefined' || !activeFamilyMember) return;
+      const until = Number(latestHidden[activeFamilyMember.id] || 0);
+      const hidden = until > Date.now();
+      const txt = hidden
+        ? `🙈 You're hidden from Nana's contacts ${fmtHiddenUntil(until)}`
+        : `👁️ You're visible to Nana (she can call you)`;
+      document.querySelectorAll('.hide-status-lbl').forEach(e => { e.innerText = txt; e.style.color = hidden ? '#fbbf24' : '#4ade80'; });
+      const line = document.getElementById('hidden-status-line');
+      if (line) {
+        line.style.display = hidden ? 'flex' : 'none';
+        document.getElementById('hidden-status-text').innerText = txt;
+      }
+    }
+    onValue(hiddenRef, (snap) => {
+      latestHidden = snap.val() || {};
+      if (role === 'nana') renderContacts(connectedMemberIds); else refreshHideUI();
+    });
+    setInterval(() => { if (role === 'nana') renderContacts(connectedMemberIds); else refreshHideUI(); }, 30000);
+
     function renderContacts(connectedList = []) {
       const grid = document.getElementById('family-grid');
       if (!grid) return;
       grid.innerHTML = "";
 
-      const displayList = CONFIG.familyMembers.filter(m => connectedList.includes(m.id)).slice(0, 8);
+      const connectedMembers = CONFIG.familyMembers.filter(m => connectedList.includes(m.id));
+      const displayList = connectedMembers.filter(m => !isHiddenFromNana(m.id)).slice(0, 8);
+
+      if (displayList.length === 0 && connectedMembers.length > 0) {
+        grid.innerHTML = `
+          <div style="grid-column: 1 / -1; grid-row: 1 / -1; display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; color:var(--text-muted); font-size:1.8rem; font-weight:700; padding:20px; text-align:center;">
+            <p style="margin:0;">😴 Nobody is available to call right now.<br>Try again a little later, or send a Family Chat message.</p>
+          </div>
+        `;
+        return;
+      }
 
       if (displayList.length === 0) {
         grid.innerHTML = `
@@ -1740,6 +1825,7 @@
 
     async function startCallFromNana(member) {
       if (!tabletSettings.callingEnabled) return;
+      if (isHiddenFromNana(member.id)) return;
       unlockCallAudio();
       didManuallyInitiateOrAnswerOnThisTab = true;
       await window.stopRadioAndSync(true);
@@ -1796,6 +1882,7 @@
         alert("Video calling is switched off for now. Turn it on in ⚙️ Controls when you're ready.");
         return;
       }
+      if (!confirm("Ring Nana's tablet now?\n\nPress OK only if you want to video call her.")) return;
       unlockCallAudio();
       didManuallyInitiateOrAnswerOnThisTab = true;
       const ringBtn = document.getElementById('family-ring-btn');

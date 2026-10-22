@@ -6,11 +6,11 @@
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <!-- NanaPhone PAGE (index.html)  --  VERSION 2.8.2
+  <!-- NanaPhone PAGE (index.html)  --  VERSION 2.8.4
        VERSION MUST MATCH: index.html (here + PAGE VERSION below + app.js/styles.css links), styles.css, app.js -->
-  <meta name="nanaphone-page-version" content="2.8.2">
+  <meta name="nanaphone-page-version" content="2.8.4">
   <script>
-    window.__NANA_PAGE_VERSION = "2.8.2";
+    window.__NANA_PAGE_VERSION = "2.8.4";
     // Safety net: if app.js or styles.css fail to load, say so after 15s and keep reloading every 60s until they do.
     (function () {
       function filesOk() {
@@ -21,7 +21,7 @@
         if (filesOk() || !document.body) return;
         var d = document.createElement('div');
         d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7c2d12;color:#fff;font:700 20px sans-serif;padding:14px;text-align:center;';
-        d.innerText = 'Loading NanaPhone... (page v2.8.2) - retrying';
+        d.innerText = 'Loading NanaPhone... (page v2.8.4) - retrying';
         document.body.appendChild(d);
       }, 15000);
       setInterval(function () { if (!filesOk()) window.location.reload(); }, 60000);
@@ -29,7 +29,7 @@
   </script>
   <title>NanaPhone Portal</title>
   <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
-  <link rel="stylesheet" href="styles.css?v=2.8.2">
+  <link rel="stylesheet" href="styles.css?v=2.8.4">
 </head>
 <body>
 
@@ -368,7 +368,7 @@
         </div>
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.8.2</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.8.4</div>
       </div>
     </div>
 
@@ -447,7 +447,6 @@
       <span>🔊 Nana Vol: <strong id="in-call-vol-label" style="color:#fef08a;">85%</strong></span>
       <button class="vol-step-btn" onclick="stepNanaCallVolume(-15)">−</button>
       <button class="vol-step-btn" onclick="stepNanaCallVolume(15)">+</button>
-      <button class="vol-step-btn" style="background:#be185d;" onclick="sendLoveToastToNana()">❤️</button>
       <button class="vol-step-btn" style="background:#334155;" onclick="openSettingsModal()">⚙️</button>
     </div>
 
@@ -469,6 +468,11 @@
       Checking tablet status...
     </div>
 
+    <div id="hidden-status-line" style="display:none; align-items:center; justify-content:space-between; gap:8px; width:92vw; max-width:540px; background:#451a03; border:2px solid #f59e0b; border-radius:14px; padding:8px 12px; font-size:0.95rem; color:#fde68a; box-sizing:border-box;">
+      <span id="hidden-status-text"></span>
+      <button class="opt-btn" style="flex:0 0 auto; min-width:0; padding:8px 12px;" onclick="showMeToNana()">👁️ Show me</button>
+    </div>
+
     <button id="family-ring-btn" class="giant-btn" style="height: 15vh; min-height: 90px; font-size: 2rem; width: 92vw; max-width: 540px; border-width: 6px; border-radius: 28px;" onclick="startCallFromFamily()">📹 Ring Nana Now</button>
 
     <div class="settings-card" style="width:92vw; max-width:540px; margin-bottom:2px; padding:10px 12px;">
@@ -484,7 +488,6 @@
 
     <div style="display:flex; gap:8px; width:92vw; max-width:540px;">
       <button class="tone-btn" style="flex:1; background:#0088cc; border-color:#7dd3fc;" onclick="openFamilyBulletin()">✈️ Family Chat</button>
-      <button class="tone-btn" style="flex:1; background:#be185d; border-color:#f472b6;" onclick="sendLoveToastToNana()">❤️ Send Hug</button>
       <button class="tone-btn" style="flex:1; background:#1e293b; border-color:#facc15; color:#fef08a;" onclick="openSettingsModal()">⚙️ Controls</button>
     </div>
 
@@ -507,6 +510,26 @@
     <h2 style="font-size: 1.7rem; color: #fef08a; margin: 0 0 4px 0;">⚙️ Family Remote Tablet Controls</h2>
     <p style="font-size: 0.95rem; color: #cbd5e1; margin: 0 0 14px 0;">All changes apply immediately to Nana's tablet over Firebase.</p>
     <div class="file-versions-line" style="font-size:0.85rem; font-family:monospace; margin:2px 0 8px 0;"></div>
+
+    <div class="settings-card" id="hide-me-card">
+      <div class="settings-label"><span>🙈 Hide Me From Nana's Contacts</span></div>
+      <div class="settings-sub hide-status-lbl" style="font-weight:800;"></div>
+      <div class="settings-sub">Your photo disappears from her tablet for a while so she can't call you (e.g. while you're at work). You can still ring her.</div>
+      <div class="opt-row">
+        <button class="opt-btn" onclick="hideMeFromNana('30m')">30 min</button>
+        <button class="opt-btn" onclick="hideMeFromNana('1h')">1 hour</button>
+        <button class="opt-btn" onclick="hideMeFromNana('2h')">2 hours</button>
+        <button class="opt-btn" onclick="hideMeFromNana('5h')">5 hours</button>
+        <button class="opt-btn" onclick="hideMeFromNana('10h')">10 hours</button>
+      </div>
+      <div class="opt-row" style="margin-top:8px;">
+        <button class="opt-btn" onclick="hideMeFromNana('tomorrow')">🌅 Until tomorrow (7am)</button>
+        <button class="opt-btn" onclick="hideMeFromNana('manual')">♾️ Until I turn it back on</button>
+      </div>
+      <div class="opt-row" style="margin-top:8px;">
+        <button class="opt-btn" style="background:#064e3b; border-color:#22c55e; color:#fef08a;" onclick="showMeToNana()">👁️ Show Me Again (turn back on)</button>
+      </div>
+    </div>
 
     <div class="settings-card">
       <div class="settings-label">
@@ -743,6 +766,6 @@
     <button class="confirm-btn" style="background:#22c55e; color:#000;" onclick="localStorage.setItem('nana_service_token','Westerham8'); window.location.reload(true);">🔄 Unlock & Reload Now</button>
   </div>
 
-  <script type="module" src="app.js?v=2.8.2"></script>
+  <script type="module" src="app.js?v=2.8.4"></script>
 </body>
 </html>

@@ -1,8 +1,8 @@
 /* =====================================================================
-   NanaPhone styles.css  --  VERSION 2.8.2
+   NanaPhone styles.css  --  VERSION 2.8.4
    VERSION MUST MATCH: index.html (2 places), styles.css (here + the line below), app.js (top)
    ===================================================================== */
-:root { --nana-styles-version: "2.8.2"; }
+:root { --nana-styles-version: "2.8.4"; }
     :root {
       --bg-main: #090d16;
       --bg-panel: #17212b;
@@ -768,7 +768,7 @@
     body.calling-off #family-grid, body.calling-off #missed-call-banner { display: none !important; }
     body.calling-off #calling-off-card { display: flex !important; }
     #remote-video {
-      width: 100%; height: 100%; object-fit: cover;
+      width: 100%; height: 100%; object-fit: contain; /* whole picture; app.js switches to cover when shapes match */
       position: absolute; inset: 0; z-index: 10; background: #090d16;
     }
     #local-video {
