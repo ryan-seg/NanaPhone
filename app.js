@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, update, push, onValue, remove, runTransaction, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-const APP_VERSION = "2.9.1";
+const APP_VERSION = "2.9.2";
 const $ = (id) => document.getElementById(id);
 
 (function versionGuard() {
@@ -38,7 +38,6 @@ window.submitManualKey = () => {
 const params = new URLSearchParams(window.location.search);
 if (params.get('key')) {
   localStorage.setItem('nana_service_token', params.get('key').trim());
-  // Scrub the secret key from the visible URL bar so it isn't leaked via screenshots/referrers
   const cleanUrl = new URL(window.location.href);
   cleanUrl.searchParams.delete('key');
   window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search);
@@ -64,7 +63,6 @@ if (computedKeyHash !== EXPECTED_KEY_HASH) {
   throw new Error("Unauthorized: Valid access key required.");
 }
 
-// Derive unguessable Firebase path & Daily room name from the verified hash
 const PORTAL_NODE_ID = `nana_${computedKeyHash.slice(0, 24)}`;
 const DERIVED_DAILY_ROOM = `NanaPhone_${computedKeyHash.slice(0, 12)}`;
 
@@ -96,7 +94,7 @@ const SILENT_WAV = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAI
 const activeFamilyMember = CONFIG.familyMembers.find(m => m.id === callerId) || CONFIG.familyMembers[4];
 const isAdminFamilyMember = (role === 'family' && activeFamilyMember.id === 'ryan');
 
-// Build Supervisor PIN keypad & Shared Settings Cards dynamically
+// Build Supervisor PIN keypad, Calling Schedule Selects & Shared Settings Cards dynamically
 (function buildDynamicControls() {
   const kp = $('pin-keypad-grid');
   if (kp) {
@@ -109,6 +107,18 @@ const isAdminFamilyMember = (role === 'family' && activeFamilyMember.id === 'rya
       b.textContent = k;
       kp.appendChild(b);
     });
+  }
+
+  // Populate hour dropdowns for family calling schedule
+  const startSel = $('sched-start-hour'), endSel = $('sched-end-hour');
+  if (startSel && endSel) {
+    for (let h = 0; h < 24; h++) {
+      const label = `${String(h).padStart(2, '0')}:00`;
+      startSel.add(new Option(label, String(h)));
+      endSel.add(new Option(label, String(h)));
+    }
+    startSel.value = "8";
+    endSel.value = "21";
   }
 
   const sc = $('shared-settings-cards');
@@ -168,6 +178,21 @@ const isAdminFamilyMember = (role === 'family' && activeFamilyMember.id === 'rya
       <div class="opt-row">${optBtns('ringVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
     </div>
     <div class="settings-card">
+      <div class="settings-label"><span>🔋 Battery Unplugged Voice Interval, Volume & Mute</span><span class="lbl-battery-summary" style="color:#38bdf8;font-size:0.92rem;">Every 3m • 85%</span></div>
+      <div class="settings-sub lbl-battery-mute">Battery Voice Status: Active</div>
+      <div class="settings-sub" style="margin-bottom:4px;">⏱️ Unplugged Voice Repeat Interval:</div>
+      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceIntervalMin', [[1,'1m'],[3,'3m'],[5,'5m'],[10,'10m'],[15,'15m'],[30,'30m']])}</div>
+      <div class="settings-sub" style="margin-bottom:4px;">🔊 Unplugged Voice Alert Volume:</div>
+      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <button class="opt-btn" style="background:#dc2626;border-color:#fff;color:#fff;" onclick="clearAllMissedCalls()">🧹 Clear Missed Calls</button>
+        <button class="opt-btn" onclick="muteBatteryVoiceForHours(0)">🔊 Unmute Battery Voice</button>
+      </div>
+      <div class="opt-row">
+        ${[1,4,12,24].map(h => `<button class="opt-btn" onclick="muteBatteryVoiceForHours(${h})">🔇 Mute ${h}h</button>`).join('')}
+      </div>
+    </div>
+    <div class="settings-card">
       <div class="settings-label"><span>🌙 Do Not Disturb (Night Mode)</span><span class="lbl-night-window" style="color:#38bdf8;">21:00 – 08:00</span></div>
       <div class="opt-row" style="margin-bottom:8px;">
         ${optBtns('nightModeEnabled', [[true,'🌙 Night Mode ON'],[false,'☀️ Always Awake']])}
@@ -179,21 +204,10 @@ const isAdminFamilyMember = (role === 'family' && activeFamilyMember.id === 'rya
       <div class="opt-row">${optBtns('nightEndHour', [[6,'06:00'],[7,'07:00'],[8,'08:00'],[9,'09:00']])}</div>
     </div>
     <div class="settings-card">
-      <div class="settings-label"><span>🧹 Missed Calls & Battery Voice Mute</span></div>
-      <div class="settings-sub lbl-battery-mute">Battery Voice Status: Active</div>
-      <div class="opt-row" style="margin-bottom:8px;">
-        <button class="opt-btn" style="background:#dc2626;border-color:#fff;color:#fff;" onclick="clearAllMissedCalls()">🧹 Clear Missed Calls</button>
-        <button class="opt-btn" onclick="muteBatteryVoiceForHours(0)">🔊 Unmute Battery Voice</button>
-      </div>
-      <div class="opt-row">
-        ${[1,4,12,24].map(h => `<button class="opt-btn" onclick="muteBatteryVoiceForHours(${h})">🔇 ${h}h</button>`).join('')}
-      </div>
-    </div>
-    <div class="settings-card">
       <div class="settings-label"><span>💬 Family Notes Alert Bar & Read Aloud</span></div>
       <div class="opt-row" style="margin-bottom:6px;">
         ${optBtns('showBulletinBar', [[true,'💬 Show Alert Bar'],[false,'🙈 Hide Alert Bar']])}
-        <button class="opt-btn" style="background:#0284c7;border-color:#fff;color:#fff;" onclick="dismissCurrentBulletinBar(true)">🧹 Mark Read</button>
+        <button class="opt-btn" style="background:#0284c7;border-color:#fff;color:#fff;" onclick="dismissCurrentBulletinBar(true)">🧹 Mark All Read</button>
       </div>
       <div class="opt-row">${optBtns('showReadAloud', [[false,'🙈 Hide "Read Aloud"'],[true,'🔊 Show "Read Aloud"']])}</div>
     </div>
@@ -264,6 +278,7 @@ const settingsRef = ref(db, `${basePath}/settings`);
 const missedCallsMapRef = ref(db, `${basePath}/missedCalls`);
 const connectedMembersRef = ref(db, `${basePath}/connectedMembers`);
 const hiddenRef = ref(db, `${basePath}/hiddenContacts`);
+const callSchedulesRef = ref(db, `${basePath}/callSchedules`);
 const entertainmentRef = ref(db, `${basePath}/entertainment`);
 const reloadCmdRef = ref(db, `${basePath}/commands/reloadAt`);
 
@@ -272,12 +287,13 @@ if (TEST_MODE) set(connectedMembersRef, CONFIG.familyMembers.map(m => m.id)).cat
 let callObject = null, isJoiningOrInRoom = false, didManuallyInitiateOrAnswerOnThisTab = false;
 let currentFacingMode = 'user', isRadioPlaying = false, latestEntState = { activeKey: "off", title: "Off" };
 let pendingCallContact = null, missedCallsByMember = {}, latestBulletinPosts = {}, unreadBulletinCount = 0;
-let chatSessionReadCutoff = null, confirmTimer = null, ringInterval = null, telegramBurstInterval = null;
+let confirmTimer = null, ringInterval = null, telegramBurstInterval = null;
 let lastTelegramMsgId = null, currentDialedMember = null, outboundTimeout = null, incomingRingTimeout = null;
 let autoAnswerTimeout = null, idleDimTimer = null, keyboardHideTimer = null, lastKeyTapMs = 0, lastKeyChar = null;
-let lastChatSendMs = 0, lastHeartbeatWriteMs = 0, lastRenderedKbLayout = null, lastRenderedReadAloud = null;
-let settingsLoaded = false, latestHidden = {}, currentState = 'idle', latestCallData = { status: 'idle' };
+let lastChatSendMs = 0, lastTouchWriteMs = 0, lastRenderedKbLayout = null, lastRenderedReadAloud = null;
+let settingsLoaded = false, latestHidden = {}, latestCallSchedules = {}, currentState = 'idle', latestCallData = { status: 'idle' };
 let latestPresenceData = {}, connectedMemberIds = [], enteredPin = "", nightDismissedUntilMs = 0, lastBatterySpokenMs = 0;
+let savedChatScrollTop = null, chatIntersectionObserver = null, pendingReadMarks = new Set();
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 let activeMp3Ringtone = null;
@@ -287,7 +303,8 @@ let tabletSettings = {
   callVolume: 85, radioVolume: 75, ringVolume: 85, ringDurationSec: 60, ringtone: 'uk-phone',
   voicePrompts: true, autoAnswer: false, speechRate: 0.9, awakeBrightness: 85, dimBrightness: 15,
   dimDelaySec: 120, nightModeEnabled: true, nightStartHour: 21, nightEndHour: 8, nightBlockCalls: false,
-  batteryVoiceMutedUntil: 0, showBulletinBar: true, showReadAloud: false, colorTheme: 'classic-dark',
+  batteryVoiceMutedUntil: 0, batteryVoiceIntervalMin: 3, batteryVoiceVolume: 85,
+  showBulletinBar: true, showReadAloud: false, colorTheme: 'classic-dark',
   keyboardLayout: 'qwerty', keyboardTimeoutSec: 60, keyGuardMs: 350, bulletinClearedAt: 0, callingEnabled: TEST_MODE
 };
 
@@ -310,7 +327,7 @@ window.wakeScreenAndResetDimTimer = function () {
   const delaySec = Number(tabletSettings.dimDelaySec ?? 120);
   if (delaySec > 0 && currentState === 'idle') {
     idleDimTimer = setTimeout(() => {
-      if (currentState === 'idle') { window.closeSeniorKeyboard(); applyScreenBrightness(tabletSettings.dimBrightness ?? 15); }
+      if (currentState === 'idle') { window.closeSeniorKeyboard(true); applyScreenBrightness(tabletSettings.dimBrightness ?? 15); }
     }, delaySec * 1000);
   }
 };
@@ -345,9 +362,14 @@ window.muteBatteryVoiceForHours = async (hours) => {
 };
 
 window.announceBatteryWarning = (text) => {
-  if (isBatteryVoiceCurrentlyMuted() || (Date.now() - lastBatterySpokenMs < 180000)) return;
+  const intervalMs = Math.max(1, Number(tabletSettings.batteryVoiceIntervalMin) || 3) * 60000;
+  if (isBatteryVoiceCurrentlyMuted() || (Date.now() - lastBatterySpokenMs < intervalMs)) return;
   lastBatterySpokenMs = Date.now();
-  speakMsg(text, true);
+  const battVol = Math.min(100, Math.max(20, Number(tabletSettings.batteryVoiceVolume) || 85));
+  if (role === 'nana' && window.AndroidBridge?.updateTabletHardwareSettings) {
+    window.AndroidBridge.updateTabletHardwareSettings(battVol, Number(tabletSettings.awakeBrightness ?? 85), Number(tabletSettings.dimDelaySec ?? 120), Number(tabletSettings.speechRate) || 0.9);
+  }
+  speakMsg(text, true, battVol / 100);
 };
 
 const incrementMissedCallForMember = (id) => runTransaction(ref(db, `${basePath}/missedCalls/${id}`), cur => ({ count: (Number(cur?.count) || 0) + 1, timestamp: Date.now() }));
@@ -379,7 +401,78 @@ function renderMissedCallsBanner() {
   banner.style.display = 'flex';
 }
 
-// Chat & Senior Keyboard
+// --- FAMILY CHAT, PHOTOS, VIEWPORT READ RECEIPTS & SCROLL PRESERVATION ---
+function isMessageUnreadByNana(item) {
+  if (!item) return false;
+  const isOut = !!item.fromNana || item.author?.toLowerCase() === 'nana';
+  if (isOut) return false;
+  const clearedAt = Number(tabletSettings.bulletinClearedAt) || 0;
+  if (item.readByNanaAt || (Number(item.timestamp) || 0) <= clearedAt) return false;
+  return true;
+}
+
+function resolveChatPhotoUrl(item) {
+  if (!item) return null;
+  const raw = (item.imageUrl || item.photoUrl || item.image || item.photo || item.mediaUrl || '').trim();
+  if (raw) {
+    if (/^(data:image\/|https?:\/\/|blob:)/i.test(raw)) return raw;
+    if (/^[A-Za-z0-9+/=]{100,}$/.test(raw)) return `data:image/jpeg;base64,${raw}`;
+    return raw;
+  }
+  const fid = item.fileId || item.photoFileId || item.telegramFileId;
+  if (fid) {
+    return `${CONFIG.googleScriptUrl}?action=get_photo&fileId=${encodeURIComponent(fid)}&secret=${encodeURIComponent(SERVICE_TOKEN)}`;
+  }
+  return null;
+}
+
+async function markSingleMessageReadByNana(msgKey, bubbleEl) {
+  if (role !== 'nana' || !msgKey || pendingReadMarks.has(msgKey)) return;
+  const item = latestBulletinPosts[msgKey];
+  if (!item || !isMessageUnreadByNana(item)) return;
+  pendingReadMarks.add(msgKey);
+  const now = Date.now();
+  item.readByNanaAt = now;
+
+  if (bubbleEl) {
+    bubbleEl.classList.remove('unread-msg');
+    bubbleEl.querySelector('.tg-new-tag')?.remove();
+  }
+  updateBulletinTickerVisibility();
+  const anyStillUnread = Object.values(latestBulletinPosts).some(p => isMessageUnreadByNana(p));
+  if (!anyStillUnread) $('first-unread-divider')?.remove();
+
+  try {
+    await update(ref(db, `${basePath}/bulletin/${msgKey}`), { readByNanaAt: now });
+  } catch (e) {
+    pendingReadMarks.delete(msgKey);
+  }
+}
+
+function setupNanaChatReadObserver() {
+  if (role !== 'nana') return;
+  if (chatIntersectionObserver) chatIntersectionObserver.disconnect();
+  const feed = $('bulletin-posts-container');
+  if (!feed || $('bulletin-modal')?.style.display !== 'flex' || $('bulletin-modal')?.classList.contains('kb-fullscreen')) return;
+
+  chatIntersectionObserver = new IntersectionObserver((entries) => {
+    if ($('bulletin-modal')?.style.display !== 'flex' || $('bulletin-modal')?.classList.contains('kb-fullscreen')) return;
+    entries.forEach(entry => {
+      if (entry.isIntersecting && entry.intersectionRatio >= 0.55) {
+        const key = entry.target.dataset.msgKey;
+        if (key) markSingleMessageReadByNana(key, entry.target);
+      }
+    });
+  }, { root: feed, threshold: [0.55, 0.85] });
+
+  feed.querySelectorAll('.tg-bubble[data-msg-key]').forEach(el => {
+    const key = el.dataset.msgKey;
+    if (key && isMessageUnreadByNana(latestBulletinPosts[key])) {
+      chatIntersectionObserver.observe(el);
+    }
+  });
+}
+
 function syncChatInputDisplay() {
   const input = $('nana-chat-input'), typed = $('nana-chat-typed'), ph = $('nana-chat-placeholder'), box = $('nana-chat-display');
   if (!input || !typed || !ph) return;
@@ -392,17 +485,25 @@ function syncChatInputDisplay() {
 window.dismissCurrentBulletinBar = async (force = false) => {
   if (role !== 'nana' && !force) return;
   const now = Date.now();
-  tabletSettings.bulletinClearedAt = now; chatSessionReadCutoff = now;
+  tabletSettings.bulletinClearedAt = now;
+  const updates = {};
+  Object.entries(latestBulletinPosts).forEach(([k, item]) => {
+    if (isMessageUnreadByNana(item)) {
+      item.readByNanaAt = now;
+      updates[`${basePath}/bulletin/${k}/readByNanaAt`] = now;
+    }
+  });
+  updates[`${basePath}/settings/bulletinClearedAt`] = now;
   updateBulletinTickerVisibility();
   $('first-unread-divider')?.remove();
   document.querySelectorAll('.tg-bubble.unread-msg').forEach(b => b.classList.remove('unread-msg'));
   document.querySelectorAll('.tg-new-tag').forEach(t => t.remove());
-  await update(settingsRef, { bulletinClearedAt: now });
+  await update(ref(db), updates);
 };
 
 function updateBulletinTickerVisibility() {
-  const bar = $('message-ticker-bar'), badge = $('chat-unread-badge'), clearedAt = Number(tabletSettings.bulletinClearedAt) || 0;
-  unreadBulletinCount = Object.values(latestBulletinPosts).filter(p => !p.fromNana && (Number(p.timestamp) || 0) > clearedAt).length;
+  const bar = $('message-ticker-bar'), badge = $('chat-unread-badge');
+  unreadBulletinCount = Object.values(latestBulletinPosts).filter(p => isMessageUnreadByNana(p)).length;
   const hasUnread = unreadBulletinCount > 0;
   if (bar) bar.style.display = (tabletSettings.showBulletinBar !== false && hasUnread) ? 'flex' : 'none';
   if (badge) { badge.innerText = unreadBulletinCount > 9 ? '9+' : `${unreadBulletinCount} NEW`; badge.style.display = hasUnread ? 'inline-block' : 'none'; }
@@ -447,7 +548,7 @@ function resetKeyboardAutoHideTimer() {
   if (sec > 0) {
     keyboardHideTimer = setTimeout(() => {
       if ($('nana-chat-input')) $('nana-chat-input').value = '';
-      syncChatInputDisplay(); window.closeSeniorKeyboard();
+      syncChatInputDisplay(); window.closeSeniorKeyboard(true);
     }, sec * 1000);
   }
 }
@@ -455,43 +556,79 @@ function resetKeyboardAutoHideTimer() {
 function scrollToFirstUnreadOrBottom() {
   const feed = $('bulletin-posts-container'), div = $('first-unread-divider');
   if (!feed) return;
-  if (div) { div.scrollIntoView({ behavior: 'auto', block: 'start' }); setTimeout(() => window.handleChatScroll(feed), 150); }
-  else feed.scrollTop = feed.scrollHeight;
+  if (div) {
+    div.scrollIntoView({ behavior: 'auto', block: 'start' });
+  } else {
+    const firstUnreadBubble = feed.querySelector('.tg-bubble.unread-msg');
+    if (firstUnreadBubble) firstUnreadBubble.scrollIntoView({ behavior: 'auto', block: 'start' });
+    else feed.scrollTop = feed.scrollHeight;
+  }
+  setTimeout(() => {
+    setupNanaChatReadObserver();
+    window.handleChatScroll(feed);
+  }, 150);
 }
 
 window.openFamilyBulletin = () => {
-  chatSessionReadCutoff = Number(tabletSettings.bulletinClearedAt) || 0;
+  savedChatScrollTop = null;
   const m = $('bulletin-modal');
   m.classList.remove('kb-fullscreen'); m.style.display = 'flex';
-  window.closeSeniorKeyboard(); renderBulletinFeed(); syncChatInputDisplay();
-  window.wakeScreenAndResetDimTimer(); recordHeartbeat("Opened Family Chat");
-  setTimeout(scrollToFirstUnreadOrBottom, 80);
+  if ($('senior-onscreen-keyboard')) $('senior-onscreen-keyboard').style.display = 'none';
+  renderBulletinFeed(true); syncChatInputDisplay();
+  window.wakeScreenAndResetDimTimer(); recordTouchActivity("Opened Family Chat");
 };
 
 window.closeFamilyBulletin = () => {
+  if (chatIntersectionObserver) chatIntersectionObserver.disconnect();
   $('bulletin-modal').style.display = 'none';
-  window.closeSeniorKeyboard(); window.speechSynthesis?.cancel();
-  window.wakeScreenAndResetDimTimer(); recordHeartbeat("On Home Grid");
-  chatSessionReadCutoff = null;
+  window.closeSeniorKeyboard(false); window.speechSynthesis?.cancel();
+  window.wakeScreenAndResetDimTimer(); recordTouchActivity("On Home Grid");
 };
 
 window.openSeniorKeyboard = () => {
+  const feed = $('bulletin-posts-container');
+  if (feed && !$('bulletin-modal')?.classList.contains('kb-fullscreen')) {
+    savedChatScrollTop = feed.scrollTop;
+  }
+  if (chatIntersectionObserver) chatIntersectionObserver.disconnect();
   renderSeniorKeyboardLayout();
   $('bulletin-modal')?.classList.add('kb-fullscreen');
   if ($('senior-onscreen-keyboard')) $('senior-onscreen-keyboard').style.display = 'flex';
   syncChatInputDisplay(); resetKeyboardAutoHideTimer(); window.wakeScreenAndResetDimTimer();
 };
 
-window.closeSeniorKeyboard = () => {
+window.closeSeniorKeyboard = (restoreScroll = true) => {
   clearTimeout(keyboardHideTimer);
+  const wasFullscreen = $('bulletin-modal')?.classList.contains('kb-fullscreen');
   if ($('senior-onscreen-keyboard')) $('senior-onscreen-keyboard').style.display = 'none';
   $('bulletin-modal')?.classList.remove('kb-fullscreen');
-  syncChatInputDisplay(); setTimeout(scrollToFirstUnreadOrBottom, 50);
+  syncChatInputDisplay();
+  if (wasFullscreen && $('bulletin-modal')?.style.display === 'flex') {
+    setTimeout(() => {
+      const feed = $('bulletin-posts-container');
+      if (feed) {
+        if (restoreScroll && savedChatScrollTop !== null) {
+          feed.scrollTop = savedChatScrollTop;
+        } else if (!restoreScroll) {
+          feed.scrollTop = feed.scrollHeight;
+        }
+        setupNanaChatReadObserver();
+      }
+    }, 30);
+  }
 };
 
 window.handleChatScroll = (el) => {
-  if (role === 'nana' && el && (el.scrollHeight - el.scrollTop - el.clientHeight) <= 45 && unreadBulletinCount > 0) {
-    window.dismissCurrentBulletinBar(true);
+  if (role === 'nana' && el && !$('bulletin-modal')?.classList.contains('kb-fullscreen')) {
+    savedChatScrollTop = el.scrollTop;
+    const feedRect = el.getBoundingClientRect();
+    el.querySelectorAll('.tg-bubble.unread-msg[data-msg-key]').forEach(bubble => {
+      const r = bubble.getBoundingClientRect();
+      const visibleHeight = Math.min(r.bottom, feedRect.bottom) - Math.max(r.top, feedRect.top);
+      if (visibleHeight >= Math.min(r.height * 0.55, feedRect.height * 0.5)) {
+        markSingleMessageReadByNana(bubble.dataset.msgKey, bubble);
+      }
+    });
   }
 };
 
@@ -518,12 +655,13 @@ window.typeSeniorKey = (char, ev) => {
   syncChatInputDisplay();
 };
 
-window.kbHideTapped = () => { if (Date.now() - lastKeyTapMs >= 350) window.closeSeniorKeyboard(); };
+window.kbHideTapped = () => { if (Date.now() - lastKeyTapMs >= 350) window.closeSeniorKeyboard(true); };
 window.submitTypedNanaMessage = async () => {
   const input = $('nana-chat-input');
   if (!input || (Date.now() - lastKeyTapMs < 350) || !input.value.trim()) return;
   const text = input.value.trim(); input.value = "";
-  syncChatInputDisplay(); window.closeSeniorKeyboard();
+  savedChatScrollTop = null;
+  syncChatInputDisplay(); window.closeSeniorKeyboard(false);
   await window.sendNanaChatMessage(text);
 };
 
@@ -534,8 +672,8 @@ window.sendNanaChatMessage = async (rawText) => {
   const author = role === 'nana' ? 'Nana' : activeFamilyMember.name, st = $('tg-send-status');
   if (st) { st.style.color = "#ffff00"; st.innerText = "⏳ Sending message to Telegram..."; }
   try {
-    await push(bulletinRef, { author, fromNana: role === 'nana', text, timestamp: Date.now() });
-    if (role === 'nana') await window.dismissCurrentBulletinBar(true);
+    const now = Date.now();
+    await push(bulletinRef, { author, fromNana: role === 'nana', text, timestamp: now, ...(role === 'nana' ? { readByNanaAt: now } : {}) });
     const res = await fetch(CONFIG.googleScriptUrl, {
       method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ secret: SERVICE_TOKEN, portalNode: PORTAL_NODE_ID, action: "nana_reply", author, text })
@@ -549,12 +687,13 @@ window.sendNanaChatMessage = async (rawText) => {
   } catch (e) { if (st) { st.style.color = "#f87171"; st.innerText = "⚠️ Saved on tablet"; } }
 };
 
-function renderBulletinFeed() {
+function renderBulletinFeed(forceInitialScroll = false) {
   const container = $('bulletin-posts-container');
   if (!container) return;
+  const previousScroll = container.scrollTop;
+  const wasAtBottom = (container.scrollHeight - container.scrollTop - container.clientHeight) <= 60;
   container.innerHTML = "";
   const keys = Object.keys(latestBulletinPosts).slice(-25);
-  const clearedAt = chatSessionReadCutoff !== null ? chatSessionReadCutoff : (Number(tabletSettings.bulletinClearedAt) || 0);
   lastRenderedReadAloud = !!tabletSettings.showReadAloud;
 
   if (keys.length) {
@@ -569,7 +708,7 @@ function renderBulletinFeed() {
   keys.forEach(k => {
     const item = latestBulletinPosts[k];
     const isOut = !!item.fromNana || item.author?.toLowerCase() === 'nana';
-    const isUnread = !isOut && (Number(item.timestamp) || 0) > clearedAt;
+    const isUnread = isMessageUnreadByNana(item);
 
     if (isUnread && !insertedDivider) {
       insertedDivider = true;
@@ -580,9 +719,11 @@ function renderBulletinFeed() {
     }
     const b = document.createElement('div');
     b.className = `tg-bubble ${isOut ? 'outgoing' : 'incoming'}${isUnread ? ' unread-msg' : ''}`;
+    b.dataset.msgKey = k;
+
     const top = document.createElement('div'); top.className = 'tg-sender-row';
     const auth = document.createElement('span'); auth.className = 'tg-sender-name';
-    auth.textContent = isOut ? '👵 Nana (You)' : `👤 ${item.author || 'Family'}`;
+    auth.textContent = isOut ? (role === 'nana' ? '👵 Nana (You)' : '👵 Nana') : `👤 ${item.author || 'Family'}`;
     if (isUnread) { const tag = document.createElement('span'); tag.className = 'tg-new-tag'; tag.textContent = 'NEW'; auth.appendChild(tag); }
     top.appendChild(auth);
     if (item.timestamp) {
@@ -591,12 +732,40 @@ function renderBulletinFeed() {
       top.appendChild(tm);
     }
     b.appendChild(top);
-    if (item.text) { const p = document.createElement('div'); p.className = 'tg-msg-text'; p.textContent = item.text; b.appendChild(p); }
-    if (item.imageUrl && /^(data:image\/|https:\/\/)/i.test(item.imageUrl)) {
-      const img = document.createElement('img'); img.src = item.imageUrl;
-      img.style.cssText = 'width:100%;max-height:340px;object-fit:contain;border-radius:14px;margin-top:4px;background:#000;';
+
+    const photoSrc = resolveChatPhotoUrl(item);
+    if (photoSrc) {
+      const img = document.createElement('img');
+      img.className = 'tg-chat-photo';
+      img.referrerPolicy = 'no-referrer';
+      img.loading = 'eager';
+      img.alt = 'Family Photo';
+      img.src = photoSrc;
+      img.onerror = () => {
+        if (item.fileId && !img.dataset.retriedProxy) {
+          img.dataset.retriedProxy = '1';
+          img.src = `${CONFIG.googleScriptUrl}?action=get_photo&fileId=${encodeURIComponent(item.fileId)}&secret=${encodeURIComponent(SERVICE_TOKEN)}`;
+        }
+      };
       b.appendChild(img);
     }
+
+    if (item.text) { const p = document.createElement('div'); p.className = 'tg-msg-text'; p.textContent = item.text; b.appendChild(p); }
+
+    // Family link view: show read status for messages sent to Nana
+    if (role === 'family' && !isOut) {
+      const rc = document.createElement('div');
+      if (!isUnread) {
+        const readTime = item.readByNanaAt ? new Date(item.readByNanaAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        rc.className = 'tg-read-receipt read';
+        rc.textContent = `✓✓ Read by Nana${readTime ? ' (' + readTime + ')' : ''}`;
+      } else {
+        rc.className = 'tg-read-receipt unread';
+        rc.textContent = '⏳ Unread by Nana';
+      }
+      b.appendChild(rc);
+    }
+
     if (item.text && tabletSettings.showReadAloud) {
       const btn = document.createElement('button'); btn.className = 'tg-speak-chip'; btn.textContent = '🔊 Read Aloud';
       btn.onclick = () => window.speakNote(`${item.author || 'Family'} says: ${item.text}`);
@@ -604,10 +773,22 @@ function renderBulletinFeed() {
     }
     container.appendChild(b);
   });
-  if ($('bulletin-modal')?.style.display === 'flex') setTimeout(scrollToFirstUnreadOrBottom, 50);
+
+  if ($('bulletin-modal')?.style.display === 'flex' && !$('bulletin-modal')?.classList.contains('kb-fullscreen')) {
+    if (forceInitialScroll) {
+      setTimeout(scrollToFirstUnreadOrBottom, 60);
+    } else {
+      container.scrollTop = wasAtBottom ? container.scrollHeight : previousScroll;
+      setTimeout(setupNanaChatReadObserver, 60);
+    }
+  }
 }
 
-onValue(query(bulletinRef, limitToLast(25)), snap => { latestBulletinPosts = snap.val() || {}; renderBulletinFeed(); });
+onValue(query(bulletinRef, limitToLast(25)), snap => {
+  latestBulletinPosts = snap.val() || {};
+  renderBulletinFeed(false);
+});
+
 window.speakNote = (txt) => {
   if ('speechSynthesis' in window && txt) {
     window.speechSynthesis.cancel();
@@ -616,10 +797,35 @@ window.speakNote = (txt) => {
   }
 };
 
-// Classic FM Radio
-window.openRadioScreen = () => { showScreen('radio-screen'); window.wakeScreenAndResetDimTimer(); recordHeartbeat("Opened Classic FM Radio"); };
-window.closeRadioScreen = () => { window.stopRadioAndSync(true); showScreen('grid-screen'); window.wakeScreenAndResetDimTimer(); recordHeartbeat("On Home Grid"); };
-window.toggleClassicFM = () => isRadioPlaying ? window.stopRadioAndSync(true) : set(entertainmentRef, { activeKey: "classicfm", title: "Classic FM Radio 🎻", timestamp: Date.now() });
+// --- CLASSIC FM RADIO WITH DYNAMIC START/STOP BOTTOM BUTTON ---
+function updateRadioButtonsUI(playing) {
+  $('btn-classicfm')?.classList.toggle('playing', playing);
+  if ($('radio-action-prompt')) $('radio-action-prompt').innerText = playing ? "Playing Live... (Tap to Stop)" : "(Tap to Start Radio)";
+  if ($('radio-status-label')) $('radio-status-label').innerText = playing ? "Playing Classic FM 🎻" : "Radio Off";
+  const bottomBtn = $('btn-bottom-radio-toggle');
+  if (bottomBtn) {
+    bottomBtn.innerText = playing ? "⏹️ Stop Radio" : "▶️ Start Radio";
+    bottomBtn.style.background = playing ? "#7f1d1d" : "#059669";
+    bottomBtn.style.borderColor = playing ? "#f87171" : "#4ade80";
+  }
+}
+
+window.openRadioScreen = () => {
+  showScreen('radio-screen');
+  updateRadioButtonsUI(isRadioPlaying);
+  window.wakeScreenAndResetDimTimer();
+  recordTouchActivity("Opened Classic FM Radio");
+};
+window.closeRadioScreen = () => {
+  window.stopRadioAndSync(true);
+  showScreen('grid-screen');
+  window.wakeScreenAndResetDimTimer();
+  recordTouchActivity("On Home Grid");
+};
+window.toggleClassicFM = () => isRadioPlaying
+  ? window.stopRadioAndSync(true)
+  : set(entertainmentRef, { activeKey: "classicfm", title: "Classic FM Radio 🎻", timestamp: Date.now() });
+
 window.remoteSetEntertainment = async (key) => {
   if (key !== 'off' && !confirm("Turn Classic FM radio ON on Nana's tablet now?")) return;
   await set(entertainmentRef, { activeKey: key === 'off' ? "off" : "classicfm", title: key === 'off' ? "Off" : "Classic FM Radio 🎻", timestamp: Date.now() });
@@ -627,8 +833,7 @@ window.remoteSetEntertainment = async (key) => {
 window.stopRadioAndSync = async (sync = true) => {
   isRadioPlaying = false;
   if (radioPlayer) { radioPlayer.pause(); radioPlayer.removeAttribute('src'); radioPlayer.load(); }
-  $('btn-classicfm')?.classList.remove('playing');
-  $('radio-action-prompt').innerText = "(Tap to Turn On)"; $('radio-status-label').innerText = "Radio Off";
+  updateRadioButtonsUI(false);
   window.wakeScreenAndResetDimTimer();
   if (sync) await set(entertainmentRef, { activeKey: "off", title: "Off", timestamp: Date.now() });
 };
@@ -637,8 +842,7 @@ function startLocalRadioStream() {
   isRadioPlaying = true; window.wakeScreenAndResetDimTimer();
   radioPlayer.volume = Math.min(1.0, Math.max(0.15, (Number(tabletSettings.radioVolume ?? 75)) / 100));
   radioPlayer.src = CLASSIC_FM_STREAM; radioPlayer.play().catch(() => {});
-  $('btn-classicfm')?.classList.add('playing');
-  $('radio-action-prompt').innerText = "Playing Live..."; $('radio-status-label').innerText = "Playing Classic FM 🎻";
+  updateRadioButtonsUI(true);
   speakMsg("Playing Classic FM");
 }
 window.adjustNanaRadioVolume = (delta) => window.updateSetting('radioVolume', Math.max(15, Math.min(100, (Number(tabletSettings.radioVolume ?? 75)) + delta)));
@@ -662,7 +866,7 @@ window.openPhoneGuideModal = () => { window.switchGuideTab(/iPad|iPhone|iPod/.te
 window.closePhoneGuideModal = () => { $('phone-guide-modal').style.display = 'none'; };
 window.switchGuideTab = (os) => {
   $('tab-btn-ios').classList.toggle('active', os === 'ios'); $('tab-btn-android').classList.toggle('active', os === 'android');
-  $('guide-content-ios').style.display = os === 'ios' ? 'block' : 'none'; $('guide-content-android').style.display = os === 'android' ? 'block' : 'none';
+  $('guide-content-ios').style.display = os === 'ios' ? 'block' : 'none'; $('guide-content-android').style.display = os === 'ios' ? 'none' : 'block';
 };
 
 window.openAdminPinModal = () => {
@@ -700,35 +904,67 @@ window.adminExecuteAction = (action) => {
   window.closeAdminPinModal();
 };
 
-// Presence, Contacts & Hide-Me
-window.resetIdleTimer = () => { window.wakeScreenAndResetDimTimer(); recordHeartbeat(); };
-window.addEventListener('pointerdown', () => { window.wakeScreenAndResetDimTimer(); recordHeartbeat(); }, { passive: true });
+// --- SEPARATED TOUCH TRACKING vs BACKGROUND HEARTBEAT ---
+window.resetIdleTimer = () => { window.wakeScreenAndResetDimTimer(); recordTouchActivity(); };
+window.addEventListener('pointerdown', () => {
+  window.wakeScreenAndResetDimTimer();
+  recordTouchActivity();
+}, { passive: true });
 
-function recordHeartbeat(customActivity = null) {
-  if (role !== 'nana') return;
-  const now = Date.now();
-  if (!customActivity && (now - lastHeartbeatWriteMs < 30000)) return;
-  lastHeartbeatWriteMs = now;
+function readTabletBatteryStatus() {
   let batteryLevel = null, isCharging = null;
   if (window.AndroidBridge?.getBatteryStatusJson) {
     try {
       const b = JSON.parse(window.AndroidBridge.getBatteryStatusJson());
       batteryLevel = b.level; isCharging = b.charging;
-      if (!isCharging && batteryLevel !== null && batteryLevel <= 25 && !isBatteryVoiceCurrentlyMuted()) window.announceBatteryWarning("Please plug in the tablet charger.");
+      if (!isCharging && batteryLevel !== null && batteryLevel <= 25 && !isBatteryVoiceCurrentlyMuted()) {
+        window.announceBatteryWarning("Please plug in the tablet charger.");
+      }
     } catch (e) {}
   }
-  const p = { lastActive: now, batteryLevel, isCharging };
+  return { batteryLevel, isCharging };
+}
+
+function recordTouchActivity(customActivity = null) {
+  if (role !== 'nana') return;
+  const now = Date.now();
+  if (!customActivity && (now - lastTouchWriteMs < 15000)) return;
+  lastTouchWriteMs = now;
+  const { batteryLevel, isCharging } = readTabletBatteryStatus();
+  const p = { lastTouched: now, lastActive: now, lastPing: now, batteryLevel, isCharging };
   if (customActivity) p.lastActivity = customActivity;
   update(presenceRef, p);
 }
-if (role === 'nana') { setTimeout(() => { window.wakeScreenAndResetDimTimer(); recordHeartbeat("Tablet Online"); }, 3000); setInterval(recordHeartbeat, 120000); }
+
+function recordBackgroundHeartbeat() {
+  if (role !== 'nana') return;
+  const { batteryLevel, isCharging } = readTabletBatteryStatus();
+  // IMPORTANT: Do NOT overwrite lastTouched or lastActive during background pings!
+  update(presenceRef, { lastPing: Date.now(), batteryLevel, isCharging });
+}
+
+if (role === 'nana') {
+  setTimeout(() => { window.wakeScreenAndResetDimTimer(); recordBackgroundHeartbeat(); }, 3000);
+  setInterval(recordBackgroundHeartbeat, 30000);
+}
+
+function formatDurationAgo(timestampMs) {
+  if (!timestampMs) return "No recent touch";
+  const diffMins = Math.max(0, Math.floor((Date.now() - timestampMs) / 60000));
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const hrs = Math.floor(diffMins / 60), mins = diffMins % 60;
+  if (hrs < 24) return mins > 0 ? `${hrs}h ${mins}m ago` : `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ${hrs % 24}h ago`;
+}
 
 function updateFamilyPresenceBanner() {
   if (role !== 'family') return;
   const card = $('nana-presence-card'), ringBtn = $('family-ring-btn');
   if (!card) return;
-  const diffMins = latestPresenceData?.lastActive ? Math.max(0, Math.round((Date.now() - latestPresenceData.lastActive) / 60000)) : null;
-  const touchText = diffMins !== null ? `👆 Last touched: ${diffMins <= 1 ? 'Just now' : diffMins + 'm ago'}` : "👆 Last touched: No recent activity";
+  const lastTouchTs = latestPresenceData?.lastTouched || latestPresenceData?.lastActive || null;
+  const touchText = `👆 Last touched: ${formatDurationAgo(lastTouchTs)}`;
   const battText = latestPresenceData?.batteryLevel != null ? ` • ${latestPresenceData.isCharging ? "🔌 Charging" : "⚠️ UNPLUGGED"} (${latestPresenceData.batteryLevel}%)` : "";
   const radioStatus = (latestEntState?.activeKey && latestEntState.activeKey !== 'off') ? `<div style="color:#fef08a;font-weight:800;margin-top:2px;">🎻 Listening to Classic FM Radio</div>` : `<div style="color:#94a3b8;font-size:0.9rem;">🎻 Radio: Off</div>`;
   const tgStatus = connectedMemberIds.includes(activeFamilyMember.id) ? `<span style="color:#4ade80;font-size:0.88rem;">✅ Your Telegram alerts are connected</span>` : `<span style="color:#fbbf24;font-size:0.88rem;">⚠️ Tap "1. Connect Telegram" below so Nana can call you</span>`;
@@ -777,8 +1013,30 @@ window.forceWebhookAndMemberSync = async () => {
   else if (lbl) lbl.innerText = "⚠️ Check Script Deployment";
 };
 
+// --- HIDE-ME & TIMEZONE-AWARE CALLING SCHEDULES ---
 const HIDE_FOREVER = 4102444800000;
-const isHiddenFromNana = (id) => Number(latestHidden[id] || 0) > Date.now();
+
+function getCurrentHourInTimezone(tz) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: tz || 'Europe/London', hour: 'numeric', hour12: false }).formatToParts(new Date());
+    const hrVal = Number(parts.find(p => p.type === 'hour')?.value ?? new Date().getHours());
+    return hrVal === 24 ? 0 : hrVal;
+  } catch (e) {
+    return new Date().getHours();
+  }
+}
+
+function isMemberWithinAllowedCallHours(id) {
+  const sched = latestCallSchedules[id];
+  if (!sched || !sched.enabled) return true;
+  const h = getCurrentHourInTimezone(sched.timezone || 'Europe/London');
+  const s = Number(sched.startHour ?? 8), e = Number(sched.endHour ?? 21);
+  if (s === e) return true;
+  return s < e ? (h >= s && h < e) : (h >= s || h < e);
+}
+
+const isHiddenFromNana = (id) => (Number(latestHidden[id] || 0) > Date.now()) || !isMemberWithinAllowedCallHours(id);
+
 window.hideMeFromNana = async (choice) => {
   if (role !== 'family' || !activeFamilyMember) return;
   const mins = { '30m': 30, '1h': 60, '2h': 120, '5h': 300, '10h': 600 };
@@ -789,14 +1047,67 @@ window.hideMeFromNana = async (choice) => {
 };
 window.showMeToNana = () => (role === 'family' && activeFamilyMember) ? remove(ref(db, `${basePath}/hiddenContacts/${activeFamilyMember.id}`)) : null;
 
+window.setMyCallScheduleMode = async (enabled) => {
+  if (role !== 'family' || !activeFamilyMember) return;
+  const myTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
+  const cur = latestCallSchedules[activeFamilyMember.id] || {};
+  const startHour = Number($('sched-start-hour')?.value ?? cur.startHour ?? 8);
+  const endHour = Number($('sched-end-hour')?.value ?? cur.endHour ?? 21);
+  await set(ref(db, `${basePath}/callSchedules/${activeFamilyMember.id}`), {
+    enabled: !!enabled, startHour, endHour, timezone: myTz, updatedAt: Date.now()
+  });
+};
+
+window.saveMyCallScheduleHours = async () => {
+  if (role !== 'family' || !activeFamilyMember) return;
+  const myTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
+  const startHour = Number($('sched-start-hour')?.value ?? 8);
+  const endHour = Number($('sched-end-hour')?.value ?? 21);
+  await set(ref(db, `${basePath}/callSchedules/${activeFamilyMember.id}`), {
+    enabled: true, startHour, endHour, timezone: myTz, updatedAt: Date.now()
+  });
+};
+
+function refreshCallScheduleUI() {
+  if (role !== 'family' || !activeFamilyMember) return;
+  const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
+  const sched = latestCallSchedules[activeFamilyMember.id] || { enabled: false, startHour: 8, endHour: 21, timezone: detectedTz };
+  const tz = sched.timezone || detectedTz;
+  if ($('call-hours-tz-badge')) $('call-hours-tz-badge').innerText = `🌍 ${tz.replace(/_/g, ' ')}`;
+  if ($('sched-start-hour')) $('sched-start-hour').value = String(sched.startHour ?? 8);
+  if ($('sched-end-hour')) $('sched-end-hour').value = String(sched.endHour ?? 21);
+  $('btn-sched-anytime')?.classList.toggle('selected', !sched.enabled);
+  $('btn-sched-custom')?.classList.toggle('selected', !!sched.enabled);
+  if ($('call-hours-pickers')) $('call-hours-pickers').style.display = sched.enabled ? 'flex' : 'none';
+
+  const stLbl = $('call-hours-status-lbl');
+  if (stLbl) {
+    if (!sched.enabled) {
+      stLbl.innerText = "🌐 Nana can call you anytime (unless hidden above)";
+      stLbl.style.color = "#4ade80";
+    } else {
+      const openNow = isMemberWithinAllowedCallHours(activeFamilyMember.id);
+      const sStr = `${String(sched.startHour ?? 8).padStart(2, '0')}:00`;
+      const eStr = `${String(sched.endHour ?? 21).padStart(2, '0')}:00`;
+      stLbl.innerText = openNow
+        ? `✅ Within your calling hours (${sStr}–${eStr} your time)`
+        : `🌙 Outside your hours (${sStr}–${eStr}) — Hidden on Nana's tablet now`;
+      stLbl.style.color = openNow ? "#4ade80" : "#fbbf24";
+    }
+  }
+}
+
 function refreshHideUI() {
   if (role !== 'family' || !activeFamilyMember) return;
   const until = Number(latestHidden[activeFamilyMember.id] || 0), hidden = until > Date.now();
   const d = new Date(until), tStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const fmt = until >= HIDE_FOREVER ? 'until you turn it back on' : 'until ' + (d.toDateString() === new Date().toDateString() ? tStr : d.toLocaleDateString([], { weekday: 'short' }) + ' ' + tStr);
   document.querySelectorAll('.hide-status-lbl').forEach(e => { e.innerText = hidden ? `🙈 Hidden from Nana ${fmt}` : `👁️ Visible on Nana's tablet`; e.style.color = hidden ? '#fbbf24' : '#4ade80'; });
+  refreshCallScheduleUI();
 }
+
 onValue(hiddenRef, snap => { latestHidden = snap.val() || {}; if (role === 'nana') renderContacts(connectedMemberIds); else refreshHideUI(); });
+onValue(callSchedulesRef, snap => { latestCallSchedules = snap.val() || {}; if (role === 'nana') renderContacts(connectedMemberIds); else refreshCallScheduleUI(); });
 setInterval(() => { if (role === 'nana') renderContacts(connectedMemberIds); else refreshHideUI(); }, 30000);
 
 function renderContacts(connectedList = []) {
@@ -881,16 +1192,18 @@ function refreshSettingsUI() {
   const awakeB = Number(tabletSettings.awakeBrightness ?? 85), dimB = Number(tabletSettings.dimBrightness ?? 15), dimSec = Number(tabletSettings.dimDelaySec ?? 120);
   const nStart = Number(tabletSettings.nightStartHour ?? 21), nEnd = Number(tabletSettings.nightEndHour ?? 8);
   const kbLayout = tabletSettings.keyboardLayout || 'qwerty', kbHideSec = Number(tabletSettings.keyboardTimeoutSec ?? 60);
+  const battIntMin = Number(tabletSettings.batteryVoiceIntervalMin ?? 3), battVol = Number(tabletSettings.batteryVoiceVolume ?? 85);
 
   if ($('in-call-vol-label')) $('in-call-vol-label').innerText = `${callVol}%`;
   if ($('nana-vol-display')) $('nana-vol-display').innerText = `${radVol}%`;
   document.querySelectorAll('.lbl-bright-summary').forEach(e => { e.innerText = `${awakeB}% ➔ ${dimB}% (${fmtDelay(dimSec)})`; });
   document.querySelectorAll('.lbl-kb-summary').forEach(e => { e.innerText = `${kbLayout.toUpperCase()} • ${fmtDelay(kbHideSec)}`; });
   document.querySelectorAll('.lbl-vol-summary').forEach(e => { e.innerText = `Call ${callVol}% • Radio ${radVol}% • Ring ${ringVol}%`; });
+  document.querySelectorAll('.lbl-battery-summary').forEach(e => { e.innerText = `Every ${battIntMin}m • Vol ${battVol}%`; });
   document.querySelectorAll('.lbl-night-window').forEach(e => { e.innerText = tabletSettings.nightModeEnabled ? `${String(nStart).padStart(2,'0')}:00 – ${String(nEnd).padStart(2,'0')}:00` : "Disabled"; });
 
   const mutedUntil = Number(tabletSettings.batteryVoiceMutedUntil) || 0;
-  const muteTxt = mutedUntil > Date.now() ? `🔇 Muted until ${new Date(mutedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : `🔊 Battery Voice: Active`;
+  const muteTxt = mutedUntil > Date.now() ? `🔇 Muted until ${new Date(mutedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : `🔊 Battery Voice: Active (Every ${battIntMin}m at ${battVol}% vol)`;
   document.querySelectorAll('.lbl-battery-mute').forEach(e => { e.innerText = muteTxt; });
 
   const sCall = Math.min(1.0, Math.max(0.2, callVol / 100)), sRad = Math.min(1.0, Math.max(0.15, radVol / 100));
@@ -900,7 +1213,7 @@ function refreshSettingsUI() {
 
   document.querySelectorAll('[data-skey]').forEach(btn => btn.classList.toggle('selected', String(tabletSettings[btn.dataset.skey]) === String(btn.dataset.sval)));
   if (lastRenderedKbLayout !== kbLayout) renderSeniorKeyboardLayout();
-  if (lastRenderedReadAloud !== !!tabletSettings.showReadAloud) renderBulletinFeed();
+  if (lastRenderedReadAloud !== !!tabletSettings.showReadAloud) renderBulletinFeed(false);
 }
 
 onValue(settingsRef, snap => {
@@ -1082,7 +1395,7 @@ async function startCallFromNana(member) {
   if (!tabletSettings.callingEnabled || isHiddenFromNana(member.id)) return;
   unlockCallAudio(); didManuallyInitiateOrAnswerOnThisTab = true;
   await window.stopRadioAndSync(true);
-  $('bulletin-modal').style.display = 'none'; window.closeSeniorKeyboard();
+  $('bulletin-modal').style.display = 'none'; window.closeSeniorKeyboard(false);
   currentState = 'calling_family'; window.wakeScreenAndResetDimTimer();
   const img = $('outbound-photo'); img.onerror = () => { img.src = member.fallback; }; img.src = member.photo;
   $('outbound-title').innerText = `Calling ${member.name}...`;
@@ -1169,7 +1482,7 @@ onValue(callStateRef, snap => {
   }
   if (role === 'family') updateFamilyPresenceBanner();
   if (data.status !== 'idle') {
-    $('bulletin-modal').style.display = 'none'; window.closeSeniorKeyboard();
+    $('bulletin-modal').style.display = 'none'; window.closeSeniorKeyboard(false);
     if (role === 'nana' && isRadioPlaying) window.stopRadioAndSync(true);
   }
 
@@ -1222,11 +1535,14 @@ function stopRingingUI() {
   if (activeMp3Ringtone) { activeMp3Ringtone.pause(); activeMp3Ringtone.currentTime = 0; activeMp3Ringtone = null; }
 }
 
-function speakMsg(text, isBatt = false) {
-  if (!tabletSettings.voicePrompts || ((isBatt || /battery|charger|plug|power/i.test(text)) && isBatteryVoiceCurrentlyMuted())) return;
+function speakMsg(text, isBatt = false, customVol = 1.0) {
+  if (!tabletSettings.voicePrompts && !isBatt) return;
+  if ((isBatt || /battery|charger|plug|power/i.test(text)) && isBatteryVoiceCurrentlyMuted()) return;
   if ('speechSynthesis' in window && text) {
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text); u.rate = Number(tabletSettings.speechRate) || 0.9;
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = Number(tabletSettings.speechRate) || 0.9;
+    u.volume = Math.min(1.0, Math.max(0.2, Number(customVol) || 1.0));
     window.speechSynthesis.speak(u);
   }
 }
@@ -1235,10 +1551,10 @@ if (role === 'family') {
   $('family-greeting').innerText = `Call Nana (as ${activeFamilyMember.name})`;
   const img = $('family-self-photo'); img.onerror = () => { img.src = activeFamilyMember.fallback; }; img.src = activeFamilyMember.photo;
   $('in-call-volume-bar').style.display = 'flex';
-  // Include secret in deep link so family member is automatically authorized by the bot
   $('telegram-link-btn').href = `https://t.me/${CONFIG.telegramBotUsername}?start=${activeFamilyMember.id}_${SERVICE_TOKEN}`;
   if ($('family-controls-btn')) $('family-controls-btn').style.display = isAdminFamilyMember ? 'inline-block' : 'none';
   if ($('in-call-settings-btn')) $('in-call-settings-btn').style.display = isAdminFamilyMember ? 'inline-block' : 'none';
+  refreshCallScheduleUI();
   window.syncConnectedFamilyFromTelegram();
   if (autoAnswerFromTelegram) showScreen('family-pickup-screen');
   else showScreen('family-screen');
