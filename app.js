@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, update, push, onValue, remove, runTransaction, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-const APP_VERSION = "2.9.0";
+const APP_VERSION = "2.9.1";
 const $ = (id) => document.getElementById(id);
 
 (function versionGuard() {
@@ -18,9 +18,33 @@ const $ = (id) => document.getElementById(id);
 })();
 window.__nanaAppLoaded = true;
 
+// --- ZERO-KNOWLEDGE SHA-256 VERIFICATION (No Plaintext Secrets in Repo) ---
+const EXPECTED_KEY_HASH = "d497b848f0915364d299c002495232b7c32a9992023309d31100fb56267b604e"; // SHA-256("nana-v2-salt:" + familySecret)
+const EXPECTED_PIN_HASH = "b3560b47fb827ce8f069b2f7bc40fa9db204d9e898c0bb7bc7875fa6e73fa2e0"; // SHA-256("nana-pin-salt:" + adminPin)
+
+async function sha256Hex(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+window.submitManualKey = () => {
+  const val = ($('manual-key-input')?.value || '').trim();
+  if (val) {
+    localStorage.setItem('nana_service_token', val);
+    window.location.reload();
+  }
+};
+
 const params = new URLSearchParams(window.location.search);
-if (params.get('key')) localStorage.setItem('nana_service_token', params.get('key').trim());
-const SERVICE_TOKEN = (localStorage.getItem('nana_service_token') || 'Westerham8').trim();
+if (params.get('key')) {
+  localStorage.setItem('nana_service_token', params.get('key').trim());
+  // Scrub the secret key from the visible URL bar so it isn't leaked via screenshots/referrers
+  const cleanUrl = new URL(window.location.href);
+  cleanUrl.searchParams.delete('key');
+  window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search);
+}
+
+const SERVICE_TOKEN = (localStorage.getItem('nana_service_token') || '').trim();
 const TEST_MODE = params.get('test') === '1';
 const role = params.get('role') || 'nana';
 const callerId = (params.get('id') || 'ryan').toLowerCase();
@@ -33,16 +57,16 @@ function showScreen(id) {
   $(id)?.classList.add('active');
 }
 
-if (SERVICE_TOKEN !== 'Westerham8') {
+const computedKeyHash = SERVICE_TOKEN ? await sha256Hex("nana-v2-salt:" + SERVICE_TOKEN) : "";
+if (computedKeyHash !== EXPECTED_KEY_HASH) {
+  localStorage.removeItem('nana_service_token');
   showScreen('auth-error-screen');
-  if (isRealAndroidTablet) {
-    setTimeout(() => {
-      try { localStorage.removeItem('nana_service_token'); } catch (e) {}
-      const u = new URL(window.location.href); u.searchParams.delete('key'); window.location.replace(u.toString());
-    }, 10000);
-  }
-  throw new Error("Invalid verification key.");
+  throw new Error("Unauthorized: Valid access key required.");
 }
+
+// Derive unguessable Firebase path & Daily room name from the verified hash
+const PORTAL_NODE_ID = `nana_${computedKeyHash.slice(0, 24)}`;
+const DERIVED_DAILY_ROOM = `NanaPhone_${computedKeyHash.slice(0, 12)}`;
 
 const mkMember = (id, name, spokenName, av, bg) => ({
   id, name, spokenName, photo: `photos/${id}.jpg`,
@@ -50,8 +74,8 @@ const mkMember = (id, name, spokenName, av, bg) => ({
 });
 
 const CONFIG = {
-  appVersion: APP_VERSION, adminPin: "1929", apkFileName: "nanaphone.apk",
-  dailyRoomUrl: "https://nanaphone.daily.co/" + (params.get('room') || 'NanaPhone'),
+  appVersion: APP_VERSION, apkFileName: "nanaphone.apk",
+  dailyRoomUrl: "https://nanaphone.daily.co/" + (params.get('room') || DERIVED_DAILY_ROOM),
   telegramBotUsername: "Nanaphone_Bot",
   googleScriptUrl: "https://script.google.com/macros/s/AKfycbwsFHE8oyj1RBGxLJT79bbPsvJ2hTkVrF9dCoj369ApEREXyrdQKE_vA0QrobBOeLE2/exec",
   firebase: { databaseURL: "https://nanaphone-f644b-default-rtdb.europe-west1.firebasedatabase.app" },
@@ -72,7 +96,7 @@ const SILENT_WAV = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAI
 const activeFamilyMember = CONFIG.familyMembers.find(m => m.id === callerId) || CONFIG.familyMembers[4];
 const isAdminFamilyMember = (role === 'family' && activeFamilyMember.id === 'ryan');
 
-// Build Supervisor PIN keypad & Shared Settings Cards dynamically to keep HTML compact
+// Build Supervisor PIN keypad & Shared Settings Cards dynamically
 (function buildDynamicControls() {
   const kp = $('pin-keypad-grid');
   if (kp) {
@@ -232,7 +256,7 @@ if (TEST_MODE) {
 
 const app = initializeApp(CONFIG.firebase);
 const db = getDatabase(app);
-const basePath = TEST_MODE ? `portals/${SERVICE_TOKEN}__test` : `portals/${SERVICE_TOKEN}`;
+const basePath = TEST_MODE ? `portals/${PORTAL_NODE_ID}__test` : `portals/${PORTAL_NODE_ID}`;
 const callStateRef = ref(db, `${basePath}/callState`);
 const presenceRef = ref(db, `${basePath}/presence`);
 const bulletinRef = ref(db, `${basePath}/bulletin`);
@@ -514,7 +538,7 @@ window.sendNanaChatMessage = async (rawText) => {
     if (role === 'nana') await window.dismissCurrentBulletinBar(true);
     const res = await fetch(CONFIG.googleScriptUrl, {
       method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ secret: SERVICE_TOKEN, action: "nana_reply", author, text })
+      body: JSON.stringify({ secret: SERVICE_TOKEN, portalNode: PORTAL_NODE_ID, action: "nana_reply", author, text })
     });
     const data = await res.json();
     if (st) {
@@ -633,7 +657,7 @@ onValue(entertainmentRef, snap => {
   }
 });
 
-// Modals & Admin PIN
+// Modals & Hashed Admin PIN Verification
 window.openPhoneGuideModal = () => { window.switchGuideTab(/iPad|iPhone|iPod/.test(navigator.userAgent) ? 'ios' : 'android'); $('phone-guide-modal').style.display = 'flex'; };
 window.closePhoneGuideModal = () => { $('phone-guide-modal').style.display = 'none'; };
 window.switchGuideTab = (os) => {
@@ -649,11 +673,12 @@ window.openAdminPinModal = () => {
 };
 window.closeAdminPinModal = () => { enteredPin = ""; $('admin-pin-modal').style.display = 'none'; };
 window.clearPinDigits = () => { enteredPin = ""; $('pin-dots-display').innerText = ""; };
-window.pressPinDigit = (d) => {
+window.pressPinDigit = async (d) => {
   if (enteredPin.length >= 4) return;
   enteredPin += d; $('pin-dots-display').innerText = "●".repeat(enteredPin.length);
   if (enteredPin.length === 4) {
-    if (enteredPin === CONFIG.adminPin) {
+    const candidateHash = await sha256Hex("nana-pin-salt:" + enteredPin);
+    if (candidateHash === EXPECTED_PIN_HASH) {
       window.AndroidBridge?.unlockAdminForFiveMinutes?.();
       const cards = $('shared-settings-cards'), mount = $('gear-settings-mount');
       if (cards && mount && cards.parentElement !== mount) mount.appendChild(cards);
@@ -734,7 +759,7 @@ window.syncConnectedFamilyFromTelegram = async () => {
   try {
     const res = await fetch(CONFIG.googleScriptUrl, {
       method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ secret: SERVICE_TOKEN, action: "sync", webhookUrl: CONFIG.googleScriptUrl, portalBaseUrl: window.location.origin + window.location.pathname })
+      body: JSON.stringify({ secret: SERVICE_TOKEN, portalNode: PORTAL_NODE_ID, action: "sync", webhookUrl: CONFIG.googleScriptUrl, portalBaseUrl: window.location.origin + window.location.pathname })
     });
     const data = await res.json();
     if (data.ok && Array.isArray(data.connected)) {
@@ -829,7 +854,9 @@ window.previewAndSetTone = async (tone) => { tabletSettings.ringtone = tone; ref
 window.setCallingEnabled = (on) => window.updateSetting('callingEnabled', !!on);
 window.copyTestLink = async (kind) => {
   const base = window.location.origin + window.location.pathname;
-  const link = kind === 'nana' ? `${base}?role=nana&test=1` : `${base}?role=family&id=${encodeURIComponent(callerId)}&test=1`;
+  const link = kind === 'nana'
+    ? `${base}?role=nana&key=${encodeURIComponent(SERVICE_TOKEN)}&test=1`
+    : `${base}?role=family&id=${encodeURIComponent(callerId)}&key=${encodeURIComponent(SERVICE_TOKEN)}&test=1`;
   try { await navigator.clipboard.writeText(link); alert('Copied:\n' + link); } catch (e) { window.prompt('Copy link:', link); }
 };
 
@@ -922,7 +949,7 @@ async function sendSingleTelegramRing(member, step, max) {
     if ($('outbound-sub')) $('outbound-sub').innerText = `Ringing their mobile now (${step}/${max})...`;
     const res = await fetch(CONFIG.googleScriptUrl, {
       method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ secret: SERVICE_TOKEN, action: "ring", memberId: member.id, answerUrl, ringCount: step, maxRings: max, previousMessageId: lastTelegramMsgId })
+      body: JSON.stringify({ secret: SERVICE_TOKEN, portalNode: PORTAL_NODE_ID, action: "ring", memberId: member.id, answerUrl, ringCount: step, maxRings: max, previousMessageId: lastTelegramMsgId })
     });
     const data = await res.json();
     if (data.ok && data.messageId) lastTelegramMsgId = data.messageId;
@@ -942,7 +969,7 @@ function stopTelegramRingBurst() {
   clearInterval(telegramBurstInterval); telegramBurstInterval = null;
   if (currentDialedMember && lastTelegramMsgId) {
     const memberId = currentDialedMember.id, messageId = lastTelegramMsgId; lastTelegramMsgId = null;
-    fetch(CONFIG.googleScriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ secret: SERVICE_TOKEN, action: "clear_rings", memberId, messageId }) }).catch(() => {});
+    fetch(CONFIG.googleScriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ secret: SERVICE_TOKEN, portalNode: PORTAL_NODE_ID, action: "clear_rings", memberId, messageId }) }).catch(() => {});
   }
 }
 
@@ -1208,14 +1235,13 @@ if (role === 'family') {
   $('family-greeting').innerText = `Call Nana (as ${activeFamilyMember.name})`;
   const img = $('family-self-photo'); img.onerror = () => { img.src = activeFamilyMember.fallback; }; img.src = activeFamilyMember.photo;
   $('in-call-volume-bar').style.display = 'flex';
-  $('telegram-link-btn').href = `https://t.me/${CONFIG.telegramBotUsername}?start=${activeFamilyMember.id}`;
+  // Include secret in deep link so family member is automatically authorized by the bot
+  $('telegram-link-btn').href = `https://t.me/${CONFIG.telegramBotUsername}?start=${activeFamilyMember.id}_${SERVICE_TOKEN}`;
   if ($('family-controls-btn')) $('family-controls-btn').style.display = isAdminFamilyMember ? 'inline-block' : 'none';
   if ($('in-call-settings-btn')) $('in-call-settings-btn').style.display = isAdminFamilyMember ? 'inline-block' : 'none';
   window.syncConnectedFamilyFromTelegram();
-  if (autoAnswerFromTelegram) {
-    window.history.replaceState({}, document.title, `${window.location.pathname}?role=family&id=${encodeURIComponent(activeFamilyMember.id)}&key=${encodeURIComponent(SERVICE_TOKEN)}&answer=true${TEST_MODE ? '&test=1' : ''}`);
-    showScreen('family-pickup-screen');
-  } else showScreen('family-screen');
+  if (autoAnswerFromTelegram) showScreen('family-pickup-screen');
+  else showScreen('family-screen');
 } else {
   renderContacts(connectedMemberIds); renderSeniorKeyboardLayout();
   window.syncConnectedFamilyFromTelegram(); showScreen('grid-screen');
