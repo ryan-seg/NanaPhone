@@ -6,9 +6,9 @@
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="nanaphone-page-version" content="2.9.1">
+  <meta name="nanaphone-page-version" content="2.9.2">
   <script>
-    window.__NANA_PAGE_VERSION = "2.9.1";
+    window.__NANA_PAGE_VERSION = "2.9.2";
     (function () {
       function ok() {
         var sv = (getComputedStyle(document.documentElement).getPropertyValue('--nana-styles-version') || '').replace(/["'\s]/g, '');
@@ -18,7 +18,7 @@
         if (ok() || !document.body) return;
         var d = document.createElement('div');
         d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7c2d12;color:#fff;font:700 20px sans-serif;padding:14px;text-align:center;';
-        d.innerText = 'Loading NanaPhone... (page v2.9.1) - retrying';
+        d.innerText = 'Loading NanaPhone... (page v2.9.2) - retrying';
         document.body.appendChild(d);
       }, 15000);
       setInterval(function () { if (!ok()) window.location.reload(); }, 60000);
@@ -26,7 +26,7 @@
   </script>
   <title>NanaPhone Portal</title>
   <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
-  <link rel="stylesheet" href="styles.css?v=2.9.1">
+  <link rel="stylesheet" href="styles.css?v=2.9.2">
 </head>
 <body>
   <div id="brightness-overlay" onclick="wakeScreenAndResetDimTimer()"></div>
@@ -141,7 +141,7 @@
         <div class="chat-pill" onclick="openFamilyBulletin()">✈️ Family Chat <span id="chat-unread-badge" class="chat-unread-badge">NEW</span></div>
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.9.1</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.9.2</div>
       </div>
     </div>
     <div id="message-ticker-bar" class="message-ticker-bar" onclick="openFamilyBulletin()">
@@ -170,7 +170,7 @@
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;width:100%;">
       <button class="giant-radio-btn" id="btn-classicfm" onclick="toggleClassicFM()">
         <span style="font-size:4rem;">🎻</span><span>Classic FM Radio</span>
-        <span id="radio-action-prompt" style="font-size:1.25rem;font-weight:700;color:var(--text-muted);">(Tap to Turn On)</span>
+        <span id="radio-action-prompt" style="font-size:1.25rem;font-weight:700;color:var(--text-muted);">(Tap to Start Radio)</span>
       </button>
     </div>
     <div style="width:100%;background:var(--bg-card);border:3px solid var(--border-main);border-radius:24px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
@@ -179,7 +179,7 @@
         <button class="vol-step-btn" style="font-size:1.5rem;padding:10px 22px;" onclick="adjustNanaRadioVolume(-15)">🔉 Quieter</button>
         <button class="vol-step-btn" style="font-size:1.5rem;padding:10px 22px;background:#0284c7;" onclick="adjustNanaRadioVolume(15)">🔊 Louder</button>
       </div>
-      <button class="cancel-btn" style="font-size:1.35rem;padding:10px 24px;background:#7f1d1d;border-color:#f87171;" onclick="stopRadioAndSync(true)">⏹️ Stop Radio</button>
+      <button id="btn-bottom-radio-toggle" class="cancel-btn" style="font-size:1.35rem;padding:10px 24px;background:#059669;border-color:#4ade80;color:#fff;" onclick="toggleClassicFM()">▶️ Start Radio</button>
     </div>
     <audio id="nana-radio-stream" preload="none"></audio>
   </div>
@@ -223,10 +223,10 @@
       <h1 id="family-greeting" style="font-size:1.45rem;margin:0;">Call Nana</h1>
     </div>
     <div id="nana-presence-card" style="background:#1e293b;border:2px solid #38bdf8;border-radius:14px;padding:8px 14px;font-size:0.95rem;line-height:1.4;width:92vw;max-width:540px;">Checking tablet status...</div>
-    <button id="family-ring-btn" class="giant-btn" style="height:13vh;min-height:82px;font-size:1.9rem;width:92vw;max-width:540px;border-width:5px;border-radius:26px;" onclick="startCallFromFamily()">📹 Ring Nana Now</button>
+    <button id="family-ring-btn" class="giant-btn" style="height:11vh;min-height:74px;font-size:1.85rem;width:92vw;max-width:540px;border-width:5px;border-radius:26px;" onclick="startCallFromFamily()">📹 Ring Nana Now</button>
 
     <div class="settings-card" id="hide-me-card" style="width:92vw;max-width:540px;margin-bottom:2px;padding:10px 12px;">
-      <div class="settings-label" style="font-size:1.02rem;margin-bottom:2px;"><span>🙈 Hide Me From Nana's Contacts</span></div>
+      <div class="settings-label" style="font-size:1.02rem;margin-bottom:2px;"><span>🙈 Hide Me Temporarily</span></div>
       <div class="settings-sub hide-status-lbl" style="font-weight:800;margin-bottom:6px;"></div>
       <div class="opt-row">
         <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('30m')">30m</button>
@@ -236,6 +236,25 @@
         <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('tomorrow')">🌅 7am</button>
         <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('manual')">♾️ Off</button>
         <button class="opt-btn" style="padding:7px 8px;font-size:0.88rem;background:#064e3b;border-color:#22c55e;color:#fef08a;" onclick="showMeToNana()">👁️ Show</button>
+      </div>
+    </div>
+
+    <!-- Daily Calling Hours Limit (Timezone-Aware) -->
+    <div class="settings-card" id="call-hours-card" style="width:92vw;max-width:540px;margin-bottom:2px;padding:10px 12px;">
+      <div class="settings-label" style="font-size:1.02rem;margin-bottom:2px;">
+        <span>⏰ My Daily Calling Hours</span>
+        <span id="call-hours-tz-badge" style="font-size:0.8rem;color:#38bdf8;font-weight:800;"></span>
+      </div>
+      <div id="call-hours-status-lbl" class="settings-sub" style="font-weight:800;margin-bottom:6px;color:#4ade80;">🌐 Nana can call you anytime</div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <button id="btn-sched-anytime" class="opt-btn selected" style="padding:7px 8px;font-size:0.88rem;" onclick="setMyCallScheduleMode(false)">🌐 Anytime (24h)</button>
+        <button id="btn-sched-custom" class="opt-btn" style="padding:7px 8px;font-size:0.88rem;" onclick="setMyCallScheduleMode(true)">🕒 Limit My Hours</button>
+      </div>
+      <div id="call-hours-pickers" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-size:0.88rem;color:#cbd5e1;font-weight:800;">From:</span>
+        <select id="sched-start-hour" class="tz-select" onchange="saveMyCallScheduleHours()"></select>
+        <span style="font-size:0.88rem;color:#cbd5e1;font-weight:800;">To:</span>
+        <select id="sched-end-hour" class="tz-select" onchange="saveMyCallScheduleHours()"></select>
       </div>
     </div>
 
@@ -286,6 +305,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2.9.1"></script>
+  <script type="module" src="app.js?v=2.9.2"></script>
 </body>
 </html>
