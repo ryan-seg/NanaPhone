@@ -6,9 +6,9 @@
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="nanaphone-page-version" content="2.9.0">
+  <meta name="nanaphone-page-version" content="2.9.1">
   <script>
-    window.__NANA_PAGE_VERSION = "2.9.0";
+    window.__NANA_PAGE_VERSION = "2.9.1";
     (function () {
       function ok() {
         var sv = (getComputedStyle(document.documentElement).getPropertyValue('--nana-styles-version') || '').replace(/["'\s]/g, '');
@@ -18,7 +18,7 @@
         if (ok() || !document.body) return;
         var d = document.createElement('div');
         d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7c2d12;color:#fff;font:700 20px sans-serif;padding:14px;text-align:center;';
-        d.innerText = 'Loading NanaPhone... (page v2.9.0) - retrying';
+        d.innerText = 'Loading NanaPhone... (page v2.9.1) - retrying';
         document.body.appendChild(d);
       }, 15000);
       setInterval(function () { if (!ok()) window.location.reload(); }, 60000);
@@ -26,7 +26,7 @@
   </script>
   <title>NanaPhone Portal</title>
   <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
-  <link rel="stylesheet" href="styles.css?v=2.9.0">
+  <link rel="stylesheet" href="styles.css?v=2.9.1">
 </head>
 <body>
   <div id="brightness-overlay" onclick="wakeScreenAndResetDimTimer()"></div>
@@ -37,11 +37,11 @@
     <p style="font-size:1.4rem;">Tap anywhere on screen to wake up for 15 minutes</p>
   </div>
 
-  <!-- Supervisor PIN & Controls (PIN: 1929) -->
+  <!-- Supervisor PIN & Controls (No hardcoded PIN shown in HTML) -->
   <div id="admin-pin-modal">
     <h1 id="admin-modal-title" style="font-size:1.9rem;color:#fef08a;margin:0;">⚙️ Supervisor & Tablet Controls</h1>
     <div class="file-versions-line" style="font-size:0.85rem;font-family:monospace;margin:2px 0 8px 0;"></div>
-    <p id="admin-modal-sub" style="font-size:1rem;color:#cbd5e1;margin:4px 0 0 0;">Enter 4-digit PIN (1929) to unlock settings & updates</p>
+    <p id="admin-modal-sub" style="font-size:1rem;color:#cbd5e1;margin:4px 0 0 0;">Enter 4-digit Supervisor PIN to unlock settings & updates</p>
     <div id="pin-keypad-section" style="display:flex;flex-direction:column;align-items:center;">
       <div id="pin-dots-display" class="pin-dots"></div>
       <div id="pin-keypad-grid" class="keypad-grid"></div>
@@ -62,7 +62,7 @@
 
   <!-- Confirm Call Screen (15s Auto-Cancel) -->
   <div id="confirm-modal">
-    <h1 id="confirm-prompt-title" style="font-size:3.2rem;color:#ffff00;margin:0 0 14px 0;">Call Phil?</h1>
+    <h1 id="confirm-prompt-title" style="font-size:3.2rem;color:#ffff00;margin:0 0 14px 0;">Call Family?</h1>
     <img id="confirm-photo" src="" alt="Family Member">
     <p id="confirm-missed-note" style="font-size:1.5rem;color:#fca5a5;margin:0 0 6px 0;font-weight:800;display:none;"></p>
     <p style="font-size:1.5rem;color:#cbd5e1;margin:0;">Cancels in <span id="confirm-timer" style="color:#f87171;font-weight:bold;">15</span>s</p>
@@ -141,7 +141,7 @@
         <div class="chat-pill" onclick="openFamilyBulletin()">✈️ Family Chat <span id="chat-unread-badge" class="chat-unread-badge">NEW</span></div>
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.9.0</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.9.1</div>
       </div>
     </div>
     <div id="message-ticker-bar" class="message-ticker-bar" onclick="openFamilyBulletin()">
@@ -265,7 +265,7 @@
     <button class="cancel-btn" style="font-size:1.4rem;padding:12px 32px;" onclick="endCall()">✖ Decline</button>
   </div>
 
-  <!-- Remote Family Settings Modal (Populated dynamically by app.js) -->
+  <!-- Remote Family Settings Modal -->
   <div id="settings-modal">
     <h2 style="font-size:1.7rem;color:#fef08a;margin:0 0 4px 0;">⚙️ Remote Tablet Controls</h2>
     <p style="font-size:0.95rem;color:#cbd5e1;margin:0 0 8px 0;">All changes apply immediately to Nana's tablet over Firebase.</p>
@@ -276,13 +276,16 @@
     <button class="cancel-btn" style="background:#22c55e;color:#000;padding:12px 40px;font-size:1.4rem;" onclick="closeSettingsModal()">✔ Done</button>
   </div>
 
+  <!-- Secure Auth Error Screen (No hardcoded secret in HTML!) -->
   <div id="auth-error-screen" class="screen" style="background:#450a0a;justify-content:center;gap:18px;">
-    <h1 style="font-size:2.4rem;margin:0;">Portal Locked</h1>
-    <p style="margin:0;">Please launch using your designated access link.</p>
-    <p style="opacity:0.8;margin:0;">Reconnecting automatically...</p>
-    <button class="confirm-btn" style="background:#22c55e;color:#000;" onclick="localStorage.setItem('nana_service_token','Westerham8');window.location.reload(true);">🔄 Unlock & Reload Now</button>
+    <h1 style="font-size:2.4rem;margin:0;">🔒 Private Family Portal</h1>
+    <p style="margin:0;">Please open this page using your personal link from the Family Telegram Bot, or enter the family access key below:</p>
+    <div style="display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:8px;">
+      <input id="manual-key-input" type="password" placeholder="Enter Family Key..." style="font-size:1.4rem;padding:12px 18px;border-radius:14px;border:3px solid #fef08a;background:#0f172a;color:#fff;text-align:center;user-select:text;-webkit-user-select:text;" />
+      <button class="confirm-btn" style="background:#22c55e;color:#000;font-size:1.4rem;padding:12px 24px;" onclick="submitManualKey()">🔓 Unlock</button>
+    </div>
   </div>
 
-  <script type="module" src="app.js?v=2.9.0"></script>
+  <script type="module" src="app.js?v=2.9.1"></script>
 </body>
 </html>
