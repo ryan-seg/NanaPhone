@@ -19,8 +19,8 @@ const $ = (id) => document.getElementById(id);
 window.__nanaAppLoaded = true;
 
 // --- ZERO-KNOWLEDGE SHA-256 VERIFICATION (No Plaintext Secrets in Repo) ---
-const EXPECTED_KEY_HASH = "d497b848f0915364d299c002495232b7c32a9992023309d31100fb56267b604e"; // SHA-256("nana-v2-salt:" + familySecret)
-const EXPECTED_PIN_HASH = "b3560b47fb827ce8f069b2f7bc40fa9db204d9e898c0bb7bc7875fa6e73fa2e0"; // SHA-256("nana-pin-salt:" + adminPin)
+const EXPECTED_KEY_HASH = "6b1b29f5d03d71ed2fdef0b65a19d5a7230f5e6684b7a13d33ef7e50ff55f93e"; // SHA-256("nana-v2-salt:" + familySecret)
+const EXPECTED_PIN_HASH = "21c6f9835cd57d3477b314cc62426c063918538b8c0317e620bb62f9e6832373"; // SHA-256("nana-pin-salt:" + adminPin)
 
 async function sha256Hex(str) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
