@@ -43,6 +43,19 @@ async function sha256Hex(str) {
 
   const styleEl = document.createElement('style');
   styleEl.textContent = `
+    /* Fix "🔽 View Messages" button text fitting on Nana's onscreen keyboard */
+    #senior-onscreen-keyboard .kb-bottom-bar {
+      grid-template-columns: 2.7fr 3.9fr 2.4fr !important;
+    }
+    #senior-onscreen-keyboard .kb-bottom-bar > button:first-child {
+      font-size: clamp(1.1rem, 2vw, 1.48rem) !important;
+      white-space: nowrap !important;
+      padding: 0 10px !important;
+      letter-spacing: -0.02em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     #video-screen { justify-content:space-between; padding:68px 18px 16px 18px; gap:10px; }
     .nana-top-nav { width:100%; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-shrink:0; flex-wrap:wrap; }
     .nana-nav-pills { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -68,9 +81,53 @@ async function sha256Hex(str) {
     .q-giant-choice:active { transform:scale(0.96); }
     .q-yes-btn { background:#22c55e; color:#000; }
     .q-no-btn { background:#ef4444; color:#fff; }
+
+    /* Tidy Tabbed Family Screen Layout */
+    #family-screen { padding: 12px 12px 28px 12px !important; gap: 8px !important; }
+    .fam-tabs-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      width: 92vw;
+      max-width: 540px;
+      background: #0f172a;
+      padding: 5px;
+      border-radius: 16px;
+      border: 2px solid #334155;
+      flex-shrink: 0;
+    }
+    .fam-tab-btn {
+      background: transparent;
+      color: #94a3b8;
+      border: 2px solid transparent;
+      border-radius: 11px;
+      padding: 8px 4px;
+      font-size: 0.86rem;
+      font-weight: 900;
+      cursor: pointer;
+      text-align: center;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .fam-tab-btn.active {
+      background: #1e293b;
+      color: #fef08a;
+      border-color: #38bdf8;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .fam-tab-pane {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 92vw;
+      max-width: 540px;
+    }
+    .fam-tab-pane.active { display: flex; }
+
     .family-input-box { width:100%; padding:9px 12px; border-radius:12px; border:2px solid #38bdf8; background:#0f172a; color:#fff; font-size:0.94rem; font-weight:700; margin-bottom:6px; user-select:text; -webkit-user-select:text; }
     .family-input-box.editing-active { border-color:#facc15; background:#1e1b4b; }
-    .fam-queue-list { display:flex; flex-direction:column; gap:6px; max-height:240px; overflow-y:auto; margin:8px 0; }
+    .fam-queue-list { display:flex; flex-direction:column; gap:6px; max-height:210px; overflow-y:auto; margin:6px 0; width:100%; }
     .fam-queue-item { display:flex; align-items:center; justify-content:space-between; gap:6px; background:#0f172a; border:2px solid #334155; border-radius:12px; padding:7px 10px; font-size:0.86rem; }
     .fam-queue-item.active-q { border-color:#22c55e; background:rgba(6,78,59,0.55); box-shadow:0 0 10px rgba(34,197,94,0.35); }
     .fam-queue-item.editing-q { border-color:#facc15; background:rgba(120,53,15,0.45); }
@@ -82,6 +139,18 @@ async function sha256Hex(str) {
     .diag-alert-box { margin:4px 0; padding:6px 10px; border-radius:10px; font-size:0.88rem; font-weight:800; line-height:1.35; }
     .diag-alert-offline { background:#450a0a; border:2px solid #f87171; color:#fef08a; }
     .diag-alert-warn { background:#422006; border:2px solid #facc15; color:#fef08a; }
+    .admin-drawer-toggle {
+      width: 100%;
+      background: #0f172a;
+      color: #7dd3fc;
+      border: 2px dashed #38bdf8;
+      border-radius: 12px;
+      padding: 7px 10px;
+      font-size: 0.85rem;
+      font-weight: 800;
+      cursor: pointer;
+      margin-bottom: 6px;
+    }
   `;
   document.head.appendChild(styleEl);
 
@@ -175,20 +244,32 @@ async function sha256Hex(str) {
   `;
   document.body.appendChild(qModal);
 
+  // --- REORGANIZE FAMILY SCREEN INTO CLEAN TABS ---
   const famScreen = $('family-screen');
   if (famScreen) {
+    // Grab existing elements from index.html so we preserve all IDs and handlers
+    const hideCard = $('hide-me-card');
+    const hoursCard = $('call-hours-card');
+    const allCards = Array.from(famScreen.querySelectorAll('.settings-card'));
+    const radioCard = allCards.find(c => c.id !== 'hide-me-card' && c.id !== 'call-hours-card');
+    const bottomRows = Array.from(famScreen.children).filter(el => el.tagName === 'DIV' && !el.id && !el.classList.contains('settings-card') && el !== famScreen.firstElementChild);
+    const chatAndControlsRow = bottomRows[0]; // Contains Family Chat + ⚙️ Controls
+    const tgAndGuideRow = bottomRows[1];      // Contains 1. Connect Telegram + 2. Ringtone Guide
+
+    // Build Question Card
     const qCard = document.createElement('div');
     qCard.className = 'settings-card';
-    qCard.style.cssText = 'width:92vw;max-width:540px;margin-bottom:2px;padding:10px 12px;';
+    qCard.style.cssText = 'width:100%;margin-bottom:0;padding:12px;';
     qCard.innerHTML = `
       <div class="settings-label" style="font-size:1.02rem;">
         <span>❓ Pop-Up Yes/No Question on Nana's Screen</span>
-        <span id="fam-q-status" style="font-size:0.88rem;color:#38bdf8;">Idle</span>
+        <span id="fam-q-status" style="font-size:0.85rem;color:#38bdf8;">Idle</span>
       </div>
+      <div class="settings-sub" style="margin-bottom:8px;">Pops up a giant Yes/No question on Nana's screen and posts her answer to Family Chat.</div>
       <input id="fam-q-input" class="family-input-box" type="text" placeholder="Type a Yes/No question for Nana..." />
-      <div class="opt-row" style="margin-bottom:6px;">
-        <button id="btn-q-voice-loud" class="opt-btn selected" style="padding:6px 8px;font-size:0.86rem;" onclick="setFamilyQuestionSilentMode(false)">🔊 Read Question Aloud</button>
-        <button id="btn-q-voice-silent" class="opt-btn" style="padding:6px 8px;font-size:0.86rem;" onclick="setFamilyQuestionSilentMode(true)">🔇 Silent Pop-Up Only</button>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <button id="btn-q-voice-loud" class="opt-btn selected" style="padding:7px 8px;font-size:0.86rem;" onclick="setFamilyQuestionSilentMode(false)">🔊 Read Aloud</button>
+        <button id="btn-q-voice-silent" class="opt-btn" style="padding:7px 8px;font-size:0.86rem;" onclick="setFamilyQuestionSilentMode(true)">🔇 Silent Pop-Up</button>
       </div>
       <div class="opt-row">
         <button class="opt-btn" style="background:#059669;border-color:#4ade80;color:#fff;" onclick="sendQuestionToNana()">📤 Send Pop-Up</button>
@@ -196,8 +277,10 @@ async function sha256Hex(str) {
       </div>
     `;
 
+    // Build Video Queue Card (with collapsible drawer for Admin add/edit/sort)
     const adminEditorHtml = isAdminFamily ? `
-      <div id="fam-admin-video-editor">
+      <button id="btn-toggle-admin-drawer" class="admin-drawer-toggle" onclick="toggleAdminVideoDrawer()">➕ Add / Edit Video Links & Sort Queue ▾</button>
+      <div id="fam-admin-video-editor" style="display:none;background:#090d16;border:1px solid #334155;border-radius:12px;padding:8px;margin-bottom:6px;">
         <input id="fam-vid-title" class="family-input-box" type="text" placeholder="Video Title (e.g. Judge John Deed - Ep 1)" />
         <input id="fam-vid-url" class="family-input-box" type="url" placeholder="Video URL (https://server/video.mkv or .mp4)" />
         <input id="fam-vid-sub" class="family-input-box" type="url" placeholder="Optional Subtitles URL (.vtt or .srt)" />
@@ -209,7 +292,7 @@ async function sha256Hex(str) {
           <button class="opt-btn" style="background:#d97706;border-color:#fef08a;color:#000;" onclick="saveEditedQueueItem()">💾 Save Changes</button>
           <button class="opt-btn" style="background:#334155;border-color:#94a3b8;color:#fff;flex:0.45;" onclick="cancelEditQueueItem()">✖ Cancel</button>
         </div>
-        <div class="opt-row" style="margin-bottom:6px;">
+        <div class="opt-row">
           <button class="opt-btn" style="padding:5px 4px;font-size:0.78rem;" onclick="sortVideoQueue('alpha_asc')">🔤 A–Z</button>
           <button class="opt-btn" style="padding:5px 4px;font-size:0.78rem;" onclick="sortVideoQueue('alpha_desc')">🔤 Z–A</button>
           <button class="opt-btn" style="padding:5px 4px;font-size:0.78rem;" onclick="sortVideoQueue('views_asc')">👁️ Views ↑</button>
@@ -220,16 +303,13 @@ async function sha256Hex(str) {
 
     const vCard = document.createElement('div');
     vCard.className = 'settings-card';
-    vCard.style.cssText = 'width:92vw;max-width:540px;margin-bottom:2px;padding:10px 12px;';
+    vCard.style.cssText = 'width:100%;margin-bottom:0;padding:10px 12px;';
     vCard.innerHTML = `
       <div class="settings-label" style="font-size:1.02rem;">
         <span id="fam-vid-form-heading">🎬 Video Queue on Nana's Tablet</span>
         <span id="fam-vid-status" style="font-size:0.85rem;color:#4ade80;">Stopped</span>
       </div>
       ${adminEditorHtml}
-      <div class="settings-sub" style="margin:2px 0;font-size:0.8rem;">
-        ${isAdminFamily ? 'Tap ▶️ to play, 🎯 to cue, ✏️ to edit, or sort/reorder above:' : 'Tap ▶️ next to any video below to play it on Nana\'s tablet:'}
-      </div>
       <div id="fam-queue-container" class="fam-queue-list"></div>
       <div class="opt-row">
         <button class="opt-btn" style="background:#334155;border-color:#94a3b8;color:#fff;flex:0.6;" onclick="remoteCommandVideo('prev')">⏮️ Prev</button>
@@ -239,10 +319,78 @@ async function sha256Hex(str) {
       </div>
     `;
 
-    const anchor = famScreen.children[famScreen.children.length - 2];
-    famScreen.insertBefore(qCard, anchor);
-    famScreen.insertBefore(vCard, anchor);
+    // Keep Family Chat & Admin Controls pinned right below the Ring Nana button
+    if (chatAndControlsRow) {
+      famScreen.insertBefore(chatAndControlsRow, hideCard || null);
+    }
+
+    // Create the 3-Tab Navigation Bar & Panes
+    const tabsBar = document.createElement('div');
+    tabsBar.className = 'fam-tabs-bar';
+    tabsBar.innerHTML = `
+      <button id="fam-tab-btn-media" class="fam-tab-btn active" onclick="switchFamilyPortalTab('media')">🎬 Media & Radio</button>
+      <button id="fam-tab-btn-ask" class="fam-tab-btn" onclick="switchFamilyPortalTab('ask')">❓ Ask Nana</button>
+      <button id="fam-tab-btn-avail" class="fam-tab-btn" onclick="switchFamilyPortalTab('avail')">⏰ Availability</button>
+    `;
+
+    const paneMedia = document.createElement('div');
+    paneMedia.id = 'fam-pane-media';
+    paneMedia.className = 'fam-tab-pane active';
+    paneMedia.appendChild(vCard);
+    if (radioCard) {
+      radioCard.style.width = '100%';
+      radioCard.style.marginBottom = '0';
+      paneMedia.appendChild(radioCard);
+    }
+
+    const paneAsk = document.createElement('div');
+    paneAsk.id = 'fam-pane-ask';
+    paneAsk.className = 'fam-tab-pane';
+    paneAsk.appendChild(qCard);
+
+    const paneAvail = document.createElement('div');
+    paneAvail.id = 'fam-pane-avail';
+    paneAvail.className = 'fam-tab-pane';
+    if (hideCard) {
+      hideCard.style.width = '100%';
+      hideCard.style.marginBottom = '0';
+      paneAvail.appendChild(hideCard);
+    }
+    if (hoursCard) {
+      hoursCard.style.width = '100%';
+      hoursCard.style.marginBottom = '0';
+      paneAvail.appendChild(hoursCard);
+    }
+    if (tgAndGuideRow) {
+      tgAndGuideRow.style.width = '100%';
+      paneAvail.appendChild(tgAndGuideRow);
+    }
+
+    famScreen.appendChild(tabsBar);
+    famScreen.appendChild(paneMedia);
+    famScreen.appendChild(paneAsk);
+    famScreen.appendChild(paneAvail);
   }
+
+  window.switchFamilyPortalTab = (tab) => {
+    ['media', 'ask', 'avail'].forEach(t => {
+      $(`fam-tab-btn-${t}`)?.classList.toggle('active', t === tab);
+      $(`fam-pane-${t}`)?.classList.toggle('active', t === tab);
+    });
+  };
+
+  window.toggleAdminVideoDrawer = (forceOpen = null) => {
+    const drawer = $('fam-admin-video-editor');
+    const btn = $('btn-toggle-admin-drawer');
+    if (!drawer) return;
+    const nextOpen = forceOpen !== null ? forceOpen : (drawer.style.display === 'none');
+    drawer.style.display = nextOpen ? 'block' : 'none';
+    if (btn) {
+      btn.innerText = nextOpen
+        ? '🔼 Hide Add / Edit & Sort Controls'
+        : '➕ Add / Edit Video Links & Sort Queue ▾';
+    }
+  };
 
   // --- INJECT PERIODIC POP-UP TIMING SETTINGS INTO SHARED SETTINGS MODAL ---
   const sharedSettingsMount = $('shared-settings-cards');
@@ -302,7 +450,6 @@ async function sha256Hex(str) {
   let lastLoadedVideoUrl = "", lastLoadedSubUrl = "", activeSubBlobUrl = null;
   let lastSavedTimeSec = 0, activeQuestionData = null, screenWakeLock = null;
 
-  // Timestamps to pace periodic prompts on Nana's tablet
   let lastActivityOrCallMs = Date.now();
   let lastUnreadChatPromptMs = Date.now();
   let lastIdleRadioPromptMs = Date.now();
@@ -685,14 +832,12 @@ async function sha256Hex(str) {
     if ($('confirm-modal')?.style.display === 'flex') return;
 
     const now = Date.now();
-    // Minimum 2-minute cooldown between any automated prompts
     if (now - lastAnyPeriodicPromptMs < 120000) return;
 
     const chatOpen = $('bulletin-modal')?.style.display === 'flex';
     const radioOpenOrPlaying = $('radio-screen')?.classList.contains('active') || (latestEntSnap?.activeKey && latestEntSnap.activeKey !== 'off');
     const videoPlaying = isNanaVideoActivelyPlaying();
 
-    // 1. Unread Family Chat Prompt
     const unreadMin = Number(periodicConfig.unreadChatPopupMin ?? 30);
     if (unreadMin > 0 && !chatOpen && !videoPlaying && hasUnreadFamilyChatMessages()) {
       if (now - lastUnreadChatPromptMs >= unreadMin * 60000) {
@@ -712,11 +857,9 @@ async function sha256Hex(str) {
       }
     }
 
-    // Only trigger idle entertainment suggestions when Nana is not already watching a video, listening to radio, or in chat
     if (chatOpen || radioOpenOrPlaying || videoPlaying) return;
     const idleElapsedMs = now - lastActivityOrCallMs;
 
-    // 2. Idle Classic FM Prompt
     const radioMin = Number(periodicConfig.idleRadioPopupMin ?? 60);
     if (radioMin > 0 && idleElapsedMs >= radioMin * 60000 && (now - lastIdleRadioPromptMs >= radioMin * 60000)) {
       lastIdleRadioPromptMs = now;
@@ -734,7 +877,6 @@ async function sha256Hex(str) {
       return;
     }
 
-    // 3. Idle Judge John Deed Video Prompt
     const videoMin = Number(periodicConfig.idleVideoPopupMin ?? 90);
     if (videoMin > 0 && idleElapsedMs >= videoMin * 60000 && (now - lastIdleVideoPromptMs >= videoMin * 60000)) {
       lastIdleVideoPromptMs = now;
@@ -1018,6 +1160,7 @@ async function sha256Hex(str) {
   function setEditFormUI(isEditing, idx = null) {
     if (!isAdminFamily) return;
     editingQueueIndex = isEditing ? idx : null;
+    if (isEditing) window.toggleAdminVideoDrawer(true);
     if ($('fam-vid-add-row')) $('fam-vid-add-row').style.display = isEditing ? 'none' : 'flex';
     if ($('fam-vid-edit-row')) $('fam-vid-edit-row').style.display = isEditing ? 'flex' : 'none';
     if ($('fam-vid-form-heading')) {
@@ -1292,7 +1435,6 @@ async function sha256Hex(str) {
     const now = Date.now();
     await update(quickQuestionRef, { status: 'answered', answer: choice, answeredAt: now });
 
-    // 1. End-of-video next queue prompt
     if (qData.type === 'next_video_prompt') {
       const targetIdx = Number(qData.nextIndex) || 0;
       const nextItem = currentStreamData.queue?.[targetIdx];
@@ -1303,17 +1445,12 @@ async function sha256Hex(str) {
       return;
     }
 
-    // 2. Periodic Unread Family Chat Prompt
     if (qData.type === 'unread_chat_prompt') {
       lastUnreadChatPromptMs = now;
-      if (choice === 'YES') {
-        window.openFamilyBulletin?.();
-      }
-      // If NO: stay on current screen and leave messages unread
+      if (choice === 'YES') window.openFamilyBulletin?.();
       return;
     }
 
-    // 3. Periodic Idle Classic FM Prompt
     if (qData.type === 'idle_radio_prompt') {
       lastIdleRadioPromptMs = now;
       if (choice === 'YES') {
@@ -1323,7 +1460,6 @@ async function sha256Hex(str) {
       return;
     }
 
-    // 4. Periodic Idle Judge John Deed Video Prompt
     if (qData.type === 'idle_video_prompt') {
       lastIdleVideoPromptMs = now;
       if (choice === 'YES') {
@@ -1338,7 +1474,6 @@ async function sha256Hex(str) {
       return;
     }
 
-    // 5. Standard Family Question: post Nana's Yes/No response to Family Chat & Telegram
     const qText = qData.question || '', askedBy = qData.askedBy || 'Family';
     const replySummary = `${choice === 'YES' ? '✅ YES' : '✖ NO'} — (In reply to ${askedBy}: "${qText}")`;
     await push(bulletinRef, { author: 'Nana', fromNana: true, text: replySummary, timestamp: now, readByNanaAt: now });
