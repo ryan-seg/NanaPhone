@@ -38,7 +38,7 @@ async function sha256Hex(str) {
   const bulletinRef      = ref(db, `${basePath}/bulletin`);
   const presenceRef      = ref(db, `${basePath}/presence`);
 
-  // --- 1. INJECT STYLES FOR TOP BAR, VIDEO PLAYER, SUBTITLES & POPUP ---
+  // --- 1. INJECT STYLES FOR TOP BAR, VIDEO PLAYER, QUEUE REORDERING & POPUP ---
   const styleEl = document.createElement('style');
   styleEl.textContent = `
     #video-screen {
@@ -142,7 +142,7 @@ async function sha256Hex(str) {
       flex-wrap: wrap;
     }
 
-    /* Yes / No Popup Modal on Nana's Screen */
+    /* Yes / No Popup Modal on Nana's Screen (z-index 142 so #brightness-overlay at 145 dims over it when idle) */
     #nana-question-modal {
       display: none;
       position: fixed;
@@ -226,7 +226,7 @@ async function sha256Hex(str) {
       display: flex;
       flex-direction: column;
       gap: 6px;
-      max-height: 190px;
+      max-height: 230px;
       overflow-y: auto;
       margin: 8px 0;
     }
@@ -234,16 +234,17 @@ async function sha256Hex(str) {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
+      gap: 6px;
       background: #0f172a;
       border: 2px solid #334155;
       border-radius: 12px;
       padding: 7px 10px;
-      font-size: 0.88rem;
+      font-size: 0.86rem;
     }
     .fam-queue-item.active-q {
       border-color: #22c55e;
-      background: rgba(6, 78, 59, 0.45);
+      background: rgba(6, 78, 59, 0.55);
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.35);
     }
     .fam-q-title {
       flex: 1;
@@ -253,16 +254,31 @@ async function sha256Hex(str) {
       text-overflow: ellipsis;
       white-space: nowrap;
       text-align: left;
+      cursor: pointer;
+    }
+    .fam-q-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 900;
+      margin-right: 5px;
+      background: #22c55e;
+      color: #000;
     }
     .fam-q-mini-btn {
       background: #1e293b;
       color: #fff;
       border: 2px solid #64748b;
       border-radius: 8px;
-      padding: 4px 8px;
-      font-size: 0.8rem;
+      padding: 4px 7px;
+      font-size: 0.78rem;
       font-weight: 800;
       cursor: pointer;
+    }
+    .fam-q-mini-btn:disabled {
+      opacity: 0.35;
+      cursor: default;
     }
   `;
   document.head.appendChild(styleEl);
@@ -364,7 +380,7 @@ async function sha256Hex(str) {
   `;
   document.body.appendChild(qModal);
 
-  // --- 4. INJECT FAMILY REMOTE CONTROLS (YES/NO QUESTION + VIDEO QUEUE & SUBTITLES) ---
+  // --- 4. INJECT FAMILY REMOTE CONTROLS & GLOBAL VOICE SETTING ---
   const famScreen = $('family-screen');
   if (famScreen) {
     const qCard = document.createElement('div');
@@ -376,6 +392,10 @@ async function sha256Hex(str) {
         <span id="fam-q-status" style="font-size:0.88rem;color:#38bdf8;">Idle</span>
       </div>
       <input id="fam-q-input" class="family-input-box" type="text" placeholder="Type a Yes/No question for Nana..." />
+      <div class="opt-row" style="margin-bottom:6px;">
+        <button id="btn-q-voice-loud" class="opt-btn selected" style="padding:6px 8px;font-size:0.86rem;" onclick="setFamilyQuestionSilentMode(false)">🔊 Read Question Aloud</button>
+        <button id="btn-q-voice-silent" class="opt-btn" style="padding:6px 8px;font-size:0.86rem;" onclick="setFamilyQuestionSilentMode(true)">🔇 Silent Pop-Up Only</button>
+      </div>
       <div class="opt-row">
         <button class="opt-btn" style="background:#059669;border-color:#4ade80;color:#fff;" onclick="sendQuestionToNana()">📤 Send Pop-Up</button>
         <button class="opt-btn" style="background:#7f1d1d;border-color:#f87171;color:#fff;flex:0.45;" onclick="clearQuestionOnNana()">✖ Clear</button>
@@ -397,11 +417,13 @@ async function sha256Hex(str) {
         <button class="opt-btn" style="background:#0284c7;border-color:#7dd3fc;color:#fff;" onclick="addVideoToQueue(false)">➕ Add to Queue</button>
         <button class="opt-btn" style="background:#7c3aed;border-color:#c4b5fd;color:#fff;" onclick="addVideoToQueue(true)">▶️ Add & Play Now</button>
       </div>
+      <div class="settings-sub" style="margin:4px 0 2px 0;font-size:0.8rem;">Tap 🎯 to cue a video, ▶️ to play it immediately, or ⬆️/⬇️ to change play order:</div>
       <div id="fam-queue-container" class="fam-queue-list"></div>
       <div class="opt-row">
-        <button class="opt-btn" style="background:#059669;border-color:#4ade80;color:#fff;" onclick="remoteCommandVideo('play')">▶️ Stream Queue</button>
+        <button class="opt-btn" style="background:#334155;border-color:#94a3b8;color:#fff;flex:0.6;" onclick="remoteCommandVideo('prev')">⏮️ Prev</button>
+        <button class="opt-btn" style="background:#059669;border-color:#4ade80;color:#fff;" onclick="remoteCommandVideo('play')">▶️ Play Selected</button>
         <button class="opt-btn" style="background:#b45309;border-color:#fde047;color:#fff;" onclick="remoteCommandVideo('pause')">⏸️ Pause</button>
-        <button class="opt-btn" style="background:#334155;border-color:#94a3b8;color:#fff;" onclick="remoteCommandVideo('next')">⏭️ Next</button>
+        <button class="opt-btn" style="background:#334155;border-color:#94a3b8;color:#fff;flex:0.6;" onclick="remoteCommandVideo('next')">⏭️ Next</button>
       </div>
     `;
 
@@ -410,15 +432,103 @@ async function sha256Hex(str) {
     famScreen.insertBefore(vCard, anchor);
   }
 
-  // --- 5. QUEUE NORMALIZATION & SEPARATE VIDEO VOLUME ---
+  // Also add global Question Voice setting into the Shared Settings Modal
+  const sharedSettingsMount = $('shared-settings-cards');
+  if (sharedSettingsMount) {
+    const qSettingCard = document.createElement('div');
+    qSettingCard.className = 'settings-card';
+    qSettingCard.innerHTML = `
+      <div class="settings-label"><span>❓ Pop-Up Question & Video Prompt Voice</span></div>
+      <div class="settings-sub">Choose whether Yes/No pop-up questions and "Watch next video?" prompts are read out loud or shown silently.</div>
+      <div class="opt-row">
+        <button id="global-q-voice-on" class="opt-btn selected" onclick="setGlobalQuestionSpeak(true)">🔊 Read Questions Aloud</button>
+        <button id="global-q-voice-off" class="opt-btn" onclick="setGlobalQuestionSpeak(false)">🔇 Silent Pop-Ups Only</button>
+      </div>
+    `;
+    sharedSettingsMount.appendChild(qSettingCard);
+  }
+
+  // --- 5. QUEUE STATE, VOICE PREFERENCES & ANTI-DIMMING / PAUSE-DIMMING ENGINE ---
   const videoEl = $('nana-video-el');
   let videoVolume = 80;
+  let speakQuestionsDefault = true;
+  let familyComposerSilent = false;
   let currentStreamData = { queue: [], currentIndex: 0, state: "paused", savedTimes: {} };
   let lastLoadedVideoUrl = "";
   let lastLoadedSubUrl = "";
   let activeSubBlobUrl = null;
   let lastSavedTimeSec = 0;
   let activeQuestionData = null;
+  let screenWakeLock = null;
+
+  function isNanaVideoActivelyPlaying() {
+    return !!(
+      role === 'nana' &&
+      videoEl &&
+      !videoEl.paused &&
+      !videoEl.ended &&
+      $('video-screen')?.classList.contains('active')
+    );
+  }
+
+  async function requestVideoWakeLock() {
+    if (role !== 'nana' || !('wakeLock' in navigator)) return;
+    try {
+      if (!screenWakeLock) {
+        screenWakeLock = await navigator.wakeLock.request('screen');
+        screenWakeLock.addEventListener('release', () => { screenWakeLock = null; });
+      }
+    } catch (_) {}
+  }
+
+  function releaseVideoWakeLock() {
+    if (screenWakeLock) {
+      screenWakeLock.release().catch(() => {});
+      screenWakeLock = null;
+    }
+  }
+
+  // While video is actively playing: prevent any dimming.
+  // When video is paused (or question popup is open): release hold so normal dimDelaySec dims the screen.
+  const origWakeFn = window.wakeScreenAndResetDimTimer;
+  function keepScreenAwakeIfPlayingVideo() {
+    if (!isNanaVideoActivelyPlaying()) return;
+    const overlay = $('brightness-overlay');
+    if (overlay) {
+      overlay.style.opacity = '0';
+      overlay.style.pointerEvents = 'none';
+    }
+    if ($('night-dimmer') && $('night-dimmer').style.display !== 'none') {
+      window.wakeFromNightMode?.();
+    }
+    origWakeFn?.();
+  }
+
+  function startNormalDimCountdownOnPause() {
+    releaseVideoWakeLock();
+    // Calling origWakeFn when video is paused arms the idleDimTimer for dimDelaySec
+    origWakeFn?.();
+  }
+
+  setInterval(() => {
+    if (isNanaVideoActivelyPlaying()) {
+      keepScreenAwakeIfPlayingVideo();
+    }
+  }, 5000);
+
+  window.setFamilyQuestionSilentMode = (silent) => {
+    familyComposerSilent = !!silent;
+    $('btn-q-voice-loud')?.classList.toggle('selected', !familyComposerSilent);
+    $('btn-q-voice-silent')?.classList.toggle('selected', familyComposerSilent);
+  };
+
+  window.setGlobalQuestionSpeak = async (speakOn) => {
+    speakQuestionsDefault = !!speakOn;
+    window.setFamilyQuestionSilentMode(!speakQuestionsDefault);
+    $('global-q-voice-on')?.classList.toggle('selected', speakQuestionsDefault);
+    $('global-q-voice-off')?.classList.toggle('selected', !speakQuestionsDefault);
+    await update(settingsRef, { speakQuestions: speakQuestionsDefault });
+  };
 
   function normalizeStreamData(raw) {
     const d = raw || {};
@@ -428,12 +538,16 @@ async function sha256Hex(str) {
     } else if (d.queue && typeof d.queue === 'object') {
       queue = Object.values(d.queue).filter(Boolean);
     } else if (d.url) {
-      // Backwards compatibility if a single url was saved previously
       queue = [{ id: 'v_legacy', url: d.url, title: d.title || 'Family Video', subtitleUrl: d.subtitleUrl || '' }];
     }
+    queue = queue.map((item, idx) => ({
+      id: item.id || `vid_item_${idx}`,
+      title: item.title || `Video ${idx + 1}`,
+      url: item.url || '',
+      subtitleUrl: item.subtitleUrl || ''
+    }));
     const currentIndex = queue.length ? Math.max(0, Math.min(queue.length - 1, Number(d.currentIndex) || 0)) : 0;
     const savedTimes = (d.savedTimes && typeof d.savedTimes === 'object') ? { ...d.savedTimes } : {};
-    if (d.url && d.savedTime && savedTimes[0] === undefined) savedTimes[0] = Number(d.savedTime) || 0;
     return {
       queue,
       currentIndex,
@@ -446,6 +560,14 @@ async function sha256Hex(str) {
     if (!data.queue || !data.queue.length) return null;
     const idx = Math.max(0, Math.min(data.queue.length - 1, Number(data.currentIndex) || 0));
     return { item: data.queue[idx], index: idx, total: data.queue.length };
+  }
+
+  // Key saved time by item.id (with fallback to index) so reordering the queue preserves each video's timestamp
+  function getSavedTimeForItem(item, idx, data = currentStreamData) {
+    if (!item) return 0;
+    const localSec = item.url ? Number(localStorage.getItem(`nana_vid_pos_${item.url}`) || 0) : 0;
+    const byId = Number(data.savedTimes?.[item.id] ?? data.savedTimes?.[idx] ?? 0);
+    return Math.max(localSec, byId);
   }
 
   function applyVideoVolume(volPct) {
@@ -465,7 +587,14 @@ async function sha256Hex(str) {
 
   onValue(settingsRef, snap => {
     const s = snap.val();
-    if (s && s.videoVolume !== undefined) applyVideoVolume(s.videoVolume);
+    if (!s) return;
+    if (s.videoVolume !== undefined) applyVideoVolume(s.videoVolume);
+    if (s.speakQuestions !== undefined) {
+      speakQuestionsDefault = !!s.speakQuestions;
+      $('global-q-voice-on')?.classList.toggle('selected', speakQuestionsDefault);
+      $('global-q-voice-off')?.classList.toggle('selected', !speakQuestionsDefault);
+      window.setFamilyQuestionSilentMode(!speakQuestionsDefault);
+    }
   });
 
   // --- 6. SUBTITLE LOADER (SUPPORTS BOTH .VTT AND AUTOMATIC .SRT CONVERSION) ---
@@ -486,7 +615,6 @@ async function sha256Hex(str) {
       const res = await fetch(subUrl);
       if (res.ok) {
         let text = await res.text();
-        // Automatically convert .srt timestamps (00:01:20,000) to WebVTT (00:01:20.000)
         if (!text.trim().startsWith('WEBVTT')) {
           text = 'WEBVTT\n\n' + text
             .replace(/\r\n/g, '\n')
@@ -496,7 +624,6 @@ async function sha256Hex(str) {
         trackSrc = activeSubBlobUrl;
       }
     } catch (_) {
-      // Fallback to direct track URL if CORS blocks fetch
       trackSrc = subUrl;
     }
 
@@ -546,12 +673,6 @@ async function sha256Hex(str) {
   };
 
   // --- 8. VIDEO PLAYER ENGINE (QUEUE PLAYBACK, MEMORY & SINGLE-TAP PAUSE) ---
-  function getRememberedTimeForIndex(index, url) {
-    const localSec = url ? Number(localStorage.getItem(`nana_vid_pos_${url}`) || 0) : 0;
-    const remoteSec = Number(currentStreamData.savedTimes?.[index] || 0);
-    return Math.max(localSec, remoteSec);
-  }
-
   function saveCurrentVideoTime(force = false) {
     const curItem = getCurrentQueueItem();
     if (!videoEl || !curItem) return;
@@ -560,10 +681,10 @@ async function sha256Hex(str) {
       lastSavedTimeSec = cur;
       localStorage.setItem(`nana_vid_pos_${curItem.item.url}`, String(cur));
       if (!currentStreamData.savedTimes) currentStreamData.savedTimes = {};
-      currentStreamData.savedTimes[curItem.index] = cur;
+      currentStreamData.savedTimes[curItem.item.id] = cur;
       if (role === 'nana') {
         update(videoStreamRef, {
-          [`savedTimes/${curItem.index}`]: cur,
+          [`savedTimes/${curItem.item.id}`]: cur,
           updatedAt: Date.now()
         }).catch(() => {});
       }
@@ -594,7 +715,7 @@ async function sha256Hex(str) {
       overlay?.classList.add('playing-hidden');
     } else {
       overlay?.classList.remove('playing-hidden');
-      const rem = getRememberedTimeForIndex(curItem.index, curItem.item.url);
+      const rem = getSavedTimeForItem(curItem.item, curItem.index);
       const mins = Math.floor(rem / 60), secs = String(rem % 60).padStart(2, '0');
       if (icon) icon.innerText = '⏸️';
       if (main) {
@@ -613,15 +734,20 @@ async function sha256Hex(str) {
   }
 
   function pauseVideoAndSavePosition(reason = 'manual') {
-    if (!videoEl || videoEl.paused) return;
+    if (!videoEl || videoEl.paused) {
+      startNormalDimCountdownOnPause();
+      return;
+    }
     saveCurrentVideoTime(true);
     videoEl.pause();
     syncVideoUI();
+    // Ensure normal idle dimming timer starts whenever the video is paused
+    startNormalDimCountdownOnPause();
     const curItem = getCurrentQueueItem();
     if (role === 'nana' && curItem) {
       update(videoStreamRef, {
         state: 'paused',
-        [`savedTimes/${curItem.index}`]: Math.floor(videoEl.currentTime || 0),
+        [`savedTimes/${curItem.item.id}`]: Math.floor(videoEl.currentTime || 0),
         pauseReason: reason,
         updatedAt: Date.now()
       }).catch(() => {});
@@ -641,7 +767,7 @@ async function sha256Hex(str) {
     }
     await attachSubtitleTrack(item.subtitleUrl || '');
 
-    const targetResume = getRememberedTimeForIndex(index, item.url);
+    const targetResume = getSavedTimeForItem(item, index);
     const playNow = () => {
       if (targetResume > 2 && Math.abs((videoEl.currentTime || 0) - targetResume) > 3) {
         try { videoEl.currentTime = targetResume; } catch (_) {}
@@ -651,16 +777,21 @@ async function sha256Hex(str) {
       }
       applyVideoVolume(videoVolume);
       videoEl.play().then(() => {
+        requestVideoWakeLock();
+        keepScreenAwakeIfPlayingVideo();
         syncVideoUI();
         if (role === 'nana') {
           update(videoStreamRef, {
             state: 'playing',
             currentIndex: index,
-            [`savedTimes/${index}`]: Math.floor(videoEl.currentTime || targetResume || 0),
+            [`savedTimes/${item.id}`]: Math.floor(videoEl.currentTime || targetResume || 0),
             updatedAt: Date.now()
           }).catch(() => {});
         }
-      }).catch(() => syncVideoUI());
+      }).catch(() => {
+        syncVideoUI();
+        startNormalDimCountdownOnPause();
+      });
     };
 
     if (videoEl.readyState >= 1) playNow();
@@ -686,29 +817,29 @@ async function sha256Hex(str) {
     const curItem = getCurrentQueueItem();
     if (!videoEl || !curItem) return;
     localStorage.setItem(`nana_vid_pos_${curItem.item.url}`, '0');
-    if (currentStreamData.savedTimes) currentStreamData.savedTimes[curItem.index] = 0;
+    if (currentStreamData.savedTimes) currentStreamData.savedTimes[curItem.item.id] = 0;
     try { videoEl.currentTime = 0; } catch (_) {}
     startOrResumeVideo();
   };
 
   // --- 9. END-OF-VIDEO PROMPT: ASK NANA IF SHE WANTS THE NEXT VIDEO (WITH LOOPING) ---
   async function handleVideoEndedOnNana() {
+    startNormalDimCountdownOnPause();
     const curItem = getCurrentQueueItem();
     if (!curItem) return;
 
-    // Reset finished video's saved position back to 0 so future loops start from the beginning
     localStorage.setItem(`nana_vid_pos_${curItem.item.url}`, '0');
-    if (currentStreamData.savedTimes) currentStreamData.savedTimes[curItem.index] = 0;
+    if (currentStreamData.savedTimes) currentStreamData.savedTimes[curItem.item.id] = 0;
 
-    // Compute next index (loops back to 0 when reaching the end of the queue)
+    // Loop back to 0 when reaching the end of the queue
     const nextIndex = (curItem.index + 1) % curItem.total;
     const nextItem = currentStreamData.queue[nextIndex];
     localStorage.setItem(`nana_vid_pos_${nextItem.url}`, '0');
 
     await update(videoStreamRef, {
       state: 'paused',
-      [`savedTimes/${curItem.index}`]: 0,
-      [`savedTimes/${nextIndex}`]: 0,
+      [`savedTimes/${curItem.item.id}`]: 0,
+      [`savedTimes/${nextItem.id}`]: 0,
       updatedAt: Date.now()
     }).catch(() => {});
 
@@ -725,6 +856,7 @@ async function sha256Hex(str) {
       nextIndex,
       question: promptText,
       askedBy: 'Video Player',
+      silent: !speakQuestionsDefault,
       status: 'pending',
       answer: null,
       askedAt: Date.now()
@@ -732,22 +864,26 @@ async function sha256Hex(str) {
   }
 
   if (videoEl) {
-    videoEl.addEventListener('timeupdate', () => saveCurrentVideoTime(false));
-    videoEl.addEventListener('pause', () => syncVideoUI());
-    videoEl.addEventListener('play', () => syncVideoUI());
+    videoEl.addEventListener('timeupdate', () => {
+      saveCurrentVideoTime(false);
+      keepScreenAwakeIfPlayingVideo();
+    });
+    videoEl.addEventListener('pause', () => {
+      syncVideoUI();
+      // Start normal idle dimming countdown whenever video is paused
+      startNormalDimCountdownOnPause();
+    });
+    videoEl.addEventListener('play', () => {
+      requestVideoWakeLock();
+      keepScreenAwakeIfPlayingVideo();
+      syncVideoUI();
+    });
     videoEl.addEventListener('ended', () => {
       if (role === 'nana') handleVideoEndedOnNana();
     });
   }
 
-  // Keep screen awake while video is playing
-  setInterval(() => {
-    if (role === 'nana' && videoEl && !videoEl.paused) {
-      window.wakeScreenAndResetDimTimer?.();
-    }
-  }, 15000);
-
-  // --- 10. FAMILY QUEUE MANAGEMENT UI & CONTROLS ---
+  // --- 10. FAMILY QUEUE LOG: SELECT ACTIVE VIDEO & REORDER QUEUE (UP / DOWN) ---
   function renderFamilyQueueUI() {
     const box = $('fam-queue-container');
     if (!box) return;
@@ -759,17 +895,22 @@ async function sha256Hex(str) {
     }
     q.forEach((item, idx) => {
       const isCur = idx === currentStreamData.currentIndex;
-      const savedSec = Number(currentStreamData.savedTimes?.[idx] || 0);
+      const isPlayingNow = isCur && currentStreamData.state === 'playing';
+      const savedSec = getSavedTimeForItem(item, idx);
       const timeTag = savedSec > 0 ? ` (${Math.floor(savedSec / 60)}:${String(savedSec % 60).padStart(2, '0')})` : '';
       const row = document.createElement('div');
       row.className = `fam-queue-item${isCur ? ' active-q' : ''}`;
       row.innerHTML = `
-        <div class="fam-q-title">
-          ${isCur ? '▶️ ' : `${idx + 1}. `}${item.title || 'Video'}${item.subtitleUrl ? ' 💬' : ''}${timeTag}
+        <div class="fam-q-title" title="Tap to select or play" onclick="selectQueueIndex(${idx}, false)">
+          ${isCur ? `<span class="fam-q-badge">${isPlayingNow ? 'PLAYING' : 'SELECTED'}</span>` : `<strong>${idx + 1}.</strong> `}
+          ${item.title || 'Video'}${item.subtitleUrl ? ' 💬' : ''}${timeTag}
         </div>
-        <div style="display:flex;gap:4px;">
-          <button class="fam-q-mini-btn" style="background:#059669;border-color:#4ade80;" onclick="playQueueIndex(${idx})">▶️</button>
-          <button class="fam-q-mini-btn" style="background:#7f1d1d;border-color:#f87171;" onclick="removeQueueIndex(${idx})">🗑️</button>
+        <div style="display:flex;gap:4px;flex-shrink:0;">
+          <button class="fam-q-mini-btn" title="Move Up in Queue" ${idx === 0 ? 'disabled' : ''} onclick="moveQueueItem(${idx}, -1)">⬆️</button>
+          <button class="fam-q-mini-btn" title="Move Down in Queue" ${idx === q.length - 1 ? 'disabled' : ''} onclick="moveQueueItem(${idx}, 1)">⬇️</button>
+          <button class="fam-q-mini-btn" title="Cue / Select Without Playing" style="background:#0284c7;border-color:#7dd3fc;" onclick="selectQueueIndex(${idx}, false)">🎯</button>
+          <button class="fam-q-mini-btn" title="Play This Video Now on Nana's Tablet" style="background:#059669;border-color:#4ade80;" onclick="selectQueueIndex(${idx}, true)">▶️</button>
+          <button class="fam-q-mini-btn" title="Remove from Queue" style="background:#7f1d1d;border-color:#f87171;" onclick="removeQueueIndex(${idx})">🗑️</button>
         </div>
       `;
       box.appendChild(row);
@@ -785,7 +926,7 @@ async function sha256Hex(str) {
     const q = [...(currentStreamData.queue || [])];
     const title = rawTitle || `Video ${q.length + 1}`;
     q.push({
-      id: `vid_${Date.now()}`,
+      id: `vid_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       title,
       url,
       subtitleUrl: subUrl
@@ -806,12 +947,35 @@ async function sha256Hex(str) {
     if ($('fam-vid-sub')) $('fam-vid-sub').value = '';
   };
 
-  window.playQueueIndex = async (idx) => {
+  // Select any video in the queue log (either cue it paused with 🎯 or start playing it immediately with ▶️)
+  window.selectQueueIndex = async (idx, startPlaying = true) => {
     const q = currentStreamData.queue || [];
     if (!q[idx]) return;
     await update(videoStreamRef, {
       currentIndex: idx,
-      state: 'playing',
+      state: startPlaying ? 'playing' : 'paused',
+      updatedBy: senderName,
+      updatedAt: Date.now()
+    });
+  };
+  window.playQueueIndex = (idx) => window.selectQueueIndex(idx, true);
+
+  // Move any video up (-1) or down (+1) in the play order while keeping the currently active video tracked
+  window.moveQueueItem = async (idx, direction) => {
+    const q = [...(currentStreamData.queue || [])];
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= q.length) return;
+
+    const activeId = q[currentStreamData.currentIndex || 0]?.id;
+    const temp = q[idx];
+    q[idx] = q[targetIdx];
+    q[targetIdx] = temp;
+
+    const newActiveIndex = activeId ? Math.max(0, q.findIndex(item => item.id === activeId)) : 0;
+
+    await update(videoStreamRef, {
+      queue: q,
+      currentIndex: newActiveIndex,
       updatedBy: senderName,
       updatedAt: Date.now()
     });
@@ -820,16 +984,19 @@ async function sha256Hex(str) {
   window.removeQueueIndex = async (idx) => {
     const q = [...(currentStreamData.queue || [])];
     if (!q[idx]) return;
-    q.splice(idx, 1);
+    const removed = q.splice(idx, 1)[0];
     let nextIdx = currentStreamData.currentIndex || 0;
     if (idx < nextIdx) nextIdx = Math.max(0, nextIdx - 1);
     if (nextIdx >= q.length) nextIdx = 0;
+
+    const nextSavedTimes = { ...(currentStreamData.savedTimes || {}) };
+    if (removed?.id) delete nextSavedTimes[removed.id];
 
     await set(videoStreamRef, {
       queue: q,
       currentIndex: nextIdx,
       state: q.length ? currentStreamData.state : 'paused',
-      savedTimes: {},
+      savedTimes: nextSavedTimes,
       updatedBy: senderName,
       updatedAt: Date.now()
     });
@@ -849,7 +1016,8 @@ async function sha256Hex(str) {
     else if (cmd === 'pause') nextState = 'paused';
     else if (cmd === 'next') {
       nextIndex = (nextIndex + 1) % q.length;
-      nextState = 'playing';
+    } else if (cmd === 'prev') {
+      nextIndex = (nextIndex - 1 + q.length) % q.length;
     }
 
     await update(videoStreamRef, {
@@ -874,16 +1042,16 @@ async function sha256Hex(str) {
           st.innerText = 'Queue Empty';
           st.style.color = '#94a3b8';
         } else {
-          const sec = Number(currentStreamData.savedTimes?.[curItem.index] || 0);
+          const sec = getSavedTimeForItem(curItem.item, curItem.index);
           const mins = Math.floor(sec / 60), secs = String(sec % 60).padStart(2, '0');
           st.innerText = currentStreamData.state === 'playing'
-            ? `▶️ Playing #${curItem.index + 1} (${mins}:${secs})`
-            : `⏸️ Paused #${curItem.index + 1} (${mins}:${secs})`;
+            ? `▶️ Playing #${curItem.index + 1}: ${curItem.item.title} (${mins}:${secs})`
+            : `⏸️ Cued #${curItem.index + 1}: ${curItem.item.title} (${mins}:${secs})`;
           st.style.color = currentStreamData.state === 'playing' ? '#4ade80' : '#fbbf24';
         }
       }
     } else if (role === 'nana') {
-      const trackChanged = (prevItem?.item?.url !== curItem?.item?.url) || (prevItem?.index !== curItem?.index);
+      const trackChanged = (prevItem?.item?.url !== curItem?.item?.url) || (prevItem?.item?.id !== curItem?.item?.id);
       if (curItem && trackChanged && videoEl) {
         lastLoadedVideoUrl = curItem.item.url;
         videoEl.src = curItem.item.url;
@@ -893,8 +1061,13 @@ async function sha256Hex(str) {
       if (currentStreamData.state === 'playing' && curItem) {
         if (!$('video-screen')?.classList.contains('active')) window.openVideoScreen();
         if (videoEl?.paused || trackChanged) startOrResumeVideo();
-      } else if (currentStreamData.state === 'paused' && videoEl && !videoEl.paused) {
-        videoEl.pause();
+      } else if (currentStreamData.state === 'paused') {
+        if (videoEl && !videoEl.paused) {
+          videoEl.pause();
+        } else {
+          // Ensure idle dimming timer is active while paused
+          startNormalDimCountdownOnPause();
+        }
       }
       syncVideoUI();
     }
@@ -911,7 +1084,7 @@ async function sha256Hex(str) {
     }
   });
 
-  // --- 12. YES / NO POP-UP QUESTION SYSTEM (HANDLES FAMILY QUESTIONS + NEXT VIDEO QUEUE) ---
+  // --- 12. YES / NO POP-UP QUESTION SYSTEM (WITH SILENT OPTION & IDLE DIMMING) ---
   window.sendQuestionToNana = async () => {
     const input = $('fam-q-input');
     const text = (input?.value || '').trim();
@@ -921,6 +1094,7 @@ async function sha256Hex(str) {
       type: 'family_question',
       question: text,
       askedBy: senderName,
+      silent: familyComposerSilent,
       status: 'pending',
       answer: null,
       askedAt: Date.now()
@@ -935,7 +1109,9 @@ async function sha256Hex(str) {
   window.submitNanaQuestionAnswer = async (choice) => {
     if (!activeQuestionData) return;
     const qData = activeQuestionData;
+    const isSilent = !!(qData.silent || !speakQuestionsDefault);
     $('nana-question-modal').style.display = 'none';
+    window.wakeScreenAndResetDimTimer?.();
 
     const now = Date.now();
     await update(quickQuestionRef, {
@@ -944,28 +1120,20 @@ async function sha256Hex(str) {
       answeredAt: now
     });
 
-    // If this was the end-of-video queue prompt:
+    // End-of-video queue prompt response
     if (qData.type === 'next_video_prompt') {
       const targetIdx = Number(qData.nextIndex) || 0;
       const nextItem = currentStreamData.queue?.[targetIdx];
       if (nextItem) localStorage.setItem(`nana_vid_pos_${nextItem.url}`, '0');
 
-      if (choice === 'YES') {
-        await update(videoStreamRef, {
-          currentIndex: targetIdx,
-          state: 'playing',
-          [`savedTimes/${targetIdx}`]: 0,
-          updatedAt: now
-        });
-      } else {
-        // Queue up the next video in paused state so it's ready for next time
-        await update(videoStreamRef, {
-          currentIndex: targetIdx,
-          state: 'paused',
-          [`savedTimes/${targetIdx}`]: 0,
-          updatedAt: now
-        });
-      }
+      const updatePayload = {
+        currentIndex: targetIdx,
+        state: choice === 'YES' ? 'playing' : 'paused',
+        updatedAt: now
+      };
+      if (nextItem?.id) updatePayload[`savedTimes/${nextItem.id}`] = 0;
+
+      await update(videoStreamRef, updatePayload);
       return;
     }
 
@@ -994,10 +1162,12 @@ async function sha256Hex(str) {
       })
     }).catch(() => {});
 
-    window.speakNote?.(`Sent ${choice} to ${askedBy}`);
+    if (!isSilent) {
+      window.speakNote?.(`Sent ${choice} to ${askedBy}`);
+    }
   };
 
-  let lastSpokenQuestionId = null;
+  let lastHandledQuestionId = null;
   onValue(quickQuestionRef, snap => {
     const q = snap.val();
     activeQuestionData = q;
@@ -1009,7 +1179,8 @@ async function sha256Hex(str) {
         st.innerText = 'No active popup';
         st.style.color = '#94a3b8';
       } else if (q.status === 'pending') {
-        st.innerText = `⏳ Showing on Nana's screen: "${q.question}"`;
+        const modeTag = (q.silent || !speakQuestionsDefault) ? '🔇 Silent' : '🔊 Spoken';
+        st.innerText = `⏳ Showing (${modeTag}): "${q.question}"`;
         st.style.color = '#facc15';
       } else if (q.status === 'answered') {
         const ansTime = q.answeredAt ? new Date(q.answeredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
@@ -1023,20 +1194,26 @@ async function sha256Hex(str) {
         if (videoEl && !videoEl.paused) {
           pauseVideoAndSavePosition('question_popup');
         }
+        const isSilent = !!(q.silent || !speakQuestionsDefault);
         $('q-popup-sender').innerText = q.type === 'next_video_prompt'
           ? '🎬 Up Next in Video Queue'
           : `❓ Question from ${q.askedBy || 'Family'}`;
         $('q-popup-text').innerText = q.question;
         modal.style.display = 'flex';
-        window.wakeFromNightMode?.();
-        window.wakeScreenAndResetDimTimer?.();
-        if (q.id !== lastSpokenQuestionId) {
-          lastSpokenQuestionId = q.id;
-          window.speakNote?.(
-            q.type === 'next_video_prompt'
-              ? `${q.question} Touch Yes or No.`
-              : `${q.askedBy || 'Family'} asks: ${q.question}. Touch Yes or No.`
-          );
+
+        if (q.id !== lastHandledQuestionId) {
+          lastHandledQuestionId = q.id;
+          // Wake screen initially when question arrives and start normal idle dim timer
+          window.wakeFromNightMode?.();
+          startNormalDimCountdownOnPause();
+
+          if (!isSilent) {
+            window.speakNote?.(
+              q.type === 'next_video_prompt'
+                ? `${q.question} Touch Yes or No.`
+                : `${q.askedBy || 'Family'} asks: ${q.question}. Touch Yes or No.`
+            );
+          }
         }
       } else {
         modal.style.display = 'none';
