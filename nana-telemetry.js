@@ -7,7 +7,98 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
 
   let activeCallConnectedAtMs = null, activeCallPartnerId = null;
 
-  // --- 1. TODAY'S COMPLETED CALLS LOGGING & REASSURANCE BANNER ---
+  // --- 1. TOP 68PX NO-TOUCH AREA ORIENTATION BANNER (DAY, TIME OF DAY, DATE & CLOCK) ---
+  if (role === 'nana') {
+    const topBar = document.createElement('div');
+    topBar.id = 'nana-top-orientation-bar';
+    document.body.appendChild(topBar);
+
+    const updateTopOrientationBanner = () => {
+      const now = new Date();
+      const hr = now.getHours();
+      let period = '🌙 Night';
+      if (hr >= 5 && hr < 12) period = '☀️ Morning';
+      else if (hr >= 12 && hr < 17) period = '🌤️ Afternoon';
+      else if (hr >= 17 && hr < 21) period = '🌆 Evening';
+
+      const dayName = now.toLocaleDateString('en-GB', { weekday: 'long' });
+      const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+      const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase();
+
+      topBar.textContent = `${period} • ${dayName} ${dateStr} • ${timeStr}`;
+    };
+
+    updateTopOrientationBanner();
+    setInterval(updateTopOrientationBanner, 10000);
+  }
+
+  // --- 2. ADJUSTABLE BATTERY UNPLUGGED VOICE THRESHOLD (%) IN SETTINGS ---
+  const battMuteLbl = document.querySelector('.lbl-battery-mute');
+  const battCard = battMuteLbl?.closest('.settings-card');
+  if (battCard && !$('batt-threshold-row')) {
+    const sub = document.createElement('div');
+    sub.className = 'settings-sub';
+    sub.style.marginBottom = '4px';
+    sub.textContent = '🔌 Start Speaking When Unplugged At or Below:';
+
+    const row = document.createElement('div');
+    row.id = 'batt-threshold-row';
+    row.className = 'opt-row';
+    row.style.marginBottom = '8px';
+    row.innerHTML = [
+      [100, '100% (Immediately)'],
+      [80, '80%'],
+      [50, '50%'],
+      [35, '35%'],
+      [25, '25%']
+    ].map(([pct, lbl]) =>
+      `<button class="opt-btn" data-battthresh="${pct}" onclick="setBatteryVoiceThresholdPct(${pct})">${lbl}</button>`
+    ).join('');
+
+    battCard.insertBefore(sub, battMuteLbl.nextSibling);
+    battCard.insertBefore(row, sub.nextSibling);
+  }
+
+  function refreshBatteryThresholdUI() {
+    const cur = Number(state.batteryVoiceThresholdPct ?? 100);
+    document.querySelectorAll('[data-battthresh]').forEach(btn => {
+      btn.classList.toggle('selected', Number(btn.dataset.battthresh) === cur);
+    });
+  }
+
+  window.setBatteryVoiceThresholdPct = async (pct) => {
+    state.batteryVoiceThresholdPct = Number(pct) || 100;
+    refreshBatteryThresholdUI();
+    await update(refs.settings, { batteryVoiceThresholdPct: state.batteryVoiceThresholdPct });
+  };
+
+  onValue(refs.settings, snap => {
+    const s = snap.val();
+    if (s && s.batteryVoiceThresholdPct !== undefined) {
+      state.batteryVoiceThresholdPct = Number(s.batteryVoiceThresholdPct) || 100;
+    }
+    refreshBatteryThresholdUI();
+  });
+
+  function checkCustomBatteryThresholdOnNana() {
+    if (role !== 'nana' || !window.AndroidBridge?.getBatteryStatusJson) return;
+    try {
+      const b = JSON.parse(window.AndroidBridge.getBatteryStatusJson());
+      const level = b.level, charging = b.charging;
+      const threshold = Number(state.batteryVoiceThresholdPct ?? 100);
+      if (!charging && level !== null && level <= threshold) {
+        // window.announceBatteryWarning in app.js already enforces mute status & batteryVoiceIntervalMin!
+        window.announceBatteryWarning?.("Please plug in the tablet charger.");
+      }
+    } catch (_) {}
+  }
+
+  if (role === 'nana') {
+    setInterval(checkCustomBatteryThresholdOnNana, 20000);
+    setTimeout(checkCustomBatteryThresholdOnNana, 4000);
+  }
+
+  // --- 3. TODAY'S COMPLETED CALLS LOGGING & REASSURANCE BANNER ---
   function getTodaysCompletedCallsList() {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -54,7 +145,7 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
   });
   setInterval(renderTodaysCallsBanner, 60000);
 
-  // --- 2. TABLET DISCONNECT, WIFI, BACKGROUND & BATTERY TELEMETRY ---
+  // --- 4. TABLET DISCONNECT, WIFI, BACKGROUND & BATTERY TELEMETRY ---
   if (role === 'nana') {
     onValue(refs.connectedInfo, snap => {
       if (snap.val() === true) {
@@ -155,7 +246,6 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     setTimeout(broadcastNanaCurrentScreen, 1500);
   }
 
-  // Wrap app.js navigation functions so screen changes broadcast immediately
   ['openFamilyBulletin', 'closeFamilyBulletin', 'openRadioScreen', 'closeRadioScreen', 'openSeniorKeyboard', 'closeSeniorKeyboard'].forEach(fnName => {
     const orig = window[fnName];
     if (typeof orig === 'function') {
@@ -163,7 +253,7 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     }
   });
 
-  // --- 3. CONCISE SINGLE-LINE FAMILY PRESENCE STATUS ---
+  // --- 5. CONCISE SINGLE-LINE FAMILY PRESENCE STATUS ---
   function getSimpleNanaStatusSummary() {
     const p = state.presenceSnap || {};
     const now = Date.now();
