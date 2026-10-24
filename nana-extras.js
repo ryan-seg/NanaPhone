@@ -36,6 +36,7 @@ async function sha256Hex(str) {
   const videoStreamRef   = ref(db, `${basePath}/videoStream`);
   const settingsRef      = ref(db, `${basePath}/settings`);
   const callStateRef     = ref(db, `${basePath}/callState`);
+  const callHistoryRef   = ref(db, `${basePath}/callHistory`);
   const bulletinRef      = ref(db, `${basePath}/bulletin`);
   const presenceRef      = ref(db, `${basePath}/presence`);
   const entertainmentRef = ref(db, `${basePath}/entertainment`);
@@ -55,6 +56,45 @@ async function sha256Hex(str) {
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
+    /* Reassurance Banner on Nana's Home Grid for Today's Completed Calls */
+    #todays-calls-reassurance-banner {
+      display: none;
+      width: 100%;
+      background: #064e3b;
+      border: 3px solid #4ade80;
+      border-radius: 16px;
+      padding: 8px 16px;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 12px;
+      flex-shrink: 0;
+      color: #ffffff;
+      font-size: clamp(1.15rem, 1.9vw, 1.45rem);
+      font-weight: 900;
+      text-align: left;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    body.theme-yellow-black #todays-calls-reassurance-banner { background:#000; border-color:#ff0; color:#ff0; }
+    body.theme-white-black #todays-calls-reassurance-banner { background:#121212; border-color:#fff; color:#fff; }
+    body.theme-black-cream #todays-calls-reassurance-banner { background:#dcfce7; border-color:#000; color:#000; }
+    .todays-calls-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .todays-call-pill {
+      background: rgba(15, 23, 42, 0.75);
+      border: 2px solid #fef08a;
+      color: #fef08a;
+      padding: 3px 12px;
+      border-radius: 12px;
+      font-size: clamp(1.05rem, 1.7vw, 1.35rem);
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    body.theme-black-cream .todays-call-pill { background:#fff; border-color:#000; color:#000; }
 
     #video-screen { justify-content:space-between; padding:68px 18px 16px 18px; gap:10px; }
     .nana-top-nav { width:100%; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-shrink:0; flex-wrap:wrap; }
@@ -150,6 +190,19 @@ async function sha256Hex(str) {
     }
   `;
   document.head.appendChild(styleEl);
+
+  // Inject Today's Calls Reassurance Banner into Nana's Home Grid
+  const gridScreen = $('grid-screen');
+  const missedBanner = $('missed-call-banner');
+  if (gridScreen && missedBanner) {
+    const todayBanner = document.createElement('div');
+    todayBanner.id = 'todays-calls-reassurance-banner';
+    todayBanner.innerHTML = `
+      <span style="white-space:nowrap;color:#4ade80;">💚 Spoken to Today:</span>
+      <div id="todays-calls-chips-container" class="todays-calls-chips"></div>
+    `;
+    gridScreen.insertBefore(todayBanner, missedBanner.nextSibling);
+  }
 
   const homeHeaderPills = document.querySelector('#grid-screen .header-pills');
   if (homeHeaderPills) {
@@ -317,7 +370,6 @@ async function sha256Hex(str) {
       famScreen.insertBefore(chatAndControlsRow, hideCard || null);
     }
 
-    // Tabs order: 1. Availability (active first) -> 2. Ask Nana -> 3. Entertainment (last)
     const tabsBar = document.createElement('div');
     tabsBar.className = 'fam-tabs-bar';
     tabsBar.innerHTML = `
@@ -329,20 +381,9 @@ async function sha256Hex(str) {
     const paneAvail = document.createElement('div');
     paneAvail.id = 'fam-pane-avail';
     paneAvail.className = 'fam-tab-pane active';
-    if (hideCard) {
-      hideCard.style.width = '100%';
-      hideCard.style.marginBottom = '0';
-      paneAvail.appendChild(hideCard);
-    }
-    if (hoursCard) {
-      hoursCard.style.width = '100%';
-      hoursCard.style.marginBottom = '0';
-      paneAvail.appendChild(hoursCard);
-    }
-    if (tgAndGuideRow) {
-      tgAndGuideRow.style.width = '100%';
-      paneAvail.appendChild(tgAndGuideRow);
-    }
+    if (hideCard) { hideCard.style.width = '100%'; hideCard.style.marginBottom = '0'; paneAvail.appendChild(hideCard); }
+    if (hoursCard) { hoursCard.style.width = '100%'; hoursCard.style.marginBottom = '0'; paneAvail.appendChild(hoursCard); }
+    if (tgAndGuideRow) { tgAndGuideRow.style.width = '100%'; paneAvail.appendChild(tgAndGuideRow); }
 
     const paneAsk = document.createElement('div');
     paneAsk.id = 'fam-pane-ask';
@@ -352,11 +393,7 @@ async function sha256Hex(str) {
     const paneMedia = document.createElement('div');
     paneMedia.id = 'fam-pane-media';
     paneMedia.className = 'fam-tab-pane';
-    if (radioCard) {
-      radioCard.style.width = '100%';
-      radioCard.style.marginBottom = '0';
-      paneMedia.appendChild(radioCard);
-    }
+    if (radioCard) { radioCard.style.width = '100%'; radioCard.style.marginBottom = '0'; paneMedia.appendChild(radioCard); }
     paneMedia.appendChild(vCard);
 
     famScreen.appendChild(tabsBar);
@@ -379,13 +416,11 @@ async function sha256Hex(str) {
     const nextOpen = forceOpen !== null ? forceOpen : (drawer.style.display === 'none');
     drawer.style.display = nextOpen ? 'block' : 'none';
     if (btn) {
-      btn.innerText = nextOpen
-        ? '🔼 Hide Add / Edit & Sort Controls'
-        : '➕ Add / Edit Video Links & Sort Queue ▾';
+      btn.innerText = nextOpen ? '🔼 Hide Add / Edit & Sort Controls' : '➕ Add / Edit Video Links & Sort Queue ▾';
     }
   };
 
-  // --- INJECT TIME-OF-DAY POP-UP SCHEDULES INTO SHARED SETTINGS MODAL ---
+  // --- INJECT TIME-OF-DAY POP-UP SCHEDULES & TODAY'S CALLS BANNER TOGGLE INTO SHARED SETTINGS ---
   const sharedSettingsMount = $('shared-settings-cards');
   if (sharedSettingsMount) {
     const buildIntervalBtns = (settingKey, options) => options.map(([val, lbl]) =>
@@ -400,13 +435,17 @@ async function sha256Hex(str) {
     periodicCard.className = 'settings-card';
     periodicCard.innerHTML = `
       <div class="settings-label">
-        <span>⏰ Scheduled Pop-Up Prompts (Times of Day)</span>
+        <span>💚 Today's Calls Memory Banner & Scheduled Prompts</span>
         <span id="lbl-periodic-summary" style="color:#38bdf8;font-size:0.88rem;">Active</span>
       </div>
-      <div class="settings-sub">Choose times of day to ask Nana if she wants Classic FM or Judge John Deed (when she's idle), plus unread chat reminders.</div>
+      <div class="settings-sub">Reassures Nana with a summary of who she has spoken to today, and offers scheduled entertainment prompts.</div>
       <div class="opt-row" style="margin-bottom:8px;">
-        <button class="opt-btn" data-ppset="periodicPopupsEnabled" data-ppval="true" onclick="updatePeriodicPopupSetting('periodicPopupsEnabled', true)">✅ Pop-Ups ON</button>
-        <button class="opt-btn" data-ppset="periodicPopupsEnabled" data-ppval="false" onclick="updatePeriodicPopupSetting('periodicPopupsEnabled', false)">🔕 All Pop-Ups OFF</button>
+        <button class="opt-btn" data-ppset="showTodaysCallsBanner" data-ppval="true" onclick="updatePeriodicPopupSetting('showTodaysCallsBanner', true)">💚 Show Today's Calls Banner</button>
+        <button class="opt-btn" data-ppset="showTodaysCallsBanner" data-ppval="false" onclick="updatePeriodicPopupSetting('showTodaysCallsBanner', false)">🙈 Hide Today's Calls Banner</button>
+      </div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        <button class="opt-btn" data-ppset="periodicPopupsEnabled" data-ppval="true" onclick="updatePeriodicPopupSetting('periodicPopupsEnabled', true)">✅ Scheduled Pop-Ups ON</button>
+        <button class="opt-btn" data-ppset="periodicPopupsEnabled" data-ppval="false" onclick="updatePeriodicPopupSetting('periodicPopupsEnabled', false)">🔕 Scheduled Pop-Ups OFF</button>
       </div>
       <div class="settings-sub" style="margin-bottom:4px;">🎻 Classic FM Radio Prompt Times (Tap hours to toggle on/off):</div>
       <div class="opt-row" style="margin-bottom:8px;">
@@ -434,6 +473,7 @@ async function sha256Hex(str) {
   const videoEl = $('nana-video-el');
   let videoVolume = 80, speakQuestionsDefault = true, familyComposerSilent = false;
   let periodicConfig = {
+    showTodaysCallsBanner: true,
     periodicPopupsEnabled: true,
     unreadChatPopupMin: 30,
     radioPromptHours: [10, 15],
@@ -445,6 +485,8 @@ async function sha256Hex(str) {
   };
   let currentStreamData = { queue: [], currentIndex: 0, state: "paused", savedTimes: {}, viewCounts: {} };
   let latestPresenceSnap = {}, latestBulletinSnap = {}, latestCallSnap = { status: 'idle' }, latestEntSnap = { activeKey: 'off' };
+  let latestCallHistorySnap = {};
+  let activeCallConnectedAtMs = null, activeCallPartnerId = null;
   let editingQueueIndex = null;
   let lastLoadedVideoUrl = "", lastLoadedSubUrl = "", activeSubBlobUrl = null;
   let lastSavedTimeSec = 0, activeQuestionData = null, screenWakeLock = null;
@@ -454,6 +496,54 @@ async function sha256Hex(str) {
   let lastAnyPeriodicPromptMs = 0;
 
   window.addEventListener('pointerdown', () => { lastActivityOrCallMs = Date.now(); }, { passive: true });
+
+  // --- TODAY'S COMPLETED CALLS LOGGING & REASSURANCE BANNER ---
+  function getTodaysCompletedCallsList() {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const todayMs = startOfToday.getTime();
+    return Object.values(latestCallHistorySnap || {})
+      .filter(c => c && (Number(c.endedAt || c.startedAt) >= todayMs))
+      .sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
+  }
+
+  function renderTodaysCallsBanner() {
+    const banner = $('todays-calls-reassurance-banner');
+    const chipsBox = $('todays-calls-chips-container');
+    if (!banner || !chipsBox) return;
+
+    if (periodicConfig.showTodaysCallsBanner === false) {
+      banner.style.display = 'none';
+      return;
+    }
+
+    const callsToday = getTodaysCompletedCallsList();
+    if (!callsToday.length) {
+      banner.style.display = 'none';
+      return;
+    }
+
+    chipsBox.innerHTML = '';
+    callsToday.forEach(c => {
+      const name = FAMILY_NAMES[c.partnerId] || c.partnerName || 'Family';
+      const timeStr = c.startedAt ? new Date(c.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+      const mins = Math.max(1, Math.round((Number(c.durationSec) || 60) / 60));
+      const pill = document.createElement('span');
+      pill.className = 'todays-call-pill';
+      pill.textContent = `✓ ${name} at ${timeStr} (${mins}m chat)`;
+      chipsBox.appendChild(pill);
+    });
+    banner.style.display = 'flex';
+  }
+
+  onValue(query(callHistoryRef, limitToLast(25)), snap => {
+    latestCallHistorySnap = snap.val() || {};
+    renderTodaysCallsBanner();
+    if (role === 'family') setTimeout(applySimpleFamilyPresenceCard, 20);
+  });
+
+  // Refresh at midnight so yesterday's calls disappear automatically
+  setInterval(renderTodaysCallsBanner, 60000);
 
   function parseHoursArray(val, fallback) {
     if (Array.isArray(val)) return val.map(Number).filter(n => !isNaN(n));
@@ -477,7 +567,7 @@ async function sha256Hex(str) {
     const sumEl = $('lbl-periodic-summary');
     if (sumEl) {
       if (!periodicConfig.periodicPopupsEnabled) {
-        sumEl.innerText = '🔕 All Off';
+        sumEl.innerText = '🔕 Pop-Ups Off';
         sumEl.style.color = '#fca5a5';
       } else {
         const rHrs = (periodicConfig.radioPromptHours || []).map(h => `${String(h).padStart(2,'0')}:00`).join(', ') || 'Off';
@@ -486,6 +576,7 @@ async function sha256Hex(str) {
         sumEl.style.color = '#38bdf8';
       }
     }
+    renderTodaysCallsBanner();
   }
 
   window.updatePeriodicPopupSetting = async (key, val) => {
@@ -582,12 +673,23 @@ async function sha256Hex(str) {
   function broadcastNanaCurrentScreen() {
     if (role !== 'nana') return;
     let screenState = 'home';
+    const isActuallyPlayingVideo = !!(
+      $('video-screen')?.classList.contains('active') &&
+      videoEl &&
+      !videoEl.paused &&
+      !videoEl.ended &&
+      videoEl.readyState >= 2
+    );
     if ($('bulletin-modal')?.style.display === 'flex') {
       screenState = $('bulletin-modal')?.classList.contains('kb-fullscreen') ? 'chat_typing' : 'chat';
     } else if ($('video-screen')?.classList.contains('active')) {
-      screenState = (videoEl && !videoEl.paused && !videoEl.ended) ? 'video_playing' : 'video_paused';
+      screenState = isActuallyPlayingVideo ? 'video_playing' : 'video_paused';
     } else if ($('radio-screen')?.classList.contains('active')) {
       screenState = 'radio';
+    }
+    // If Firebase videoStream says 'playing' but the tablet is not actually playing it, heal Firebase state to 'paused'
+    if (currentStreamData.state === 'playing' && !isActuallyPlayingVideo) {
+      update(videoStreamRef, { state: 'paused', updatedAt: Date.now() }).catch(() => {});
     }
     update(presenceRef, {
       online: true,
@@ -639,10 +741,10 @@ async function sha256Hex(str) {
       return { border: '#facc15', text: `🟠 Left the app` };
     }
 
-    // 3. Watching a Video
+    // 3. Watching a Video (Strictly requires Nana's tablet to report currentScreen === 'video_playing')
     const curItem = getCurrentQueueItem();
     const scr = p.currentScreen || 'home';
-    if ((currentStreamData.state === 'playing' && curItem) || scr === 'video_playing') {
+    if (scr === 'video_playing') {
       return {
         border: '#a855f7',
         text: `🎬 Video is playing${curItem?.item?.title ? ` (${curItem.item.title})` : ''}`
@@ -674,12 +776,23 @@ async function sha256Hex(str) {
     const summary = getSimpleNanaStatusSummary();
     card.style.borderColor = summary.border;
 
-    // Keep the existing touch/battery span & Telegram status span from app.js, but replace the clutter above them with 1 status line
-    const spans = Array.from(card.querySelectorAll('span'));
+    const spans = Array.from(card.querySelectorAll('span')).filter(s => !s.classList.contains('fam-today-calls-line'));
     const touchBattHtml = spans[0] ? spans[0].outerHTML : '';
     const tgStatusHtml = spans[1] ? `<br>${spans[1].outerHTML}` : '';
 
-    const cleanHtml = `<div style="font-size:1.05rem;font-weight:900;color:#fef08a;margin-bottom:2px;">${summary.text}</div>${touchBattHtml}${tgStatusHtml}`;
+    const callsToday = getTodaysCompletedCallsList();
+    let todayLineHtml = '';
+    if (callsToday.length) {
+      const summaryItems = callsToday.map(c => {
+        const name = FAMILY_NAMES[c.partnerId] || c.partnerName || 'Family';
+        const t = c.startedAt ? new Date(c.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+        const m = Math.max(1, Math.round((Number(c.durationSec) || 60) / 60));
+        return `${name} (${t}, ${m}m)`;
+      }).join(' • ');
+      todayLineHtml = `<br><span class="fam-today-calls-line" style="color:#86efac;font-size:0.84rem;font-weight:800;">💚 Calls today: ${summaryItems}</span>`;
+    }
+
+    const cleanHtml = `<div style="font-size:1.05rem;font-weight:900;color:#fef08a;margin-bottom:2px;">${summary.text}</div>${touchBattHtml}${todayLineHtml}${tgStatusHtml}`;
     if (card.innerHTML !== cleanHtml) {
       card.innerHTML = cleanHtml;
     }
@@ -814,7 +927,7 @@ async function sha256Hex(str) {
       $('global-q-voice-off')?.classList.toggle('selected', !speakQuestionsDefault);
       window.setFamilyQuestionSilentMode(!speakQuestionsDefault);
     }
-    ['periodicPopupsEnabled', 'unreadChatPopupMin', 'nightModeEnabled', 'nightStartHour', 'nightEndHour', 'bulletinClearedAt'].forEach(k => {
+    ['showTodaysCallsBanner', 'periodicPopupsEnabled', 'unreadChatPopupMin', 'nightModeEnabled', 'nightStartHour', 'nightEndHour', 'bulletinClearedAt'].forEach(k => {
       if (s[k] !== undefined) periodicConfig[k] = s[k];
     });
     if (s.radioPromptHours !== undefined) {
@@ -870,7 +983,6 @@ async function sha256Hex(str) {
     const radioOpenOrPlaying = $('radio-screen')?.classList.contains('active') || (latestEntSnap?.activeKey && latestEntSnap.activeKey !== 'off');
     const videoPlaying = isNanaVideoActivelyPlaying();
 
-    // 1. Unread Family Chat Prompt
     const unreadMin = Number(periodicConfig.unreadChatPopupMin ?? 30);
     if (unreadMin > 0 && !chatOpen && !videoPlaying && hasUnreadFamilyChatMessages()) {
       if (now - lastUnreadChatPromptMs >= unreadMin * 60000) {
@@ -890,7 +1002,6 @@ async function sha256Hex(str) {
       }
     }
 
-    // Only trigger scheduled Radio / Video prompts if Nana is not already busy and hasn't touched the screen in the last 3 minutes
     if (chatOpen || radioOpenOrPlaying || videoPlaying) return;
     if (now - lastActivityOrCallMs < 180000) return;
 
@@ -899,9 +1010,7 @@ async function sha256Hex(str) {
     const curMin = d.getMinutes();
     const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}_${curHour}`;
 
-    // Trigger within the first 20 minutes of any scheduled hour (once per scheduled hour per day)
     if (curMin <= 20) {
-      // 2. Scheduled Time-of-Day Classic FM Prompt
       if ((periodicConfig.radioPromptHours || []).includes(curHour)) {
         const storageKey = `nana_sched_radio_${dateKey}`;
         if (!localStorage.getItem(storageKey)) {
@@ -921,7 +1030,6 @@ async function sha256Hex(str) {
         }
       }
 
-      // 3. Scheduled Time-of-Day Judge John Deed Video Prompt
       if ((periodicConfig.videoPromptHours || []).includes(curHour)) {
         const storageKey = `nana_sched_video_${dateKey}`;
         if (!localStorage.getItem(storageKey)) {
@@ -1060,7 +1168,14 @@ async function sha256Hex(str) {
   }
 
   function pauseVideoAndSavePosition(reason = 'manual') {
-    if (!videoEl || videoEl.paused) { startNormalDimCountdownOnPause(); return; }
+    if (!videoEl || videoEl.paused) {
+      startNormalDimCountdownOnPause();
+      if (role === 'nana' && currentStreamData.state === 'playing') {
+        update(videoStreamRef, { state: 'paused', pauseReason: reason, updatedAt: Date.now() }).catch(() => {});
+      }
+      broadcastNanaCurrentScreen();
+      return;
+    }
     saveCurrentVideoTime(true);
     videoEl.pause();
     syncVideoUI();
@@ -1108,7 +1223,15 @@ async function sha256Hex(str) {
             updatedAt: Date.now()
           }).catch(() => {});
         }
-      }).catch(() => { syncVideoUI(); startNormalDimCountdownOnPause(); });
+      }).catch(() => {
+        // Autoplay was blocked by browser until Nana touches the glass: mark state paused so Family screen is accurate
+        syncVideoUI();
+        startNormalDimCountdownOnPause();
+        if (role === 'nana') {
+          update(videoStreamRef, { state: 'paused', pauseReason: 'autoplay_blocked', updatedAt: Date.now() }).catch(() => {});
+          broadcastNanaCurrentScreen();
+        }
+      });
     };
     if (videoEl.readyState >= 1) playNow();
     else videoEl.addEventListener('loadedmetadata', playNow, { once: true });
@@ -1275,10 +1398,11 @@ async function sha256Hex(str) {
       box.innerHTML = `<div style="color:#94a3b8;font-size:0.85rem;padding:6px;">No videos in queue yet.</div>`;
       return;
     }
+    const isTrulyPlayingOnTablet = latestPresenceSnap?.currentScreen === 'video_playing';
     q.forEach((item, idx) => {
       const isCur = idx === currentStreamData.currentIndex;
       const isEditingThis = isAdminFamily && idx === editingQueueIndex;
-      const isPlayingNow = isCur && currentStreamData.state === 'playing';
+      const isPlayingNow = isCur && isTrulyPlayingOnTablet;
       const savedSec = getSavedTimeForItem(item, idx);
       const views = getViewCountForItem(item);
       const timeTag = savedSec > 0 ? ` (${Math.floor(savedSec / 60)}:${String(savedSec % 60).padStart(2, '0')})` : '';
@@ -1413,12 +1537,13 @@ async function sha256Hex(str) {
       if (st) {
         if (!curItem) { st.innerText = 'Queue Empty'; st.style.color = '#94a3b8'; }
         else {
+          const isTrulyPlaying = latestPresenceSnap?.currentScreen === 'video_playing';
           const sec = getSavedTimeForItem(curItem.item, curItem.index);
           const mins = Math.floor(sec / 60), secs = String(sec % 60).padStart(2, '0');
-          st.innerText = currentStreamData.state === 'playing'
+          st.innerText = isTrulyPlaying
             ? `▶️ Playing #${curItem.index + 1}: ${curItem.item.title} (${mins}:${secs})`
             : `⏸️ Cued #${curItem.index + 1}: ${curItem.item.title} (${mins}:${secs})`;
-          st.style.color = currentStreamData.state === 'playing' ? '#4ade80' : '#fbbf24';
+          st.style.color = isTrulyPlaying ? '#4ade80' : '#fbbf24';
         }
       }
     } else if (role === 'nana') {
@@ -1444,15 +1569,43 @@ async function sha256Hex(str) {
     }
   });
 
+  // Track connected calls on Nana's tablet and log completed calls to callHistoryRef
   onValue(callStateRef, snap => {
     const call = snap.val();
     if (!call) return;
     latestCallSnap = call;
     lastActivityOrCallMs = Date.now();
     if (role === 'family') setTimeout(applySimpleFamilyPresenceCard, 20);
-    if (call.status !== 'idle' && role === 'nana') {
-      if ($('nana-question-modal')) $('nana-question-modal').style.display = 'none';
-      if (videoEl && !videoEl.paused) pauseVideoAndSavePosition('incoming_call');
+
+    if (role === 'nana') {
+      if (call.status === 'connected') {
+        if (!activeCallConnectedAtMs) {
+          activeCallConnectedAtMs = Date.now();
+          activeCallPartnerId = call.callerId === 'nana' ? call.targetId : call.callerId;
+        }
+      } else if (call.status === 'idle' && activeCallConnectedAtMs) {
+        const endedAt = Date.now();
+        const durationSec = Math.round((endedAt - activeCallConnectedAtMs) / 1000);
+        const partnerId = activeCallPartnerId || 'family';
+        const startedAt = activeCallConnectedAtMs;
+        activeCallConnectedAtMs = null;
+        activeCallPartnerId = null;
+        // Record any genuine conversation (>= 15 seconds) in Today's Calls
+        if (durationSec >= 15) {
+          push(callHistoryRef, {
+            partnerId,
+            partnerName: FAMILY_NAMES[partnerId] || 'Family',
+            startedAt,
+            endedAt,
+            durationSec
+          }).catch(() => {});
+        }
+      }
+
+      if (call.status !== 'idle') {
+        if ($('nana-question-modal')) $('nana-question-modal').style.display = 'none';
+        if (videoEl && !videoEl.paused) pauseVideoAndSavePosition('incoming_call');
+      }
     }
   });
 
