@@ -1,5 +1,5 @@
 import { getApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, update, push, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, set, update, push, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -16,6 +16,7 @@ async function sha256Hex(str) {
   const TEST_MODE = params.get('test') === '1';
   const role = params.get('role') || 'nana';
   const callerId = (params.get('id') || 'ryan').toLowerCase();
+  const isAdminFamily = (role === 'family' && callerId === 'ryan');
 
   const FAMILY_NAMES = {
     "phil": "Phil", "nicky-s": "Nicky S", "denise": "Denise", "gill": "Gill",
@@ -37,6 +38,7 @@ async function sha256Hex(str) {
   const callStateRef     = ref(db, `${basePath}/callState`);
   const bulletinRef      = ref(db, `${basePath}/bulletin`);
   const presenceRef      = ref(db, `${basePath}/presence`);
+  const connectedInfoRef = ref(db, `.info/connected`);
 
   const styleEl = document.createElement('style');
   styleEl.textContent = `
@@ -73,8 +75,12 @@ async function sha256Hex(str) {
     .fam-queue-item.editing-q { border-color:#facc15; background:rgba(120,53,15,0.45); }
     .fam-q-title { flex:1; font-weight:800; color:#f8fafc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; cursor:pointer; }
     .fam-q-badge { display:inline-block; padding:1px 6px; border-radius:6px; font-size:0.72rem; font-weight:900; margin-right:5px; background:#22c55e; color:#000; }
+    .fam-view-pill { display:inline-block; padding:1px 6px; border-radius:6px; font-size:0.74rem; font-weight:800; margin-left:5px; background:#1e293b; color:#38bdf8; border:1px solid #38bdf8; }
     .fam-q-mini-btn { background:#1e293b; color:#fff; border:2px solid #64748b; border-radius:8px; padding:4px 7px; font-size:0.78rem; font-weight:800; cursor:pointer; }
     .fam-q-mini-btn:disabled { opacity:0.35; cursor:default; }
+    .diag-alert-box { margin:4px 0; padding:6px 10px; border-radius:10px; font-size:0.88rem; font-weight:800; line-height:1.35; }
+    .diag-alert-offline { background:#450a0a; border:2px solid #f87171; color:#fef08a; }
+    .diag-alert-warn { background:#422006; border:2px solid #facc15; color:#fef08a; }
   `;
   document.head.appendChild(styleEl);
 
@@ -189,30 +195,44 @@ async function sha256Hex(str) {
       </div>
     `;
 
+    const adminEditorHtml = isAdminFamily ? `
+      <div id="fam-admin-video-editor">
+        <input id="fam-vid-title" class="family-input-box" type="text" placeholder="Video Title (e.g. Episode 1)" />
+        <input id="fam-vid-url" class="family-input-box" type="url" placeholder="Video URL (https://server/video.mkv or .mp4)" />
+        <input id="fam-vid-sub" class="family-input-box" type="url" placeholder="Optional Subtitles URL (.vtt or .srt)" />
+        <div id="fam-vid-add-row" class="opt-row" style="margin-bottom:6px;">
+          <button class="opt-btn" style="background:#0284c7;border-color:#7dd3fc;color:#fff;" onclick="addVideoToQueue(false)">➕ Add to Queue</button>
+          <button class="opt-btn" style="background:#7c3aed;border-color:#c4b5fd;color:#fff;" onclick="addVideoToQueue(true)">▶️ Add & Play Now</button>
+        </div>
+        <div id="fam-vid-edit-row" class="opt-row" style="margin-bottom:6px;display:none;">
+          <button class="opt-btn" style="background:#d97706;border-color:#fef08a;color:#000;" onclick="saveEditedQueueItem()">💾 Save Changes</button>
+          <button class="opt-btn" style="background:#334155;border-color:#94a3b8;color:#fff;flex:0.45;" onclick="cancelEditQueueItem()">✖ Cancel</button>
+        </div>
+        <div class="opt-row" style="margin-bottom:6px;">
+          <button class="opt-btn" style="padding:5px 4px;font-size:0.78rem;" onclick="sortVideoQueue('alpha_asc')">🔤 A–Z</button>
+          <button class="opt-btn" style="padding:5px 4px;font-size:0.78rem;" onclick="sortVideoQueue('alpha_desc')">🔤 Z–A</button>
+          <button class="opt-btn" style="padding:5px 4px;font-size:0.78rem;" onclick="sortVideoQueue('views_asc')">👁️ Views ↑</button>
+          <button class="opt-btn" style="padding:5px 4px;font-size:0.78rem;" onclick="sortVideoQueue('views_desc')">👁️ Views ↓</button>
+        </div>
+      </div>
+    ` : '';
+
     const vCard = document.createElement('div');
     vCard.className = 'settings-card';
     vCard.style.cssText = 'width:92vw;max-width:540px;margin-bottom:2px;padding:10px 12px;';
     vCard.innerHTML = `
       <div class="settings-label" style="font-size:1.02rem;">
-        <span id="fam-vid-form-heading">🎬 Video Queue & Subtitles (Loops Automatically)</span>
+        <span id="fam-vid-form-heading">🎬 Video Queue on Nana's Tablet</span>
         <span id="fam-vid-status" style="font-size:0.85rem;color:#4ade80;">Stopped</span>
       </div>
-      <input id="fam-vid-title" class="family-input-box" type="text" placeholder="Video Title (e.g. Episode 1)" />
-      <input id="fam-vid-url" class="family-input-box" type="url" placeholder="Video URL (https://server/video.mkv or .mp4)" />
-      <input id="fam-vid-sub" class="family-input-box" type="url" placeholder="Optional Subtitles URL (.vtt or .srt)" />
-      <div id="fam-vid-add-row" class="opt-row" style="margin-bottom:6px;">
-        <button class="opt-btn" style="background:#0284c7;border-color:#7dd3fc;color:#fff;" onclick="addVideoToQueue(false)">➕ Add to Queue</button>
-        <button class="opt-btn" style="background:#7c3aed;border-color:#c4b5fd;color:#fff;" onclick="addVideoToQueue(true)">▶️ Add & Play Now</button>
+      ${adminEditorHtml}
+      <div class="settings-sub" style="margin:2px 0;font-size:0.8rem;">
+        ${isAdminFamily ? 'Tap ▶️ to play, 🎯 to cue, ✏️ to edit, or sort/reorder above:' : 'Tap ▶️ next to any video below to play it on Nana\'s tablet:'}
       </div>
-      <div id="fam-vid-edit-row" class="opt-row" style="margin-bottom:6px;display:none;">
-        <button class="opt-btn" style="background:#d97706;border-color:#fef08a;color:#000;" onclick="saveEditedQueueItem()">💾 Save Changes</button>
-        <button class="opt-btn" style="background:#334155;border-color:#94a3b8;color:#fff;flex:0.45;" onclick="cancelEditQueueItem()">✖ Cancel</button>
-      </div>
-      <div class="settings-sub" style="margin:4px 0 2px 0;font-size:0.8rem;">Tap ✏️ to edit links, 🎯 to cue, ▶️ to play now, or ⬆️/⬇️ to reorder:</div>
       <div id="fam-queue-container" class="fam-queue-list"></div>
       <div class="opt-row">
         <button class="opt-btn" style="background:#334155;border-color:#94a3b8;color:#fff;flex:0.6;" onclick="remoteCommandVideo('prev')">⏮️ Prev</button>
-        <button class="opt-btn" style="background:#059669;border-color:#4ade80;color:#fff;" onclick="remoteCommandVideo('play')">▶️ Play Selected</button>
+        <button class="opt-btn" style="background:#059669;border-color:#4ade80;color:#fff;" onclick="remoteCommandVideo('play')">▶️ Play</button>
         <button class="opt-btn" style="background:#b45309;border-color:#fde047;color:#fff;" onclick="remoteCommandVideo('pause')">⏸️ Pause</button>
         <button class="opt-btn" style="background:#334155;border-color:#94a3b8;color:#fff;flex:0.6;" onclick="remoteCommandVideo('next')">⏭️ Next</button>
       </div>
@@ -240,10 +260,223 @@ async function sha256Hex(str) {
 
   const videoEl = $('nana-video-el');
   let videoVolume = 80, speakQuestionsDefault = true, familyComposerSilent = false;
-  let currentStreamData = { queue: [], currentIndex: 0, state: "paused", savedTimes: {} };
+  let currentStreamData = { queue: [], currentIndex: 0, state: "paused", savedTimes: {}, viewCounts: {} };
+  let latestPresenceSnap = {};
   let editingQueueIndex = null;
   let lastLoadedVideoUrl = "", lastLoadedSubUrl = "", activeSubBlobUrl = null;
   let lastSavedTimeSec = 0, activeQuestionData = null, screenWakeLock = null;
+
+  // --- TABLET DISCONNECT, WIFI, BACKGROUND & BATTERY TELEMETRY ---
+  if (role === 'nana') {
+    onValue(connectedInfoRef, snap => {
+      if (snap.val() === true) {
+        // Arm server-side onDisconnect hook so Firebase instantly records if connection drops
+        const od = onDisconnect(presenceRef);
+        od.update({
+          online: false,
+          disconnectedAt: Date.now()
+        }).catch(() => {});
+
+        update(presenceRef, {
+          online: true,
+          appState: document.visibilityState === 'hidden' ? 'backgrounded' : 'foreground',
+          networkOnline: navigator.onLine !== false,
+          lastConnectedAt: Date.now()
+        }).catch(() => {});
+      }
+    });
+
+    // Detect if Nana backed out of the app, pressed Home, or tapped a system notification
+    document.addEventListener('visibilitychange', () => {
+      const isHidden = document.visibilityState === 'hidden';
+      update(presenceRef, {
+        appState: isHidden ? 'backgrounded' : 'foreground',
+        appStateChangedAt: Date.now(),
+        lastExitHint: isHidden ? 'backed_out_or_notification' : 'active_in_app'
+      }).catch(() => {});
+    });
+
+    // Detect if top Android notification shade was pulled down or window lost focus
+    window.addEventListener('blur', () => {
+      if (document.visibilityState !== 'hidden') {
+        update(presenceRef, {
+          appState: 'shade_or_overlay',
+          appStateChangedAt: Date.now(),
+          lastExitHint: 'notification_shade_or_overlay'
+        }).catch(() => {});
+      }
+    });
+
+    window.addEventListener('focus', () => {
+      update(presenceRef, {
+        appState: 'foreground',
+        appStateChangedAt: Date.now(),
+        lastExitHint: 'active_in_app'
+      }).catch(() => {});
+    });
+
+    // Detect if Wi-Fi was toggled off
+    window.addEventListener('offline', () => {
+      // Best-effort write if local queue flushes or before radio teardown completes
+      update(presenceRef, {
+        networkOnline: false,
+        lastExitHint: 'wifi_turned_off',
+        wifiDroppedAt: Date.now()
+      }).catch(() => {});
+    });
+
+    window.addEventListener('online', () => {
+      update(presenceRef, {
+        online: true,
+        networkOnline: true,
+        lastExitHint: 'active_in_app'
+      }).catch(() => {});
+    });
+
+    window.addEventListener('pagehide', () => {
+      update(presenceRef, {
+        online: false,
+        appState: 'closed',
+        lastExitHint: 'app_closed_or_backed_out',
+        disconnectedAt: Date.now()
+      }).catch(() => {});
+    });
+  }
+
+  function diagnoseTabletConnectionStatus(p) {
+    if (!p || (!p.lastPing && !p.lastConnectedAt)) return null;
+    const now = Date.now();
+    const lastSeenMs = Math.max(Number(p.lastPing || 0), Number(p.disconnectedAt || 0), Number(p.appStateChangedAt || 0));
+    const silenceSec = lastSeenMs ? Math.floor((now - Number(p.lastPing || lastSeenMs)) / 1000) : 0;
+    const isOffline = (p.online === false) || (p.lastPing && silenceSec > 75);
+    const batt = p.batteryLevel != null ? Number(p.batteryLevel) : null;
+    const charging = !!p.isCharging;
+    const agoStr = lastSeenMs ? `${Math.max(1, Math.floor((now - lastSeenMs) / 60000))}m ago` : 'recently';
+
+    if (isOffline) {
+      // 1. Check if battery ran out
+      if (batt !== null && !charging && (batt <= 6 || (batt <= 14 && silenceSec > 600))) {
+        return {
+          level: 'offline',
+          html: `🔴 <strong>TABLET OFFLINE — Likely Ran Out of Battery</strong><br><span style="color:#fca5a5;">Last battery reading was ${batt}% (unplugged) ${agoStr}.</span>`
+        };
+      }
+      // 2. Check if she backed out of the app or closed it before it went offline
+      if (p.appState === 'backgrounded' || p.appState === 'closed' || p.lastExitHint === 'backed_out_or_notification' || p.lastExitHint === 'app_closed_or_backed_out') {
+        return {
+          level: 'offline',
+          html: `🔴 <strong>TABLET OFFLINE — Backed Out of App / Opened Notification</strong><br><span style="color:#fca5a5;">Nana exited the NanaPhone screen ${agoStr}${batt !== null ? ` (Battery: ${batt}%)` : ''}.</span>`
+        };
+      }
+      // 3. Check if notification shade was pulled down right before Wi-Fi cut out
+      if (p.lastExitHint === 'wifi_turned_off' || p.appState === 'shade_or_overlay' || p.lastExitHint === 'notification_shade_or_overlay') {
+        return {
+          level: 'offline',
+          html: `🔴 <strong>TABLET OFFLINE — Wi-Fi Turned Off from Notification Shade</strong><br><span style="color:#fca5a5;">Top notification bar was opened right before Wi-Fi disconnected (${agoStr}${batt !== null ? `, Battery: ${batt}%` : ''}).</span>`
+        };
+      }
+      // 4. Sudden drop while in foreground with healthy battery -> Wi-Fi / Broadband drop
+      return {
+        level: 'offline',
+        html: `🔴 <strong>TABLET DISCONNECTED FROM INTERNET</strong><br><span style="color:#fca5a5;">Wi-Fi was switched off or internet dropped ${agoStr}${batt !== null ? ` (Battery was ${batt}% ${charging ? 'charging' : 'unplugged'})` : ''}.</span>`
+      };
+    }
+
+    // Tablet is still connected to Wi-Fi, but Nana backed out of the app or opened a notification
+    if (p.appState === 'backgrounded') {
+      return {
+        level: 'warn',
+        html: `🟠 <strong>LEFT APP SCREEN — Backed Out or Tapped a Notification</strong><br><span style="color:#fde047;">Wi-Fi is still connected, but NanaPhone is in the background (${agoStr}).</span>`
+      };
+    }
+
+    return null;
+  }
+
+  // --- LIVE SCREEN & ACTIVITY STATUS FOR FAMILY PRESENCE CARD ---
+  function broadcastNanaCurrentScreen() {
+    if (role !== 'nana') return;
+    let screenState = 'home';
+    if ($('bulletin-modal')?.style.display === 'flex') {
+      screenState = $('bulletin-modal')?.classList.contains('kb-fullscreen') ? 'chat_typing' : 'chat';
+    } else if ($('video-screen')?.classList.contains('active')) {
+      screenState = (videoEl && !videoEl.paused && !videoEl.ended) ? 'video_playing' : 'video_paused';
+    } else if ($('radio-screen')?.classList.contains('active')) {
+      screenState = 'radio';
+    }
+    update(presenceRef, {
+      online: true,
+      currentScreen: screenState,
+      appState: document.visibilityState === 'hidden' ? 'backgrounded' : 'foreground'
+    }).catch(() => {});
+  }
+
+  if (role === 'nana') {
+    setInterval(broadcastNanaCurrentScreen, 10000);
+    setTimeout(broadcastNanaCurrentScreen, 1500);
+  }
+
+  function injectExtraPresenceLine() {
+    if (role !== 'family') return;
+    const card = $('nana-presence-card');
+    if (!card) return;
+    const curItem = getCurrentQueueItem();
+    const scr = latestPresenceSnap?.currentScreen || 'home';
+    const isVidPlaying = currentStreamData.state === 'playing' && curItem;
+    const isOnVidScreen = scr === 'video_playing' || scr === 'video_paused' || isVidPlaying;
+    const isInChat = scr === 'chat' || scr === 'chat_typing';
+
+    const diag = diagnoseTabletConnectionStatus(latestPresenceSnap);
+    let html = '';
+    if (diag) {
+      html += `<div class="diag-alert-box ${diag.level === 'offline' ? 'diag-alert-offline' : 'diag-alert-warn'}">${diag.html}</div>`;
+      card.style.borderColor = diag.level === 'offline' ? '#ef4444' : '#facc15';
+    }
+
+    if (isVidPlaying) {
+      const views = getViewCountForItem(curItem.item);
+      html += `<div style="color:#c4b5fd;font-weight:800;margin-top:2px;">🎬 Watching Video: ${curItem.item.title} (👁️ ${views})</div>`;
+    } else if (isOnVidScreen && curItem) {
+      html += `<div style="color:#cbd5e1;font-weight:700;font-size:0.9rem;margin-top:2px;">🎬 Video Screen (Paused: ${curItem.item.title})</div>`;
+    } else {
+      html += `<div style="color:#94a3b8;font-size:0.9rem;">🎬 Video: Off</div>`;
+    }
+
+    if (isInChat) {
+      html += `<div style="color:#38bdf8;font-weight:800;margin-top:2px;">${scr === 'chat_typing' ? '⌨️ Typing in Family Chat' : '✈️ Reading Family Chat'}</div>`;
+    } else {
+      html += `<div style="color:#94a3b8;font-size:0.9rem;">💬 Family Chat: Closed</div>`;
+    }
+
+    let extraBox = $('nana-extra-presence-lines');
+    if (!extraBox) {
+      extraBox = document.createElement('div');
+      extraBox.id = 'nana-extra-presence-lines';
+      const firstBr = card.querySelector('span');
+      if (firstBr) card.insertBefore(extraBox, firstBr);
+      else card.appendChild(extraBox);
+    }
+    if (extraBox.innerHTML !== html) extraBox.innerHTML = html;
+  }
+
+  if (role === 'family') {
+    onValue(presenceRef, snap => {
+      latestPresenceSnap = snap.val() || {};
+      setTimeout(injectExtraPresenceLine, 30);
+    });
+    setInterval(injectExtraPresenceLine, 15000);
+    const cardEl = $('nana-presence-card');
+    if (cardEl) {
+      let obsLock = false;
+      const obs = new MutationObserver(() => {
+        if (obsLock) return;
+        obsLock = true;
+        injectExtraPresenceLine();
+        obsLock = false;
+      });
+      obs.observe(cardEl, { childList: true });
+    }
+  }
 
   function isNanaVideoActivelyPlaying() {
     return !!(role === 'nana' && videoEl && !videoEl.paused && !videoEl.ended && $('video-screen')?.classList.contains('active'));
@@ -298,15 +531,20 @@ async function sha256Hex(str) {
     let queue = Array.isArray(d.queue) ? d.queue.filter(Boolean)
       : (d.queue && typeof d.queue === 'object' ? Object.values(d.queue).filter(Boolean)
       : (d.url ? [{ id: 'v_legacy', url: d.url, title: d.title || 'Family Video', subtitleUrl: d.subtitleUrl || '' }] : []));
-    queue = queue.map((item, idx) => ({
-      id: item.id || `vid_item_${idx}`,
-      title: item.title || `Video ${idx + 1}`,
-      url: item.url || '',
-      subtitleUrl: item.subtitleUrl || ''
-    }));
+    const viewCounts = (d.viewCounts && typeof d.viewCounts === 'object') ? { ...d.viewCounts } : {};
+    queue = queue.map((item, idx) => {
+      const id = item.id || `vid_item_${idx}`;
+      return {
+        id,
+        title: item.title || `Video ${idx + 1}`,
+        url: item.url || '',
+        subtitleUrl: item.subtitleUrl || '',
+        views: Number(viewCounts[id] ?? item.views ?? 0)
+      };
+    });
     const currentIndex = queue.length ? Math.max(0, Math.min(queue.length - 1, Number(d.currentIndex) || 0)) : 0;
     const savedTimes = (d.savedTimes && typeof d.savedTimes === 'object') ? { ...d.savedTimes } : {};
-    return { queue, currentIndex, state: d.state || 'paused', savedTimes };
+    return { queue, currentIndex, state: d.state || 'paused', savedTimes, viewCounts };
   }
 
   function getCurrentQueueItem(data = currentStreamData) {
@@ -320,6 +558,11 @@ async function sha256Hex(str) {
     const localSec = item.url ? Number(localStorage.getItem(`nana_vid_pos_${item.url}`) || 0) : 0;
     const byId = Number(data.savedTimes?.[item.id] ?? data.savedTimes?.[idx] ?? 0);
     return Math.max(localSec, byId);
+  }
+
+  function getViewCountForItem(item, data = currentStreamData) {
+    if (!item) return 0;
+    return Number(data.viewCounts?.[item.id] ?? item.views ?? 0);
   }
 
   function applyVideoVolume(volPct) {
@@ -377,6 +620,15 @@ async function sha256Hex(str) {
     setTimeout(enableTrack, 300);
   }
 
+  const origOpenBulletin = window.openFamilyBulletin;
+  if (origOpenBulletin) window.openFamilyBulletin = () => { origOpenBulletin(); broadcastNanaCurrentScreen(); };
+  const origCloseBulletin = window.closeFamilyBulletin;
+  if (origCloseBulletin) window.closeFamilyBulletin = () => { origCloseBulletin(); broadcastNanaCurrentScreen(); };
+  const origOpenRadio = window.openRadioScreen;
+  if (origOpenRadio) window.openRadioScreen = () => { origOpenRadio(); broadcastNanaCurrentScreen(); };
+  const origCloseRadio = window.closeRadioScreen;
+  if (origCloseRadio) window.closeRadioScreen = () => { origCloseRadio(); broadcastNanaCurrentScreen(); };
+
   window.switchNanaMainTab = (tab) => {
     if (tab !== 'video') pauseVideoAndSavePosition('switched_tab');
     if (tab !== 'chat' && $('bulletin-modal')?.style.display === 'flex') window.closeFamilyBulletin?.();
@@ -387,6 +639,7 @@ async function sha256Hex(str) {
     } else if (tab === 'chat') window.openFamilyBulletin?.();
     else if (tab === 'radio') window.openRadioScreen?.();
     else if (tab === 'video') window.openVideoScreen();
+    broadcastNanaCurrentScreen();
   };
 
   window.openVideoScreen = () => {
@@ -395,7 +648,7 @@ async function sha256Hex(str) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     $('video-screen')?.classList.add('active');
     window.wakeScreenAndResetDimTimer?.();
-    update(presenceRef, { lastActivity: "Opened Video Player", lastTouched: Date.now() }).catch(() => {});
+    update(presenceRef, { online: true, lastActivity: "Opened Video Player", currentScreen: "video_paused", lastTouched: Date.now() }).catch(() => {});
     syncVideoUI();
   };
 
@@ -428,7 +681,7 @@ async function sha256Hex(str) {
       overlay?.classList.remove('playing-hidden');
       if (icon) icon.innerText = '🎬';
       if (main) main.innerText = 'No videos in queue yet';
-      if (sub) sub.innerText = 'Family can add videos & subtitles from their phone';
+      if (sub) sub.innerText = 'Family can start a video from their phone';
     } else if (playing) {
       overlay?.classList.add('playing-hidden');
     } else {
@@ -452,6 +705,7 @@ async function sha256Hex(str) {
     videoEl.pause();
     syncVideoUI();
     startNormalDimCountdownOnPause();
+    broadcastNanaCurrentScreen();
     const curItem = getCurrentQueueItem();
     if (role === 'nana' && curItem) {
       update(videoStreamRef, {
@@ -485,6 +739,7 @@ async function sha256Hex(str) {
         requestVideoWakeLock();
         keepScreenAwakeIfPlayingVideo();
         syncVideoUI();
+        broadcastNanaCurrentScreen();
         if (role === 'nana') {
           update(videoStreamRef, {
             state: 'playing',
@@ -530,6 +785,10 @@ async function sha256Hex(str) {
     localStorage.setItem(`nana_vid_pos_${curItem.item.url}`, '0');
     if (currentStreamData.savedTimes) currentStreamData.savedTimes[curItem.item.id] = 0;
 
+    const newViewCount = getViewCountForItem(curItem.item) + 1;
+    if (!currentStreamData.viewCounts) currentStreamData.viewCounts = {};
+    currentStreamData.viewCounts[curItem.item.id] = newViewCount;
+
     const nextIndex = (curItem.index + 1) % curItem.total;
     const nextItem = currentStreamData.queue[nextIndex];
     localStorage.setItem(`nana_vid_pos_${nextItem.url}`, '0');
@@ -538,10 +797,13 @@ async function sha256Hex(str) {
       state: 'paused',
       [`savedTimes/${curItem.item.id}`]: 0,
       [`savedTimes/${nextItem.id}`]: 0,
+      [`viewCounts/${curItem.item.id}`]: newViewCount,
       updatedAt: Date.now()
     }).catch(() => {});
 
     syncVideoUI();
+    broadcastNanaCurrentScreen();
+
     const nextTitle = nextItem.title || `Video ${nextIndex + 1}`;
     const promptText = curItem.total > 1
       ? `That video has finished. Would you like to watch the next video: "${nextTitle}"?`
@@ -562,26 +824,46 @@ async function sha256Hex(str) {
 
   if (videoEl) {
     videoEl.addEventListener('timeupdate', () => { saveCurrentVideoTime(false); keepScreenAwakeIfPlayingVideo(); });
-    videoEl.addEventListener('pause', () => { syncVideoUI(); startNormalDimCountdownOnPause(); });
-    videoEl.addEventListener('play', () => { requestVideoWakeLock(); keepScreenAwakeIfPlayingVideo(); syncVideoUI(); });
+    videoEl.addEventListener('pause', () => { syncVideoUI(); startNormalDimCountdownOnPause(); broadcastNanaCurrentScreen(); });
+    videoEl.addEventListener('play', () => { requestVideoWakeLock(); keepScreenAwakeIfPlayingVideo(); syncVideoUI(); broadcastNanaCurrentScreen(); });
     videoEl.addEventListener('ended', () => { if (role === 'nana') handleVideoEndedOnNana(); });
   }
 
-  // --- FAMILY QUEUE LOG: EDIT, SELECT & REORDER ---
+  // --- QUEUE MANAGEMENT: SORTING, ADMIN EDITING & FAMILY PLAY-ONLY VIEW ---
+  window.sortVideoQueue = async (mode) => {
+    if (!isAdminFamily) return;
+    const q = [...(currentStreamData.queue || [])];
+    if (q.length < 2) return;
+    if (editingQueueIndex !== null) window.cancelEditQueueItem();
+
+    const activeId = q[currentStreamData.currentIndex || 0]?.id;
+    q.sort((a, b) => {
+      if (mode === 'alpha_asc') return (a.title || '').localeCompare(b.title || '', undefined, { numeric: true, sensitivity: 'base' });
+      if (mode === 'alpha_desc') return (b.title || '').localeCompare(a.title || '', undefined, { numeric: true, sensitivity: 'base' });
+      const vA = getViewCountForItem(a), vB = getViewCountForItem(b);
+      if (mode === 'views_asc') return vA !== vB ? vA - vB : (a.title || '').localeCompare(b.title || '');
+      if (mode === 'views_desc') return vB !== vA ? vB - vA : (a.title || '').localeCompare(b.title || '');
+      return 0;
+    });
+
+    const newActiveIndex = activeId ? Math.max(0, q.findIndex(item => item.id === activeId)) : 0;
+    await update(videoStreamRef, { queue: q, currentIndex: newActiveIndex, updatedBy: senderName, updatedAt: Date.now() });
+  };
+
   function setEditFormUI(isEditing, idx = null) {
+    if (!isAdminFamily) return;
     editingQueueIndex = isEditing ? idx : null;
     if ($('fam-vid-add-row')) $('fam-vid-add-row').style.display = isEditing ? 'none' : 'flex';
     if ($('fam-vid-edit-row')) $('fam-vid-edit-row').style.display = isEditing ? 'flex' : 'none';
     if ($('fam-vid-form-heading')) {
-      $('fam-vid-form-heading').innerText = isEditing
-        ? `✏️ Editing Video #${idx + 1}`
-        : '🎬 Video Queue & Subtitles (Loops Automatically)';
+      $('fam-vid-form-heading').innerText = isEditing ? `✏️ Editing Video #${idx + 1}` : '🎬 Video Queue on Nana\'s Tablet';
     }
     ['fam-vid-title', 'fam-vid-url', 'fam-vid-sub'].forEach(id => $(id)?.classList.toggle('editing-active', isEditing));
     renderFamilyQueueUI();
   }
 
   window.editQueueIndex = (idx) => {
+    if (!isAdminFamily) return;
     const item = currentStreamData.queue?.[idx];
     if (!item) return;
     if ($('fam-vid-title')) $('fam-vid-title').value = item.title || '';
@@ -592,6 +874,7 @@ async function sha256Hex(str) {
   };
 
   window.cancelEditQueueItem = () => {
+    if (!isAdminFamily) return;
     if ($('fam-vid-title')) $('fam-vid-title').value = '';
     if ($('fam-vid-url')) $('fam-vid-url').value = '';
     if ($('fam-vid-sub')) $('fam-vid-sub').value = '';
@@ -599,6 +882,7 @@ async function sha256Hex(str) {
   };
 
   window.saveEditedQueueItem = async () => {
+    if (!isAdminFamily) return;
     const idx = editingQueueIndex;
     const q = [...(currentStreamData.queue || [])];
     if (idx === null || !q[idx]) return window.cancelEditQueueItem();
@@ -619,12 +903,7 @@ async function sha256Hex(str) {
     }
 
     window.cancelEditQueueItem();
-    await update(videoStreamRef, {
-      queue: q,
-      savedTimes: nextSavedTimes,
-      updatedBy: senderName,
-      updatedAt: Date.now()
-    });
+    await update(videoStreamRef, { queue: q, savedTimes: nextSavedTimes, updatedBy: senderName, updatedAt: Date.now() });
   };
 
   function renderFamilyQueueUI() {
@@ -633,36 +912,44 @@ async function sha256Hex(str) {
     box.innerHTML = '';
     const q = currentStreamData.queue || [];
     if (!q.length) {
-      box.innerHTML = `<div style="color:#94a3b8;font-size:0.85rem;padding:6px;">Queue is empty. Add a video URL above.</div>`;
+      box.innerHTML = `<div style="color:#94a3b8;font-size:0.85rem;padding:6px;">No videos in queue yet.</div>`;
       return;
     }
     q.forEach((item, idx) => {
       const isCur = idx === currentStreamData.currentIndex;
-      const isEditingThis = idx === editingQueueIndex;
+      const isEditingThis = isAdminFamily && idx === editingQueueIndex;
       const isPlayingNow = isCur && currentStreamData.state === 'playing';
       const savedSec = getSavedTimeForItem(item, idx);
+      const views = getViewCountForItem(item);
       const timeTag = savedSec > 0 ? ` (${Math.floor(savedSec / 60)}:${String(savedSec % 60).padStart(2, '0')})` : '';
       const row = document.createElement('div');
       row.className = `fam-queue-item${isCur ? ' active-q' : ''}${isEditingThis ? ' editing-q' : ''}`;
+
+      const adminBtns = isAdminFamily ? `
+        <button class="fam-q-mini-btn" title="Edit Video & Subtitle Links" style="background:#b45309;border-color:#fde047;" onclick="editQueueIndex(${idx})">✏️</button>
+        <button class="fam-q-mini-btn" title="Move Up" ${idx === 0 ? 'disabled' : ''} onclick="moveQueueItem(${idx}, -1)">⬆️</button>
+        <button class="fam-q-mini-btn" title="Move Down" ${idx === q.length - 1 ? 'disabled' : ''} onclick="moveQueueItem(${idx}, 1)">⬇️</button>
+        <button class="fam-q-mini-btn" title="Cue / Select" style="background:#0284c7;border-color:#7dd3fc;" onclick="selectQueueIndex(${idx}, false)">🎯</button>
+        <button class="fam-q-mini-btn" title="Play Now" style="background:#059669;border-color:#4ade80;" onclick="selectQueueIndex(${idx}, true)">▶️</button>
+        <button class="fam-q-mini-btn" title="Delete" style="background:#7f1d1d;border-color:#f87171;" onclick="removeQueueIndex(${idx})">🗑️</button>
+      ` : `
+        <button class="fam-q-mini-btn" title="Play This Video on Nana's Tablet" style="background:#059669;border-color:#4ade80;padding:5px 12px;" onclick="selectQueueIndex(${idx}, true)">▶️ Play</button>
+      `;
+
       row.innerHTML = `
-        <div class="fam-q-title" title="Tap to select or cue" onclick="selectQueueIndex(${idx}, false)">
+        <div class="fam-q-title" onclick="selectQueueIndex(${idx}, ${!isAdminFamily})">
           ${isCur ? `<span class="fam-q-badge">${isPlayingNow ? 'PLAYING' : 'SELECTED'}</span>` : `<strong>${idx + 1}.</strong> `}
           ${item.title || 'Video'}${item.subtitleUrl ? ' 💬' : ''}${timeTag}
+          <span class="fam-view-pill" title="Number of times Nana has watched this video">👁️ ${views}</span>
         </div>
-        <div style="display:flex;gap:4px;flex-shrink:0;">
-          <button class="fam-q-mini-btn" title="Edit Video & Subtitle Links" style="background:#b45309;border-color:#fde047;" onclick="editQueueIndex(${idx})">✏️</button>
-          <button class="fam-q-mini-btn" title="Move Up" ${idx === 0 ? 'disabled' : ''} onclick="moveQueueItem(${idx}, -1)">⬆️</button>
-          <button class="fam-q-mini-btn" title="Move Down" ${idx === q.length - 1 ? 'disabled' : ''} onclick="moveQueueItem(${idx}, 1)">⬇️</button>
-          <button class="fam-q-mini-btn" title="Cue / Select" style="background:#0284c7;border-color:#7dd3fc;" onclick="selectQueueIndex(${idx}, false)">🎯</button>
-          <button class="fam-q-mini-btn" title="Play Now" style="background:#059669;border-color:#4ade80;" onclick="selectQueueIndex(${idx}, true)">▶️</button>
-          <button class="fam-q-mini-btn" title="Delete" style="background:#7f1d1d;border-color:#f87171;" onclick="removeQueueIndex(${idx})">🗑️</button>
-        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0;">${adminBtns}</div>
       `;
       box.appendChild(row);
     });
   }
 
   window.addVideoToQueue = async (playImmediately = false) => {
+    if (!isAdminFamily) return;
     const url = ($('fam-vid-url')?.value || '').trim();
     const subUrl = ($('fam-vid-sub')?.value || '').trim();
     const rawTitle = ($('fam-vid-title')?.value || '').trim();
@@ -670,7 +957,8 @@ async function sha256Hex(str) {
 
     const q = [...(currentStreamData.queue || [])];
     const title = rawTitle || `Video ${q.length + 1}`;
-    q.push({ id: `vid_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, title, url, subtitleUrl: subUrl });
+    const id = `vid_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    q.push({ id, title, url, subtitleUrl: subUrl, views: 0 });
 
     const newIndex = playImmediately ? (q.length - 1) : (currentStreamData.currentIndex || 0);
     await set(videoStreamRef, {
@@ -678,6 +966,7 @@ async function sha256Hex(str) {
       currentIndex: newIndex,
       state: playImmediately ? 'playing' : (currentStreamData.state || 'paused'),
       savedTimes: currentStreamData.savedTimes || {},
+      viewCounts: currentStreamData.viewCounts || {},
       updatedBy: senderName,
       updatedAt: Date.now()
     });
@@ -695,6 +984,7 @@ async function sha256Hex(str) {
   window.playQueueIndex = (idx) => window.selectQueueIndex(idx, true);
 
   window.moveQueueItem = async (idx, direction) => {
+    if (!isAdminFamily) return;
     const q = [...(currentStreamData.queue || [])];
     const targetIdx = idx + direction;
     if (targetIdx < 0 || targetIdx >= q.length) return;
@@ -708,6 +998,7 @@ async function sha256Hex(str) {
   };
 
   window.removeQueueIndex = async (idx) => {
+    if (!isAdminFamily) return;
     const q = [...(currentStreamData.queue || [])];
     if (!q[idx]) return;
     if (editingQueueIndex === idx) window.cancelEditQueueItem();
@@ -717,13 +1008,15 @@ async function sha256Hex(str) {
     if (nextIdx >= q.length) nextIdx = 0;
 
     const nextSavedTimes = { ...(currentStreamData.savedTimes || {}) };
-    if (removed?.id) delete nextSavedTimes[removed.id];
+    const nextViewCounts = { ...(currentStreamData.viewCounts || {}) };
+    if (removed?.id) { delete nextSavedTimes[removed.id]; delete nextViewCounts[removed.id]; }
 
     await set(videoStreamRef, {
       queue: q,
       currentIndex: nextIdx,
       state: q.length ? currentStreamData.state : 'paused',
       savedTimes: nextSavedTimes,
+      viewCounts: nextViewCounts,
       updatedBy: senderName,
       updatedAt: Date.now()
     });
@@ -732,9 +1025,11 @@ async function sha256Hex(str) {
   window.remoteCommandVideo = async (cmd) => {
     const q = currentStreamData.queue || [];
     if (!q.length) {
-      const typedUrl = ($('fam-vid-url')?.value || '').trim();
-      if (typedUrl) return window.addVideoToQueue(cmd === 'play');
-      return alert("Please add at least one video to the queue first.");
+      if (isAdminFamily) {
+        const typedUrl = ($('fam-vid-url')?.value || '').trim();
+        if (typedUrl) return window.addVideoToQueue(cmd === 'play');
+      }
+      return alert("No videos in the queue yet.");
     }
     let nextIndex = currentStreamData.currentIndex || 0;
     let nextState = currentStreamData.state || 'paused';
@@ -753,6 +1048,7 @@ async function sha256Hex(str) {
 
     if (role === 'family') {
       renderFamilyQueueUI();
+      injectExtraPresenceLine();
       const st = $('fam-vid-status');
       if (st) {
         if (!curItem) { st.innerText = 'Queue Empty'; st.style.color = '#94a3b8'; }
