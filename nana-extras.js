@@ -136,9 +136,6 @@ async function sha256Hex(str) {
     .fam-view-pill { display:inline-block; padding:1px 6px; border-radius:6px; font-size:0.74rem; font-weight:800; margin-left:5px; background:#1e293b; color:#38bdf8; border:1px solid #38bdf8; }
     .fam-q-mini-btn { background:#1e293b; color:#fff; border:2px solid #64748b; border-radius:8px; padding:4px 7px; font-size:0.78rem; font-weight:800; cursor:pointer; }
     .fam-q-mini-btn:disabled { opacity:0.35; cursor:default; }
-    .diag-alert-box { margin:4px 0; padding:6px 10px; border-radius:10px; font-size:0.88rem; font-weight:800; line-height:1.35; }
-    .diag-alert-offline { background:#450a0a; border:2px solid #f87171; color:#fef08a; }
-    .diag-alert-warn { background:#422006; border:2px solid #facc15; color:#fef08a; }
     .admin-drawer-toggle {
       width: 100%;
       background: #0f172a;
@@ -244,19 +241,17 @@ async function sha256Hex(str) {
   `;
   document.body.appendChild(qModal);
 
-  // --- REORGANIZE FAMILY SCREEN INTO CLEAN TABS ---
+  // --- REORGANIZE FAMILY SCREEN TABS: 1. AVAILABILITY -> 2. ASK NANA -> 3. ENTERTAINMENT ---
   const famScreen = $('family-screen');
   if (famScreen) {
-    // Grab existing elements from index.html so we preserve all IDs and handlers
     const hideCard = $('hide-me-card');
     const hoursCard = $('call-hours-card');
     const allCards = Array.from(famScreen.querySelectorAll('.settings-card'));
     const radioCard = allCards.find(c => c.id !== 'hide-me-card' && c.id !== 'call-hours-card');
     const bottomRows = Array.from(famScreen.children).filter(el => el.tagName === 'DIV' && !el.id && !el.classList.contains('settings-card') && el !== famScreen.firstElementChild);
-    const chatAndControlsRow = bottomRows[0]; // Contains Family Chat + ⚙️ Controls
-    const tgAndGuideRow = bottomRows[1];      // Contains 1. Connect Telegram + 2. Ringtone Guide
+    const chatAndControlsRow = bottomRows[0];
+    const tgAndGuideRow = bottomRows[1];
 
-    // Build Question Card
     const qCard = document.createElement('div');
     qCard.className = 'settings-card';
     qCard.style.cssText = 'width:100%;margin-bottom:0;padding:12px;';
@@ -277,7 +272,6 @@ async function sha256Hex(str) {
       </div>
     `;
 
-    // Build Video Queue Card (with collapsible drawer for Admin add/edit/sort)
     const adminEditorHtml = isAdminFamily ? `
       <button id="btn-toggle-admin-drawer" class="admin-drawer-toggle" onclick="toggleAdminVideoDrawer()">➕ Add / Edit Video Links & Sort Queue ▾</button>
       <div id="fam-admin-video-editor" style="display:none;background:#090d16;border:1px solid #334155;border-radius:12px;padding:8px;margin-bottom:6px;">
@@ -319,38 +313,22 @@ async function sha256Hex(str) {
       </div>
     `;
 
-    // Keep Family Chat & Admin Controls pinned right below the Ring Nana button
     if (chatAndControlsRow) {
       famScreen.insertBefore(chatAndControlsRow, hideCard || null);
     }
 
-    // Create the 3-Tab Navigation Bar & Panes
+    // Tabs order: 1. Availability (active first) -> 2. Ask Nana -> 3. Entertainment (last)
     const tabsBar = document.createElement('div');
     tabsBar.className = 'fam-tabs-bar';
     tabsBar.innerHTML = `
-      <button id="fam-tab-btn-media" class="fam-tab-btn active" onclick="switchFamilyPortalTab('media')">🎬 Media & Radio</button>
+      <button id="fam-tab-btn-avail" class="fam-tab-btn active" onclick="switchFamilyPortalTab('avail')">⏰ Availability</button>
       <button id="fam-tab-btn-ask" class="fam-tab-btn" onclick="switchFamilyPortalTab('ask')">❓ Ask Nana</button>
-      <button id="fam-tab-btn-avail" class="fam-tab-btn" onclick="switchFamilyPortalTab('avail')">⏰ Availability</button>
+      <button id="fam-tab-btn-media" class="fam-tab-btn" onclick="switchFamilyPortalTab('media')">🎬 Entertainment</button>
     `;
-
-    const paneMedia = document.createElement('div');
-    paneMedia.id = 'fam-pane-media';
-    paneMedia.className = 'fam-tab-pane active';
-    paneMedia.appendChild(vCard);
-    if (radioCard) {
-      radioCard.style.width = '100%';
-      radioCard.style.marginBottom = '0';
-      paneMedia.appendChild(radioCard);
-    }
-
-    const paneAsk = document.createElement('div');
-    paneAsk.id = 'fam-pane-ask';
-    paneAsk.className = 'fam-tab-pane';
-    paneAsk.appendChild(qCard);
 
     const paneAvail = document.createElement('div');
     paneAvail.id = 'fam-pane-avail';
-    paneAvail.className = 'fam-tab-pane';
+    paneAvail.className = 'fam-tab-pane active';
     if (hideCard) {
       hideCard.style.width = '100%';
       hideCard.style.marginBottom = '0';
@@ -366,14 +344,29 @@ async function sha256Hex(str) {
       paneAvail.appendChild(tgAndGuideRow);
     }
 
+    const paneAsk = document.createElement('div');
+    paneAsk.id = 'fam-pane-ask';
+    paneAsk.className = 'fam-tab-pane';
+    paneAsk.appendChild(qCard);
+
+    const paneMedia = document.createElement('div');
+    paneMedia.id = 'fam-pane-media';
+    paneMedia.className = 'fam-tab-pane';
+    if (radioCard) {
+      radioCard.style.width = '100%';
+      radioCard.style.marginBottom = '0';
+      paneMedia.appendChild(radioCard);
+    }
+    paneMedia.appendChild(vCard);
+
     famScreen.appendChild(tabsBar);
-    famScreen.appendChild(paneMedia);
-    famScreen.appendChild(paneAsk);
     famScreen.appendChild(paneAvail);
+    famScreen.appendChild(paneAsk);
+    famScreen.appendChild(paneMedia);
   }
 
   window.switchFamilyPortalTab = (tab) => {
-    ['media', 'ask', 'avail'].forEach(t => {
+    ['avail', 'ask', 'media'].forEach(t => {
       $(`fam-tab-btn-${t}`)?.classList.toggle('active', t === tab);
       $(`fam-pane-${t}`)?.classList.toggle('active', t === tab);
     });
@@ -392,36 +385,42 @@ async function sha256Hex(str) {
     }
   };
 
-  // --- INJECT PERIODIC POP-UP TIMING SETTINGS INTO SHARED SETTINGS MODAL ---
+  // --- INJECT TIME-OF-DAY POP-UP SCHEDULES INTO SHARED SETTINGS MODAL ---
   const sharedSettingsMount = $('shared-settings-cards');
   if (sharedSettingsMount) {
     const buildIntervalBtns = (settingKey, options) => options.map(([val, lbl]) =>
       `<button class="opt-btn" data-ppset="${settingKey}" data-ppval="${val}" onclick="updatePeriodicPopupSetting('${settingKey}', ${val})">${lbl}</button>`
     ).join('');
 
+    const buildHourToggles = (listKey, hours) => hours.map(h =>
+      `<button class="opt-btn" data-pphourlist="${listKey}" data-pphour="${h}" onclick="toggleScheduledPromptHour('${listKey}', ${h})">${String(h).padStart(2, '0')}:00</button>`
+    ).join('');
+
     const periodicCard = document.createElement('div');
     periodicCard.className = 'settings-card';
     periodicCard.innerHTML = `
       <div class="settings-label">
-        <span>⏰ Periodic Idle & Unread Pop-Up Prompts</span>
-        <span id="lbl-periodic-summary" style="color:#38bdf8;font-size:0.9rem;">Active</span>
+        <span>⏰ Scheduled Pop-Up Prompts (Times of Day)</span>
+        <span id="lbl-periodic-summary" style="color:#38bdf8;font-size:0.88rem;">Active</span>
       </div>
-      <div class="settings-sub">Automatically prompts Nana when she has unread messages or when the tablet has been idle with no calls.</div>
+      <div class="settings-sub">Choose times of day to ask Nana if she wants Classic FM or Judge John Deed (when she's idle), plus unread chat reminders.</div>
       <div class="opt-row" style="margin-bottom:8px;">
         <button class="opt-btn" data-ppset="periodicPopupsEnabled" data-ppval="true" onclick="updatePeriodicPopupSetting('periodicPopupsEnabled', true)">✅ Pop-Ups ON</button>
         <button class="opt-btn" data-ppset="periodicPopupsEnabled" data-ppval="false" onclick="updatePeriodicPopupSetting('periodicPopupsEnabled', false)">🔕 All Pop-Ups OFF</button>
       </div>
-      <div class="settings-sub" style="margin-bottom:4px;">💬 Unread Family Chat Prompt ("You have unread messages, would you like to read them?"):</div>
+      <div class="settings-sub" style="margin-bottom:4px;">🎻 Classic FM Radio Prompt Times (Tap hours to toggle on/off):</div>
       <div class="opt-row" style="margin-bottom:8px;">
-        ${buildIntervalBtns('unreadChatPopupMin', [[0,'Off'],[10,'10m'],[15,'15m'],[30,'30m'],[60,'1h'],[120,'2h']])}
+        ${buildHourToggles('radioPromptHours', [9, 10, 11, 13, 14, 15, 16, 19])}
+        <button class="opt-btn" style="background:#7f1d1d;color:#fff;" onclick="clearScheduledPromptHours('radioPromptHours')">Off</button>
       </div>
-      <div class="settings-sub" style="margin-bottom:4px;">🎻 Idle Classic FM Prompt ("Would you like to listen to Classic FM?"):</div>
+      <div class="settings-sub" style="margin-bottom:4px;">🎬 Judge John Deed Video Prompt Times (Tap hours to toggle on/off):</div>
       <div class="opt-row" style="margin-bottom:8px;">
-        ${buildIntervalBtns('idleRadioPopupMin', [[0,'Off'],[30,'30m'],[60,'1h'],[90,'1.5h'],[120,'2h'],[240,'4h']])}
+        ${buildHourToggles('videoPromptHours', [11, 14, 16, 17, 18, 19, 20])}
+        <button class="opt-btn" style="background:#7f1d1d;color:#fff;" onclick="clearScheduledPromptHours('videoPromptHours')">Off</button>
       </div>
-      <div class="settings-sub" style="margin-bottom:4px;">🎬 Idle Judge John Deed Prompt ("Would you like to watch Judge John Deed?"):</div>
+      <div class="settings-sub" style="margin-bottom:4px;">💬 Unread Family Chat Reminder ("You have unread messages, would you like to read them?"):</div>
       <div class="opt-row" style="margin-bottom:8px;">
-        ${buildIntervalBtns('idleVideoPopupMin', [[0,'Off'],[30,'30m'],[60,'1h'],[90,'1.5h'],[120,'2h'],[240,'4h']])}
+        ${buildIntervalBtns('unreadChatPopupMin', [[0,'Off'],[15,'15m'],[30,'30m'],[60,'1h'],[120,'2h']])}
       </div>
       <div class="settings-sub" style="margin-bottom:4px;">🗣️ Pop-Up Question & Prompt Voice:</div>
       <div class="opt-row">
@@ -437,8 +436,8 @@ async function sha256Hex(str) {
   let periodicConfig = {
     periodicPopupsEnabled: true,
     unreadChatPopupMin: 30,
-    idleRadioPopupMin: 60,
-    idleVideoPopupMin: 90,
+    radioPromptHours: [10, 15],
+    videoPromptHours: [14, 19],
     nightModeEnabled: true,
     nightStartHour: 21,
     nightEndHour: 8,
@@ -452,16 +451,28 @@ async function sha256Hex(str) {
 
   let lastActivityOrCallMs = Date.now();
   let lastUnreadChatPromptMs = Date.now();
-  let lastIdleRadioPromptMs = Date.now();
-  let lastIdleVideoPromptMs = Date.now();
   let lastAnyPeriodicPromptMs = 0;
 
   window.addEventListener('pointerdown', () => { lastActivityOrCallMs = Date.now(); }, { passive: true });
+
+  function parseHoursArray(val, fallback) {
+    if (Array.isArray(val)) return val.map(Number).filter(n => !isNaN(n));
+    if (val && typeof val === 'object') return Object.values(val).map(Number).filter(n => !isNaN(n));
+    if (val === 'none') return [];
+    return fallback;
+  }
 
   function refreshPeriodicSettingsUI() {
     document.querySelectorAll('[data-ppset]').forEach(btn => {
       const k = btn.dataset.ppset, v = btn.dataset.ppval;
       btn.classList.toggle('selected', String(periodicConfig[k]) === String(v));
+    });
+    ['radioPromptHours', 'videoPromptHours'].forEach(listKey => {
+      const arr = periodicConfig[listKey] || [];
+      document.querySelectorAll(`[data-pphourlist="${listKey}"]`).forEach(btn => {
+        const hr = Number(btn.dataset.pphour);
+        btn.classList.toggle('selected', arr.includes(hr));
+      });
     });
     const sumEl = $('lbl-periodic-summary');
     if (sumEl) {
@@ -469,8 +480,9 @@ async function sha256Hex(str) {
         sumEl.innerText = '🔕 All Off';
         sumEl.style.color = '#fca5a5';
       } else {
-        const fmt = (m) => m > 0 ? `${m}m` : 'Off';
-        sumEl.innerText = `Chat ${fmt(periodicConfig.unreadChatPopupMin)} • Radio ${fmt(periodicConfig.idleRadioPopupMin)} • Video ${fmt(periodicConfig.idleVideoPopupMin)}`;
+        const rHrs = (periodicConfig.radioPromptHours || []).map(h => `${String(h).padStart(2,'0')}:00`).join(', ') || 'Off';
+        const vHrs = (periodicConfig.videoPromptHours || []).map(h => `${String(h).padStart(2,'0')}:00`).join(', ') || 'Off';
+        sumEl.innerText = `Radio [${rHrs}] • Video [${vHrs}]`;
         sumEl.style.color = '#38bdf8';
       }
     }
@@ -480,6 +492,23 @@ async function sha256Hex(str) {
     periodicConfig[key] = val;
     refreshPeriodicSettingsUI();
     await update(settingsRef, { [key]: val });
+  };
+
+  window.toggleScheduledPromptHour = async (listKey, hour) => {
+    const cur = [...(periodicConfig[listKey] || [])];
+    const idx = cur.indexOf(hour);
+    if (idx >= 0) cur.splice(idx, 1);
+    else cur.push(hour);
+    cur.sort((a, b) => a - b);
+    periodicConfig[listKey] = cur;
+    refreshPeriodicSettingsUI();
+    await update(settingsRef, { [listKey]: cur.length ? cur : 'none' });
+  };
+
+  window.clearScheduledPromptHours = async (listKey) => {
+    periodicConfig[listKey] = [];
+    refreshPeriodicSettingsUI();
+    await update(settingsRef, { [listKey]: 'none' });
   };
 
   // --- TABLET DISCONNECT, WIFI, BACKGROUND & BATTERY TELEMETRY ---
@@ -550,50 +579,6 @@ async function sha256Hex(str) {
     });
   }
 
-  function diagnoseTabletConnectionStatus(p) {
-    if (!p || (!p.lastPing && !p.lastConnectedAt)) return null;
-    const now = Date.now();
-    const lastSeenMs = Math.max(Number(p.lastPing || 0), Number(p.disconnectedAt || 0), Number(p.appStateChangedAt || 0));
-    const silenceSec = lastSeenMs ? Math.floor((now - Number(p.lastPing || lastSeenMs)) / 1000) : 0;
-    const isOffline = (p.online === false) || (p.lastPing && silenceSec > 75);
-    const batt = p.batteryLevel != null ? Number(p.batteryLevel) : null;
-    const charging = !!p.isCharging;
-    const agoStr = lastSeenMs ? `${Math.max(1, Math.floor((now - lastSeenMs) / 60000))}m ago` : 'recently';
-
-    if (isOffline) {
-      if (batt !== null && !charging && (batt <= 6 || (batt <= 14 && silenceSec > 600))) {
-        return {
-          level: 'offline',
-          html: `🔴 <strong>TABLET OFFLINE — Likely Ran Out of Battery</strong><br><span style="color:#fca5a5;">Last battery reading was ${batt}% (unplugged) ${agoStr}.</span>`
-        };
-      }
-      if (p.appState === 'backgrounded' || p.appState === 'closed' || p.lastExitHint === 'backed_out_or_notification' || p.lastExitHint === 'app_closed_or_backed_out') {
-        return {
-          level: 'offline',
-          html: `🔴 <strong>TABLET OFFLINE — Backed Out of App / Opened Notification</strong><br><span style="color:#fca5a5;">Nana exited the NanaPhone screen ${agoStr}${batt !== null ? ` (Battery: ${batt}%)` : ''}.</span>`
-        };
-      }
-      if (p.lastExitHint === 'wifi_turned_off' || p.appState === 'shade_or_overlay' || p.lastExitHint === 'notification_shade_or_overlay') {
-        return {
-          level: 'offline',
-          html: `🔴 <strong>TABLET OFFLINE — Wi-Fi Turned Off from Notification Shade</strong><br><span style="color:#fca5a5;">Top notification bar was opened right before Wi-Fi disconnected (${agoStr}${batt !== null ? `, Battery: ${batt}%` : ''}).</span>`
-        };
-      }
-      return {
-        level: 'offline',
-        html: `🔴 <strong>TABLET DISCONNECTED FROM INTERNET</strong><br><span style="color:#fca5a5;">Wi-Fi was switched off or internet dropped ${agoStr}${batt !== null ? ` (Battery was ${batt}% ${charging ? 'charging' : 'unplugged'})` : ''}.</span>`
-      };
-    }
-
-    if (p.appState === 'backgrounded') {
-      return {
-        level: 'warn',
-        html: `🟠 <strong>LEFT APP SCREEN — Backed Out or Tapped a Notification</strong><br><span style="color:#fde047;">Wi-Fi is still connected, but NanaPhone is in the background (${agoStr}).</span>`
-      };
-    }
-    return null;
-  }
-
   function broadcastNanaCurrentScreen() {
     if (role !== 'nana') return;
     let screenState = 'home';
@@ -616,62 +601,103 @@ async function sha256Hex(str) {
     setTimeout(broadcastNanaCurrentScreen, 1500);
   }
 
-  function injectExtraPresenceLine() {
+  // --- CONCISE SINGLE-STATUS REPLACE ON FAMILY PRESENCE CARD ---
+  function getSimpleNanaStatusSummary() {
+    const p = latestPresenceSnap || {};
+    const now = Date.now();
+    const lastSeenMs = Math.max(Number(p.lastPing || 0), Number(p.disconnectedAt || 0), Number(p.appStateChangedAt || 0));
+    const silenceSec = lastSeenMs ? Math.floor((now - Number(p.lastPing || lastSeenMs)) / 1000) : 0;
+    const isOffline = (p.online === false) || (p.lastPing && silenceSec > 75);
+    const batt = p.batteryLevel != null ? Number(p.batteryLevel) : null;
+    const charging = !!p.isCharging;
+
+    // 1. In a Call or Ringing
+    const st = latestCallSnap?.status || 'idle';
+    if (st !== 'idle') {
+      const otherId = latestCallSnap.callerId === 'nana' ? latestCallSnap.targetId : latestCallSnap.callerId;
+      const withName = FAMILY_NAMES[otherId] || 'Family';
+      return {
+        border: '#f87171',
+        text: st === 'connected' ? `🔴 In a call with ${withName}` : `🟡 Ringing (${withName})`
+      };
+    }
+
+    // 2. Disconnected or Left the App
+    if (isOffline) {
+      if (batt !== null && !charging && (batt <= 6 || (batt <= 14 && silenceSec > 600))) {
+        return { border: '#ef4444', text: `🔴 Offline (Ran out of battery)` };
+      }
+      if (p.appState === 'backgrounded' || p.appState === 'closed' || p.lastExitHint === 'backed_out_or_notification' || p.lastExitHint === 'app_closed_or_backed_out') {
+        return { border: '#ef4444', text: `🟠 Left the app` };
+      }
+      if (p.lastExitHint === 'wifi_turned_off' || p.appState === 'shade_or_overlay' || p.lastExitHint === 'notification_shade_or_overlay') {
+        return { border: '#ef4444', text: `🔴 Offline (Wi-Fi turned off)` };
+      }
+      return { border: '#ef4444', text: `🔴 Offline (Disconnected from internet)` };
+    }
+    if (p.appState === 'backgrounded') {
+      return { border: '#facc15', text: `🟠 Left the app` };
+    }
+
+    // 3. Watching a Video
+    const curItem = getCurrentQueueItem();
+    const scr = p.currentScreen || 'home';
+    if ((currentStreamData.state === 'playing' && curItem) || scr === 'video_playing') {
+      return {
+        border: '#a855f7',
+        text: `🎬 Video is playing${curItem?.item?.title ? ` (${curItem.item.title})` : ''}`
+      };
+    }
+
+    // 4. Listening to the Radio
+    if (latestEntSnap?.activeKey && latestEntSnap.activeKey !== 'off') {
+      return { border: '#22c55e', text: `🎻 Listening to the radio` };
+    }
+
+    // 5. On the Family Chat (Reading or Typing)
+    if (scr === 'chat_typing') {
+      return { border: '#38bdf8', text: `⌨️ On the family chat (typing)` };
+    }
+    if (scr === 'chat') {
+      return { border: '#38bdf8', text: `✈️ On the family chat (reading)` };
+    }
+
+    // 6. Idle / Not doing anything
+    return { border: '#22c55e', text: `🟢 Not doing anything` };
+  }
+
+  function applySimpleFamilyPresenceCard() {
     if (role !== 'family') return;
     const card = $('nana-presence-card');
     if (!card) return;
-    const curItem = getCurrentQueueItem();
-    const scr = latestPresenceSnap?.currentScreen || 'home';
-    const isVidPlaying = currentStreamData.state === 'playing' && curItem;
-    const isOnVidScreen = scr === 'video_playing' || scr === 'video_paused' || isVidPlaying;
-    const isInChat = scr === 'chat' || scr === 'chat_typing';
 
-    const diag = diagnoseTabletConnectionStatus(latestPresenceSnap);
-    let html = '';
-    if (diag) {
-      html += `<div class="diag-alert-box ${diag.level === 'offline' ? 'diag-alert-offline' : 'diag-alert-warn'}">${diag.html}</div>`;
-      card.style.borderColor = diag.level === 'offline' ? '#ef4444' : '#facc15';
-    }
+    const summary = getSimpleNanaStatusSummary();
+    card.style.borderColor = summary.border;
 
-    if (isVidPlaying) {
-      const views = getViewCountForItem(curItem.item);
-      html += `<div style="color:#c4b5fd;font-weight:800;margin-top:2px;">🎬 Watching Video: ${curItem.item.title} (👁️ ${views})</div>`;
-    } else if (isOnVidScreen && curItem) {
-      html += `<div style="color:#cbd5e1;font-weight:700;font-size:0.9rem;margin-top:2px;">🎬 Video Screen (Paused: ${curItem.item.title})</div>`;
-    } else {
-      html += `<div style="color:#94a3b8;font-size:0.9rem;">🎬 Video: Off</div>`;
-    }
+    // Keep the existing touch/battery span & Telegram status span from app.js, but replace the clutter above them with 1 status line
+    const spans = Array.from(card.querySelectorAll('span'));
+    const touchBattHtml = spans[0] ? spans[0].outerHTML : '';
+    const tgStatusHtml = spans[1] ? `<br>${spans[1].outerHTML}` : '';
 
-    if (isInChat) {
-      html += `<div style="color:#38bdf8;font-weight:800;margin-top:2px;">${scr === 'chat_typing' ? '⌨️ Typing in Family Chat' : '✈️ Reading Family Chat'}</div>`;
-    } else {
-      html += `<div style="color:#94a3b8;font-size:0.9rem;">💬 Family Chat: Closed</div>`;
+    const cleanHtml = `<div style="font-size:1.05rem;font-weight:900;color:#fef08a;margin-bottom:2px;">${summary.text}</div>${touchBattHtml}${tgStatusHtml}`;
+    if (card.innerHTML !== cleanHtml) {
+      card.innerHTML = cleanHtml;
     }
-
-    let extraBox = $('nana-extra-presence-lines');
-    if (!extraBox) {
-      extraBox = document.createElement('div');
-      extraBox.id = 'nana-extra-presence-lines';
-      const firstBr = card.querySelector('span');
-      if (firstBr) card.insertBefore(extraBox, firstBr);
-      else card.appendChild(extraBox);
-    }
-    if (extraBox.innerHTML !== html) extraBox.innerHTML = html;
   }
 
   if (role === 'family') {
     onValue(presenceRef, snap => {
       latestPresenceSnap = snap.val() || {};
-      setTimeout(injectExtraPresenceLine, 30);
+      setTimeout(applySimpleFamilyPresenceCard, 20);
     });
-    setInterval(injectExtraPresenceLine, 15000);
+    setInterval(applySimpleFamilyPresenceCard, 15000);
     const cardEl = $('nana-presence-card');
     if (cardEl) {
       let obsLock = false;
       const obs = new MutationObserver(() => {
         if (obsLock) return;
         obsLock = true;
-        injectExtraPresenceLine();
+        applySimpleFamilyPresenceCard();
         obsLock = false;
       });
       obs.observe(cardEl, { childList: true });
@@ -788,10 +814,15 @@ async function sha256Hex(str) {
       $('global-q-voice-off')?.classList.toggle('selected', !speakQuestionsDefault);
       window.setFamilyQuestionSilentMode(!speakQuestionsDefault);
     }
-    ['periodicPopupsEnabled', 'unreadChatPopupMin', 'idleRadioPopupMin', 'idleVideoPopupMin',
-     'nightModeEnabled', 'nightStartHour', 'nightEndHour', 'bulletinClearedAt'].forEach(k => {
+    ['periodicPopupsEnabled', 'unreadChatPopupMin', 'nightModeEnabled', 'nightStartHour', 'nightEndHour', 'bulletinClearedAt'].forEach(k => {
       if (s[k] !== undefined) periodicConfig[k] = s[k];
     });
+    if (s.radioPromptHours !== undefined) {
+      periodicConfig.radioPromptHours = parseHoursArray(s.radioPromptHours, [10, 15]);
+    }
+    if (s.videoPromptHours !== undefined) {
+      periodicConfig.videoPromptHours = parseHoursArray(s.videoPromptHours, [14, 19]);
+    }
     refreshPeriodicSettingsUI();
   });
 
@@ -801,9 +832,10 @@ async function sha256Hex(str) {
 
   onValue(entertainmentRef, snap => {
     latestEntSnap = snap.val() || { activeKey: 'off' };
+    if (role === 'family') setTimeout(applySimpleFamilyPresenceCard, 20);
   });
 
-  // --- PERIODIC IDLE & UNREAD POP-UP ENGINE ---
+  // --- TIME-OF-DAY & UNREAD CHAT POP-UP ENGINE ---
   function isInNightModeWindow() {
     if (!periodicConfig.nightModeEnabled) return false;
     const h = new Date().getHours();
@@ -823,7 +855,7 @@ async function sha256Hex(str) {
     });
   }
 
-  async function evaluatePeriodicPopupsOnNana() {
+  async function evaluateScheduledPopupsOnNana() {
     if (role !== 'nana') return;
     if (!periodicConfig.periodicPopupsEnabled) return;
     if (isInNightModeWindow()) return;
@@ -838,6 +870,7 @@ async function sha256Hex(str) {
     const radioOpenOrPlaying = $('radio-screen')?.classList.contains('active') || (latestEntSnap?.activeKey && latestEntSnap.activeKey !== 'off');
     const videoPlaying = isNanaVideoActivelyPlaying();
 
+    // 1. Unread Family Chat Prompt
     const unreadMin = Number(periodicConfig.unreadChatPopupMin ?? 30);
     if (unreadMin > 0 && !chatOpen && !videoPlaying && hasUnreadFamilyChatMessages()) {
       if (now - lastUnreadChatPromptMs >= unreadMin * 60000) {
@@ -857,45 +890,60 @@ async function sha256Hex(str) {
       }
     }
 
+    // Only trigger scheduled Radio / Video prompts if Nana is not already busy and hasn't touched the screen in the last 3 minutes
     if (chatOpen || radioOpenOrPlaying || videoPlaying) return;
-    const idleElapsedMs = now - lastActivityOrCallMs;
+    if (now - lastActivityOrCallMs < 180000) return;
 
-    const radioMin = Number(periodicConfig.idleRadioPopupMin ?? 60);
-    if (radioMin > 0 && idleElapsedMs >= radioMin * 60000 && (now - lastIdleRadioPromptMs >= radioMin * 60000)) {
-      lastIdleRadioPromptMs = now;
-      lastAnyPeriodicPromptMs = now;
-      await set(quickQuestionRef, {
-        id: `q_idleradio_${now}`,
-        type: 'idle_radio_prompt',
-        question: 'Would you like to listen to Classic FM?',
-        askedBy: 'Classic FM Radio',
-        silent: !speakQuestionsDefault,
-        status: 'pending',
-        answer: null,
-        askedAt: now
-      });
-      return;
-    }
+    const d = new Date();
+    const curHour = d.getHours();
+    const curMin = d.getMinutes();
+    const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}_${curHour}`;
 
-    const videoMin = Number(periodicConfig.idleVideoPopupMin ?? 90);
-    if (videoMin > 0 && idleElapsedMs >= videoMin * 60000 && (now - lastIdleVideoPromptMs >= videoMin * 60000)) {
-      lastIdleVideoPromptMs = now;
-      lastAnyPeriodicPromptMs = now;
-      await set(quickQuestionRef, {
-        id: `q_idlevideo_${now}`,
-        type: 'idle_video_prompt',
-        question: 'Would you like to watch Judge John Deed?',
-        askedBy: 'Video Player',
-        silent: !speakQuestionsDefault,
-        status: 'pending',
-        answer: null,
-        askedAt: now
-      });
+    // Trigger within the first 20 minutes of any scheduled hour (once per scheduled hour per day)
+    if (curMin <= 20) {
+      // 2. Scheduled Time-of-Day Classic FM Prompt
+      if ((periodicConfig.radioPromptHours || []).includes(curHour)) {
+        const storageKey = `nana_sched_radio_${dateKey}`;
+        if (!localStorage.getItem(storageKey)) {
+          localStorage.setItem(storageKey, '1');
+          lastAnyPeriodicPromptMs = now;
+          await set(quickQuestionRef, {
+            id: `q_schedradio_${now}`,
+            type: 'idle_radio_prompt',
+            question: 'Would you like to listen to Classic FM?',
+            askedBy: 'Classic FM Radio',
+            silent: !speakQuestionsDefault,
+            status: 'pending',
+            answer: null,
+            askedAt: now
+          });
+          return;
+        }
+      }
+
+      // 3. Scheduled Time-of-Day Judge John Deed Video Prompt
+      if ((periodicConfig.videoPromptHours || []).includes(curHour)) {
+        const storageKey = `nana_sched_video_${dateKey}`;
+        if (!localStorage.getItem(storageKey)) {
+          localStorage.setItem(storageKey, '1');
+          lastAnyPeriodicPromptMs = now;
+          await set(quickQuestionRef, {
+            id: `q_schedvideo_${now}`,
+            type: 'idle_video_prompt',
+            question: 'Would you like to watch Judge John Deed?',
+            askedBy: 'Video Player',
+            silent: !speakQuestionsDefault,
+            status: 'pending',
+            answer: null,
+            askedAt: now
+          });
+        }
+      }
     }
   }
 
   if (role === 'nana') {
-    setInterval(evaluatePeriodicPopupsOnNana, 20000);
+    setInterval(evaluateScheduledPopupsOnNana, 20000);
   }
 
   async function attachSubtitleTrack(subUrl, forceReload = false) {
@@ -936,6 +984,10 @@ async function sha256Hex(str) {
   if (origOpenRadio) window.openRadioScreen = () => { origOpenRadio(); broadcastNanaCurrentScreen(); };
   const origCloseRadio = window.closeRadioScreen;
   if (origCloseRadio) window.closeRadioScreen = () => { origCloseRadio(); broadcastNanaCurrentScreen(); };
+  const origOpenKb = window.openSeniorKeyboard;
+  if (origOpenKb) window.openSeniorKeyboard = () => { origOpenKb(); broadcastNanaCurrentScreen(); };
+  const origCloseKb = window.closeSeniorKeyboard;
+  if (origCloseKb) window.closeSeniorKeyboard = (r) => { origCloseKb(r); broadcastNanaCurrentScreen(); };
 
   window.switchNanaMainTab = (tab) => {
     if (tab !== 'video') pauseVideoAndSavePosition('switched_tab');
@@ -1356,7 +1408,7 @@ async function sha256Hex(str) {
 
     if (role === 'family') {
       renderFamilyQueueUI();
-      injectExtraPresenceLine();
+      applySimpleFamilyPresenceCard();
       const st = $('fam-vid-status');
       if (st) {
         if (!curItem) { st.innerText = 'Queue Empty'; st.style.color = '#94a3b8'; }
@@ -1397,6 +1449,7 @@ async function sha256Hex(str) {
     if (!call) return;
     latestCallSnap = call;
     lastActivityOrCallMs = Date.now();
+    if (role === 'family') setTimeout(applySimpleFamilyPresenceCard, 20);
     if (call.status !== 'idle' && role === 'nana') {
       if ($('nana-question-modal')) $('nana-question-modal').style.display = 'none';
       if (videoEl && !videoEl.paused) pauseVideoAndSavePosition('incoming_call');
@@ -1452,7 +1505,6 @@ async function sha256Hex(str) {
     }
 
     if (qData.type === 'idle_radio_prompt') {
-      lastIdleRadioPromptMs = now;
       if (choice === 'YES') {
         window.openRadioScreen?.();
         set(entertainmentRef, { activeKey: "classicfm", title: "Classic FM Radio 🎻", timestamp: now }).catch(() => {});
@@ -1461,7 +1513,6 @@ async function sha256Hex(str) {
     }
 
     if (qData.type === 'idle_video_prompt') {
-      lastIdleVideoPromptMs = now;
       if (choice === 'YES') {
         window.openVideoScreen();
         const q = currentStreamData.queue || [];
