@@ -37,7 +37,7 @@
     <p style="font-size:1.4rem;">Tap anywhere on screen to wake up for 15 minutes</p>
   </div>
 
-  <!-- Supervisor PIN & Controls (No hardcoded PIN shown in HTML) -->
+  <!-- Supervisor PIN & Controls -->
   <div id="admin-pin-modal">
     <h1 id="admin-modal-title" style="font-size:1.9rem;color:#fef08a;margin:0;">⚙️ Supervisor & Tablet Controls</h1>
     <div class="file-versions-line" style="font-size:0.85rem;font-family:monospace;margin:2px 0 8px 0;"></div>
@@ -72,17 +72,28 @@
     </div>
   </div>
 
+  <!-- Yes / No Question Pop-Up Modal on Nana's Screen -->
+  <div id="nana-question-modal">
+    <div class="q-popup-card">
+      <div class="q-sender-badge" id="q-popup-sender">💬 Question from Family</div>
+      <div class="q-main-text" id="q-popup-text">Would you like a cup of tea?</div>
+      <div class="q-btn-row">
+        <button class="q-giant-choice q-yes-btn" onclick="submitNanaQuestionAnswer('YES')">✅ YES</button>
+        <button class="q-giant-choice q-no-btn" onclick="submitNanaQuestionAnswer('NO')">✖ NO</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Senior Telegram Chat & Fullscreen Keyboard -->
   <div id="bulletin-modal" oncontextmenu="return false;">
     <div class="tg-header">
-      <button class="tg-back-home-btn" onclick="closeFamilyBulletin()"><span>🏠</span> <span>Back to Family Calls</span></button>
-      <div class="tg-header-info">
-        <div class="tg-avatar-circle">✈️</div>
-        <div>
-          <div style="font-size:1.35rem;font-weight:900;color:var(--text-main);">Family Telegram Chat</div>
-          <div id="tg-send-status" style="font-size:0.95rem;color:#4ade80;font-weight:800;">🟢 Connected to Family Group</div>
-        </div>
+      <div class="nana-nav-pills">
+        <button class="nav-pill-btn calls-pill" onclick="switchNanaMainTab('calls')">📞 Family Calls</button>
+        <button class="nav-pill-btn chat-pill-x active-tab">✈️ Family Chat</button>
+        <button class="nav-pill-btn radio-pill-x" onclick="switchNanaMainTab('radio')">🎻 Classic FM</button>
+        <button class="nav-pill-btn video-pill-x" onclick="switchNanaMainTab('video')">🎬 Video</button>
       </div>
+      <div id="tg-send-status" style="font-size:0.95rem;color:#4ade80;font-weight:800;">🟢 Connected to Family Group</div>
     </div>
     <div id="bulletin-posts-container" class="tg-chat-feed" onscroll="handleChatScroll(this)"></div>
     <div class="tg-composer-area">
@@ -105,7 +116,7 @@
       </div>
       <div id="senior-kb-letters-container" class="kb-rows-wrapper"></div>
       <div class="kb-bottom-bar">
-        <button class="kb-letter-btn" style="background:#334155;color:#fff;" onclick="kbHideTapped()">🔽 View Messages</button>
+        <button class="kb-letter-btn kb-view-msgs-btn" style="background:#334155;color:#fff;" onclick="kbHideTapped()">🔽 View Messages</button>
         <button class="kb-letter-btn" style="background:var(--key-bg);" onpointerdown="typeSeniorKey(' ', event)">SPACE BAR</button>
         <button class="kb-letter-btn" style="background:#22c55e;color:#000;font-size:1.6rem;" onclick="submitTypedNanaMessage()">Send ➤</button>
       </div>
@@ -138,8 +149,10 @@
     <div class="header-bar">
       <div class="header-title" id="grid-header-title">Tap a photo to call family</div>
       <div class="header-pills">
+        <div class="nav-pill-btn calls-pill active-tab" onclick="switchNanaMainTab('calls')">📞 Family Calls</div>
         <div class="chat-pill" onclick="openFamilyBulletin()">✈️ Family Chat <span id="chat-unread-badge" class="chat-unread-badge">NEW</span></div>
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
+        <div class="nav-pill-btn video-pill-x" onclick="openVideoScreen()">🎬 Video</div>
         <div id="clock" class="clock-pill">12:00</div>
         <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.9.2</div>
       </div>
@@ -152,6 +165,10 @@
       <div class="missed-label">📞 Missed Calls:</div>
       <div id="missed-chips-container" class="missed-chips-row"></div>
     </div>
+    <div id="todays-calls-reassurance-banner">
+      <span style="white-space:nowrap;color:#4ade80;">💚 Spoken to Today:</span>
+      <div id="todays-calls-chips-container" class="todays-calls-chips"></div>
+    </div>
     <div id="calling-off-card" style="flex:1;width:100%;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:18px;">
       <div style="font-size:4rem;">💬</div>
       <div style="font-size:2.2rem;font-weight:900;color:var(--text-accent);">Video calling is switched off for now</div>
@@ -163,9 +180,14 @@
 
   <!-- 1B. Nana's Radio Screen -->
   <div id="radio-screen" class="screen" style="justify-content:space-between;padding:68px 18px 24px 18px;">
-    <div style="width:100%;display:flex;justify-content:space-between;align-items:center;">
-      <button class="cancel-btn" style="background:#22c55e;color:#000;border-color:#fff;font-size:1.8rem;padding:12px 28px;" onclick="closeRadioScreen()">🏠 Back to Family Calls</button>
-      <div id="radio-status-label" style="font-size:1.65rem;font-weight:900;color:var(--text-accent);">Radio Off</div>
+    <div class="nana-top-nav">
+      <div class="nana-nav-pills">
+        <button class="nav-pill-btn calls-pill" onclick="switchNanaMainTab('calls')">📞 Family Calls</button>
+        <button class="nav-pill-btn chat-pill-x" onclick="switchNanaMainTab('chat')">✈️ Family Chat</button>
+        <button class="nav-pill-btn radio-pill-x active-tab">🎻 Classic FM</button>
+        <button class="nav-pill-btn video-pill-x" onclick="switchNanaMainTab('video')">🎬 Video</button>
+      </div>
+      <div id="radio-status-label" style="font-size:1.45rem;font-weight:900;color:var(--text-accent);">Radio Off</div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;width:100%;">
       <button class="giant-radio-btn" id="btn-classicfm" onclick="toggleClassicFM()">
@@ -182,6 +204,38 @@
       <button id="btn-bottom-radio-toggle" class="cancel-btn" style="font-size:1.35rem;padding:10px 24px;background:#059669;border-color:#4ade80;color:#fff;" onclick="toggleClassicFM()">▶️ Start Radio</button>
     </div>
     <audio id="nana-radio-stream" preload="none"></audio>
+  </div>
+
+  <!-- 1C. Nana's Video Player Screen -->
+  <div id="video-screen" class="screen">
+    <div class="nana-top-nav">
+      <div class="nana-nav-pills">
+        <button class="nav-pill-btn calls-pill" onclick="switchNanaMainTab('calls')">📞 Family Calls</button>
+        <button class="nav-pill-btn chat-pill-x" onclick="switchNanaMainTab('chat')">✈️ Family Chat</button>
+        <button class="nav-pill-btn radio-pill-x" onclick="switchNanaMainTab('radio')">🎻 Classic FM</button>
+        <button class="nav-pill-btn video-pill-x active-tab">🎬 Video</button>
+      </div>
+      <div id="video-title-banner" style="font-size:1.3rem;font-weight:900;color:var(--text-accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🎬 Family Video Player</div>
+    </div>
+    <div class="video-stage-box" id="video-stage-touch" onclick="handleVideoStageTap(event)">
+      <video id="nana-video-el" crossorigin="anonymous" playsinline preload="metadata"></video>
+      <div id="video-tap-overlay">
+        <div id="video-overlay-icon" style="font-size:4.2rem;">▶️</div>
+        <div id="video-overlay-main">Tap Screen to Play Video</div>
+        <div id="video-overlay-sub" style="font-size:1.35rem;color:#cbd5e1;font-weight:700;">Touching the screen while playing pauses the video</div>
+      </div>
+    </div>
+    <div class="video-bottom-bar">
+      <div style="font-size:1.35rem;font-weight:900;color:var(--text-accent);">🔊 Video Vol: <span id="nana-video-vol-display">80%</span></div>
+      <div style="display:flex;gap:12px;">
+        <button class="vol-step-btn" style="font-size:1.45rem;padding:10px 22px;" onclick="adjustNanaVideoVolume(-15)">🔉 Quieter</button>
+        <button class="vol-step-btn" style="font-size:1.45rem;padding:10px 22px;background:#0284c7;" onclick="adjustNanaVideoVolume(15)">🔊 Louder</button>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button id="btn-bottom-video-toggle" class="cancel-btn" style="font-size:1.35rem;padding:10px 22px;background:#059669;border-color:#4ade80;color:#fff;" onclick="toggleNanaVideoPlayback()">▶️ Play Video</button>
+        <button class="cancel-btn" style="font-size:1.2rem;padding:10px 16px;background:#334155;border-color:#94a3b8;color:#fff;" onclick="restartNanaVideoFromBeginning()">⏮️ Restart</button>
+      </div>
+    </div>
   </div>
 
   <!-- 2. Outbound Call Screen -->
@@ -216,8 +270,8 @@
     <button id="hangup-btn" class="hangup-btn" onclick="endCall()">End Call</button>
   </div>
 
-  <!-- 5. Family Member Screen -->
-  <div id="family-screen" class="screen" style="justify-content:flex-start;gap:8px;padding:14px;overflow-y:auto;">
+  <!-- 5. Family Member Screen (Organized into 3 Clean Tabs) -->
+  <div id="family-screen" class="screen" style="justify-content:flex-start;gap:8px;padding:12px 12px 28px 12px;overflow-y:auto;">
     <div style="display:flex;align-items:center;gap:12px;margin-top:4px;">
       <img id="family-self-photo" src="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:3px solid #fff;">
       <h1 id="family-greeting" style="font-size:1.45rem;margin:0;">Call Nana</h1>
@@ -225,54 +279,121 @@
     <div id="nana-presence-card" style="background:#1e293b;border:2px solid #38bdf8;border-radius:14px;padding:8px 14px;font-size:0.95rem;line-height:1.4;width:92vw;max-width:540px;">Checking tablet status...</div>
     <button id="family-ring-btn" class="giant-btn" style="height:11vh;min-height:74px;font-size:1.85rem;width:92vw;max-width:540px;border-width:5px;border-radius:26px;" onclick="startCallFromFamily()">📹 Ring Nana Now</button>
 
-    <div class="settings-card" id="hide-me-card" style="width:92vw;max-width:540px;margin-bottom:2px;padding:10px 12px;">
-      <div class="settings-label" style="font-size:1.02rem;margin-bottom:2px;"><span>🙈 Hide Me Temporarily</span></div>
-      <div class="settings-sub hide-status-lbl" style="font-weight:800;margin-bottom:6px;"></div>
-      <div class="opt-row">
-        <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('30m')">30m</button>
-        <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('1h')">1h</button>
-        <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('2h')">2h</button>
-        <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('5h')">5h</button>
-        <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('tomorrow')">🌅 7am</button>
-        <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('manual')">♾️ Off</button>
-        <button class="opt-btn" style="padding:7px 8px;font-size:0.88rem;background:#064e3b;border-color:#22c55e;color:#fef08a;" onclick="showMeToNana()">👁️ Show</button>
-      </div>
-    </div>
-
-    <!-- Daily Calling Hours Limit (Timezone-Aware) -->
-    <div class="settings-card" id="call-hours-card" style="width:92vw;max-width:540px;margin-bottom:2px;padding:10px 12px;">
-      <div class="settings-label" style="font-size:1.02rem;margin-bottom:2px;">
-        <span>⏰ My Daily Calling Hours</span>
-        <span id="call-hours-tz-badge" style="font-size:0.8rem;color:#38bdf8;font-weight:800;"></span>
-      </div>
-      <div id="call-hours-status-lbl" class="settings-sub" style="font-weight:800;margin-bottom:6px;color:#4ade80;">🌐 Nana can call you anytime</div>
-      <div class="opt-row" style="margin-bottom:8px;">
-        <button id="btn-sched-anytime" class="opt-btn selected" style="padding:7px 8px;font-size:0.88rem;" onclick="setMyCallScheduleMode(false)">🌐 Anytime (24h)</button>
-        <button id="btn-sched-custom" class="opt-btn" style="padding:7px 8px;font-size:0.88rem;" onclick="setMyCallScheduleMode(true)">🕒 Limit My Hours</button>
-      </div>
-      <div id="call-hours-pickers" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span style="font-size:0.88rem;color:#cbd5e1;font-weight:800;">From:</span>
-        <select id="sched-start-hour" class="tz-select" onchange="saveMyCallScheduleHours()"></select>
-        <span style="font-size:0.88rem;color:#cbd5e1;font-weight:800;">To:</span>
-        <select id="sched-end-hour" class="tz-select" onchange="saveMyCallScheduleHours()"></select>
-      </div>
-    </div>
-
-    <div class="settings-card" style="width:92vw;max-width:540px;margin-bottom:2px;padding:10px 12px;">
-      <div class="settings-label" style="font-size:1.02rem;"><span>🎻 Classic FM Radio On Nana's Tablet</span><span id="lbl-remote-ent-status" style="color:#4ade80;font-size:0.9rem;">Off</span></div>
-      <div class="opt-row">
-        <button class="opt-btn" id="fam-ent-classicfm" onclick="remoteSetEntertainment('classicfm')">🎻 Turn ON</button>
-        <button class="opt-btn" style="background:#7f1d1d;border-color:#f87171;color:#fff;" onclick="remoteSetEntertainment('off')">⏹️ Turn OFF</button>
-      </div>
-    </div>
-
     <div style="display:flex;gap:8px;width:92vw;max-width:540px;">
       <button class="tone-btn" style="flex:1;background:#0088cc;border-color:#7dd3fc;" onclick="openFamilyBulletin()">✈️ Family Chat</button>
       <button id="family-controls-btn" class="tone-btn" style="flex:1;background:#1e293b;border-color:#facc15;color:#fef08a;display:none;" onclick="openSettingsModal()">⚙️ Controls</button>
     </div>
-    <div style="display:flex;gap:8px;width:92vw;max-width:540px;">
-      <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="flex:1;background:#0284c7;border-color:#38bdf8;">🔔 1. Connect Telegram</a>
-      <button class="tone-btn" style="flex:1;background:#0f172a;border-color:#22c55e;color:#86efac;" onclick="openPhoneGuideModal()">📱 2. Ringtone Guide</button>
+
+    <!-- Family Portal 3-Tab Bar: 1. Availability -> 2. Ask Nana -> 3. Entertainment -->
+    <div class="fam-tabs-bar">
+      <button id="fam-tab-btn-avail" class="fam-tab-btn active" onclick="switchFamilyPortalTab('avail')">⏰ Availability</button>
+      <button id="fam-tab-btn-ask" class="fam-tab-btn" onclick="switchFamilyPortalTab('ask')">❓ Ask Nana</button>
+      <button id="fam-tab-btn-media" class="fam-tab-btn" onclick="switchFamilyPortalTab('media')">🎬 Entertainment</button>
+    </div>
+
+    <!-- Tab 1: Availability & Setup -->
+    <div id="fam-pane-avail" class="fam-tab-pane active">
+      <div class="settings-card" id="hide-me-card" style="width:100%;margin-bottom:0;padding:10px 12px;">
+        <div class="settings-label" style="font-size:1.02rem;margin-bottom:2px;"><span>🙈 Hide Me Temporarily</span></div>
+        <div class="settings-sub hide-status-lbl" style="font-weight:800;margin-bottom:6px;"></div>
+        <div class="opt-row">
+          <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('30m')">30m</button>
+          <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('1h')">1h</button>
+          <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('2h')">2h</button>
+          <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('5h')">5h</button>
+          <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('tomorrow')">🌅 7am</button>
+          <button class="opt-btn" style="padding:7px 4px;font-size:0.88rem;" onclick="hideMeFromNana('manual')">♾️ Off</button>
+          <button class="opt-btn" style="padding:7px 8px;font-size:0.88rem;background:#064e3b;border-color:#22c55e;color:#fef08a;" onclick="showMeToNana()">👁️ Show</button>
+        </div>
+      </div>
+
+      <div class="settings-card" id="call-hours-card" style="width:100%;margin-bottom:0;padding:10px 12px;">
+        <div class="settings-label" style="font-size:1.02rem;margin-bottom:2px;">
+          <span>⏰ My Daily Calling Hours</span>
+          <span id="call-hours-tz-badge" style="font-size:0.8rem;color:#38bdf8;font-weight:800;"></span>
+        </div>
+        <div id="call-hours-status-lbl" class="settings-sub" style="font-weight:800;margin-bottom:6px;color:#4ade80;">🌐 Nana can call you anytime</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button id="btn-sched-anytime" class="opt-btn selected" style="padding:7px 8px;font-size:0.88rem;" onclick="setMyCallScheduleMode(false)">🌐 Anytime (24h)</button>
+          <button id="btn-sched-custom" class="opt-btn" style="padding:7px 8px;font-size:0.88rem;" onclick="setMyCallScheduleMode(true)">🕒 Limit My Hours</button>
+        </div>
+        <div id="call-hours-pickers" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:0.88rem;color:#cbd5e1;font-weight:800;">From:</span>
+          <select id="sched-start-hour" class="tz-select" onchange="saveMyCallScheduleHours()"></select>
+          <span style="font-size:0.88rem;color:#cbd5e1;font-weight:800;">To:</span>
+          <select id="sched-end-hour" class="tz-select" onchange="saveMyCallScheduleHours()"></select>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;width:100%;">
+        <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="flex:1;background:#0284c7;border-color:#38bdf8;">🔔 1. Connect Telegram</a>
+        <button class="tone-btn" style="flex:1;background:#0f172a;border-color:#22c55e;color:#86efac;" onclick="openPhoneGuideModal()">📱 2. Ringtone Guide</button>
+      </div>
+    </div>
+
+    <!-- Tab 2: Ask Nana a Yes/No Question -->
+    <div id="fam-pane-ask" class="fam-tab-pane">
+      <div class="settings-card" style="width:100%;margin-bottom:0;padding:12px;">
+        <div class="settings-label" style="font-size:1.02rem;">
+          <span>❓ Pop-Up Yes/No Question on Nana's Screen</span>
+          <span id="fam-q-status" style="font-size:0.85rem;color:#38bdf8;">Idle</span>
+        </div>
+        <div class="settings-sub" style="margin-bottom:8px;">Pops up a giant Yes/No question on Nana's screen and posts her answer to Family Chat.</div>
+        <input id="fam-q-input" class="family-input-box" type="text" placeholder="Type a Yes/No question for Nana..." />
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button id="btn-q-voice-loud" class="opt-btn selected" style="padding:7px 8px;font-size:0.86rem;" onclick="setFamilyQuestionSilentMode(false)">🔊 Read Aloud</button>
+          <button id="btn-q-voice-silent" class="opt-btn" style="padding:7px 8px;font-size:0.86rem;" onclick="setFamilyQuestionSilentMode(true)">🔇 Silent Pop-Up</button>
+        </div>
+        <div class="opt-row">
+          <button class="opt-btn" style="background:#059669;border-color:#4ade80;color:#fff;" onclick="sendQuestionToNana()">📤 Send Pop-Up</button>
+          <button class="opt-btn" style="background:#7f1d1d;border-color:#f87171;color:#fff;flex:0.45;" onclick="clearQuestionOnNana()">✖ Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Entertainment (Radio & Video Queue) -->
+    <div id="fam-pane-media" class="fam-tab-pane">
+      <div class="settings-card" style="width:100%;margin-bottom:0;padding:10px 12px;">
+        <div class="settings-label" style="font-size:1.02rem;"><span>🎻 Classic FM Radio On Nana's Tablet</span><span id="lbl-remote-ent-status" style="color:#4ade80;font-size:0.9rem;">Off</span></div>
+        <div class="opt-row">
+          <button class="opt-btn" id="fam-ent-classicfm" onclick="remoteSetEntertainment('classicfm')">🎻 Turn ON</button>
+          <button class="opt-btn" style="background:#7f1d1d;border-color:#f87171;color:#fff;" onclick="remoteSetEntertainment('off')">⏹️ Turn OFF</button>
+        </div>
+      </div>
+
+      <div class="settings-card" style="width:100%;margin-bottom:0;padding:10px 12px;">
+        <div class="settings-label" style="font-size:1.02rem;">
+          <span id="fam-vid-form-heading">🎬 Video Queue on Nana's Tablet</span>
+          <span id="fam-vid-status" style="font-size:0.85rem;color:#4ade80;">Stopped</span>
+        </div>
+        <button id="btn-toggle-admin-drawer" class="admin-drawer-toggle" style="display:none;" onclick="toggleAdminVideoDrawer()">➕ Add / Edit Video Links & Sort Queue ▾</button>
+        <div id="fam-admin-video-editor" style="display:none;background:#090d16;border:1px solid #334155;border-radius:12px;padding:8px;margin-bottom:6px;">
+          <input id="fam-vid-title" class="family-input-box" type="text" placeholder="Video Title (e.g. Judge John Deed - Ep 1)" />
+          <input id="fam-vid-url" class="family-input-box" type="url" placeholder="Video URL (https://server/video.mkv or .mp4)" />
+          <input id="fam-vid-sub" class="family-input-box" type="url" placeholder="Optional Subtitles URL (.vtt or .srt)" />
+          <div id="fam-vid-add-row" class="opt-row" style="margin-bottom:6px;">
+            <button class="opt-btn" style="background:#0284c7;border-color:#7dd3fc;color:#fff;" onclick="addVideoToQueue(false)">➕ Add to Queue</button>
+            <button class="opt-btn" style="background:#7c3aed;border-color:#c4b5fd;color:#fff;" onclick="addVideoToQueue(true)">▶️ Add & Play Now</button>
+          </div>
+          <div id="fam-vid-edit-row" class="opt-row" style="margin-bottom:6px;display:none;">
+            <button class="opt-btn" style="background:#d97706;border-color:#fef08a;color:#000;" onclick="saveEditedQueueItem()">💾 Save Changes</button>
+            <button class="opt-btn" style="background:#334155;border-color:#94a3b8;color:#fff;flex:0.45;" onclick="cancelEditQueueItem()">✖ Cancel</button>
+          </div>
+          <div class="opt-row">
+            <button class="opt-btn" style="padding:5px 4px;font-size:0.78rem;" onclick="sortVideoQueue('alpha_asc')">🔤 A–Z</button>
+            <button class="opt-btn" style="padding:5px 4px;font-size:0.78rem;" onclick="sortVideoQueue('alpha_desc')">🔤 Z–A</button>
+            <button class="opt-btn" style="padding:5px 4px;font-size:0.78rem;" onclick="sortVideoQueue('views_asc')">👁️ Views ↑</button>
+            <button class="opt-btn" style="padding:5px 4px;font-size:0.78rem;" onclick="sortVideoQueue('views_desc')">👁️ Views ↓</button>
+          </div>
+        </div>
+        <div id="fam-queue-container" class="fam-queue-list"></div>
+        <div class="opt-row">
+          <button class="opt-btn" style="background:#334155;border-color:#94a3b8;color:#fff;flex:0.6;" onclick="remoteCommandVideo('prev')">⏮️ Prev</button>
+          <button class="opt-btn" style="background:#059669;border-color:#4ade80;color:#fff;" onclick="remoteCommandVideo('play')">▶️ Play</button>
+          <button class="opt-btn" style="background:#b45309;border-color:#fde047;color:#fff;" onclick="remoteCommandVideo('pause')">⏸️ Pause</button>
+          <button class="opt-btn" style="background:#334155;border-color:#94a3b8;color:#fff;flex:0.6;" onclick="remoteCommandVideo('next')">⏭️ Next</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -295,7 +416,7 @@
     <button class="cancel-btn" style="background:#22c55e;color:#000;padding:12px 40px;font-size:1.4rem;" onclick="closeSettingsModal()">✔ Done</button>
   </div>
 
-  <!-- Secure Auth Error Screen (No hardcoded secret in HTML!) -->
+  <!-- Secure Auth Error Screen -->
   <div id="auth-error-screen" class="screen" style="background:#450a0a;justify-content:center;gap:18px;">
     <h1 style="font-size:2.4rem;margin:0;">🔒 Private Family Portal</h1>
     <p style="margin:0;">Please open this page using your personal link from the Family Telegram Bot, or enter the family access key below:</p>
@@ -304,7 +425,11 @@
       <button class="confirm-btn" style="background:#22c55e;color:#000;font-size:1.4rem;padding:12px 24px;" onclick="submitManualKey()">🔓 Unlock</button>
     </div>
   </div>
-<script type="module" src="app.js?v=2.9.2"></script>
-  <script type="module" src="nana-extras.js?v=2.9.2"></script>
+
+  <script type="module" src="app.js?v=2.9.2"></script>
+  <script type="module" src="nana-core.js?v=2.9.2"></script>
+  <script type="module" src="nana-video.js?v=2.9.2"></script>
+  <script type="module" src="nana-popups.js?v=2.9.2"></script>
+  <script type="module" src="nana-telemetry.js?v=2.9.2"></script>
 </body>
 </html>
