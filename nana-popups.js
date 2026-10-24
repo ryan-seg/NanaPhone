@@ -1,10 +1,22 @@
-import { $, NanaCore, set, update, push, onValue, query, limitToLast } from "./nana-core.js?v=2.9.2";
+import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from "./nana-core.js?v=2.9.2";
 
 (function initNanaPopups() {
   if (!NanaCore.SERVICE_TOKEN) return;
-  const { SERVICE_TOKEN, PORTAL_NODE_ID, GOOGLE_SCRIPT_URL, role, senderName, refs, state, hooks } = NanaCore;
+  const { SERVICE_TOKEN, PORTAL_NODE_ID, GOOGLE_SCRIPT_URL, basePath, db, role, senderName, refs, state, hooks } = NanaCore;
 
-  // Inject Scheduled Prompts & Today's Calls Banner Toggle into Shared Settings Modal
+  // 1. Inject Last 5 Questions History Container into the "Ask Nana" Tab on Family Screen
+  const askPaneCard = document.querySelector('#fam-pane-ask .settings-card');
+  if (askPaneCard && !$('fam-q-history-box')) {
+    const histWrap = document.createElement('div');
+    histWrap.style.cssText = 'margin-top:12px;border-top:2px solid #334155;padding-top:10px;width:100%;';
+    histWrap.innerHTML = `
+      <div class="settings-sub" style="margin-bottom:4px;font-weight:800;color:#fef08a;">🕘 Last 5 Questions Asked by Family:</div>
+      <div id="fam-q-history-box" class="fam-q-history-list"></div>
+    `;
+    askPaneCard.appendChild(histWrap);
+  }
+
+  // 2. Inject Scheduled Prompts & Today's Calls Banner Toggle into Shared Settings Modal
   const sharedSettingsMount = $('shared-settings-cards');
   if (sharedSettingsMount) {
     const buildIntervalBtns = (settingKey, options) => options.map(([val, lbl]) =>
@@ -163,6 +175,62 @@ import { $, NanaCore, set, update, push, onValue, query, limitToLast } from "./n
     state.bulletinSnap = snap.val() || {};
   });
 
+  // --- 3. RENDER LAST 5 FAMILY QUESTIONS LOG & ASK AGAIN ---
+  function formatQuestionTimestamp(ms) {
+    if (!ms) return '';
+    const d = new Date(ms);
+    const isToday = d.toDateString() === new Date().toDateString();
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return isToday ? `Today ${timeStr}` : `${d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })} ${timeStr}`;
+  }
+
+  function renderFamilyQuestionHistory() {
+    const box = $('fam-q-history-box');
+    if (!box) return;
+    const entries = Object.entries(state.questionHistorySnap || {})
+      .map(([k, v]) => ({ key: k, ...v }))
+      .filter(item => item && item.question)
+      .sort((a, b) => (b.askedAt || 0) - (a.askedAt || 0))
+      .slice(0, 5);
+
+    if (!entries.length) {
+      box.innerHTML = `<div style="color:#94a3b8;font-size:0.84rem;padding:6px;">No questions asked yet.</div>`;
+      return;
+    }
+
+    box.innerHTML = '';
+    entries.forEach(item => {
+      const askedStr = formatQuestionTimestamp(item.askedAt);
+      let ansBadge = `<span style="color:#facc15;">⏳ Waiting for answer</span>`;
+      if (item.status === 'answered') {
+        const ansTime = item.answeredAt ? new Date(item.answeredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        ansBadge = item.answer === 'YES'
+          ? `<span style="color:#4ade80;">✅ Answered YES${ansTime ? ' at ' + ansTime : ''}</span>`
+          : `<span style="color:#f87171;">✖ Answered NO${ansTime ? ' at ' + ansTime : ''}</span>`;
+      } else if (item.status === 'cleared') {
+        ansBadge = `<span style="color:#94a3b8;">✖ Cleared</span>`;
+      }
+
+      const row = document.createElement('div');
+      row.className = 'fam-q-hist-item';
+      row.innerHTML = `
+        <div class="fam-q-hist-info">
+          <div class="fam-q-hist-text">"${item.question}"</div>
+          <div class="fam-q-hist-meta">👤 ${item.askedBy || 'Family'} • ${askedStr} • ${ansBadge}</div>
+        </div>
+        <button class="fam-q-mini-btn" style="background:#059669;border-color:#4ade80;padding:6px 10px;white-space:nowrap;" title="Send this question to Nana's screen again">🔄 Ask Again</button>
+      `;
+      row.querySelector('button').onclick = () => window.askFamilyQuestionAgain(item.question);
+      box.appendChild(row);
+    });
+  }
+
+  onValue(query(refs.questionHistory, limitToLast(10)), snap => {
+    state.questionHistorySnap = snap.val() || {};
+    if (role === 'family') renderFamilyQuestionHistory();
+  });
+
+  // --- 4. TIME-OF-DAY & UNREAD CHAT POP-UP ENGINE ---
   function isInNightModeWindow() {
     if (!periodicConfig.nightModeEnabled) return false;
     const h = new Date().getHours();
@@ -261,25 +329,52 @@ import { $, NanaCore, set, update, push, onValue, query, limitToLast } from "./n
 
   if (role === 'nana') setInterval(evaluateScheduledPopupsOnNana, 20000);
 
-  window.sendQuestionToNana = async () => {
-    const input = $('fam-q-input');
-    const text = (input?.value || '').trim();
+  async function dispatchFamilyQuestionPopup(questionText) {
+    const text = (questionText || '').trim();
     if (!text) return alert("Please type a question for Nana first.");
+    const now = Date.now();
+    const histNode = await push(refs.questionHistory, {
+      question: text,
+      askedBy: senderName,
+      silent: state.familyComposerSilent,
+      status: 'pending',
+      answer: null,
+      askedAt: now
+    });
     await set(refs.quickQuestion, {
-      id: `q_${Date.now()}`,
+      id: `q_${now}`,
+      historyKey: histNode.key,
       type: 'family_question',
       question: text,
       askedBy: senderName,
       silent: state.familyComposerSilent,
       status: 'pending',
       answer: null,
-      askedAt: Date.now()
+      askedAt: now
     });
+  }
+
+  window.sendQuestionToNana = async () => {
+    const input = $('fam-q-input');
+    const text = (input?.value || '').trim();
+    if (!text) return alert("Please type a question for Nana first.");
+    await dispatchFamilyQuestionPopup(text);
     if (input) input.value = '';
   };
 
+  window.askFamilyQuestionAgain = async (questionText) => {
+    await dispatchFamilyQuestionPopup(questionText);
+  };
+
   window.clearQuestionOnNana = async () => {
-    await set(refs.quickQuestion, { status: 'cleared', updatedAt: Date.now() });
+    const now = Date.now();
+    if (activeQuestionData?.historyKey) {
+      update(ref(db, `${basePath}/questionHistory/${activeQuestionData.historyKey}`), {
+        status: 'cleared',
+        clearedAt: now
+      }).catch(() => {});
+    }
+    await set(refs.quickQuestion, { status: 'cleared', updatedAt: now });
   };
 
   window.submitNanaQuestionAnswer = async (choice) => {
@@ -292,6 +387,14 @@ import { $, NanaCore, set, update, push, onValue, query, limitToLast } from "./n
 
     const now = Date.now();
     await update(refs.quickQuestion, { status: 'answered', answer: choice, answeredAt: now });
+
+    if (qData.historyKey) {
+      update(ref(db, `${basePath}/questionHistory/${qData.historyKey}`), {
+        status: 'answered',
+        answer: choice,
+        answeredAt: now
+      }).catch(() => {});
+    }
 
     if (qData.type === 'next_video_prompt') {
       const targetIdx = Number(qData.nextIndex) || 0;
