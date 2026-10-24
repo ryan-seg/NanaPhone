@@ -218,3 +218,69 @@ body.role-nana .hangup-btn { display: none !important; }
 
 #brightness-overlay { position: fixed; inset: 0; background: #000; pointer-events: none; z-index: 145; opacity: 0; transition: opacity 0.6s ease; }
 #night-dimmer { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.96); z-index: 150; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; font-size: 2.2rem; }
+
+/* Top 68px No-Touch Orientation Banner (Day, Time of Day, Date & Clock) */
+#nana-top-orientation-bar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 62px;
+  z-index: 140;
+  background: var(--bg-panel);
+  border-bottom: 3px solid var(--border-accent);
+  color: var(--text-accent);
+  font-size: clamp(1.35rem, 2.3vw, 1.95rem);
+  font-weight: 900;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 0 18px;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+body.role-nana #nana-top-orientation-bar {
+  display: flex;
+}
+
+/* Recent 5 Questions History List on Family Screen */
+.fam-q-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.fam-q-hist-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #0f172a;
+  border: 2px solid #334155;
+  border-radius: 12px;
+  padding: 8px 10px;
+  text-align: left;
+}
+.fam-q-hist-info {
+  flex: 1;
+  min-width: 0;
+}
+.fam-q-hist-text {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #f8fafc;
+  word-wrap: break-word;
+}
+.fam-q-hist-meta {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #94a3b8;
+  margin-top: 2px;
+}
