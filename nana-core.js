@@ -43,15 +43,16 @@ export const NanaCore = {
   basePath,
   db,
   refs: {
-    quickQuestion: ref(db, `${basePath}/quickQuestion`),
-    videoStream:   ref(db, `${basePath}/videoStream`),
-    settings:      ref(db, `${basePath}/settings`),
-    callState:     ref(db, `${basePath}/callState`),
-    callHistory:   ref(db, `${basePath}/callHistory`),
-    bulletin:      ref(db, `${basePath}/bulletin`),
-    presence:      ref(db, `${basePath}/presence`),
-    entertainment: ref(db, `${basePath}/entertainment`),
-    connectedInfo: ref(db, `.info/connected`)
+    quickQuestion:   ref(db, `${basePath}/quickQuestion`),
+    questionHistory: ref(db, `${basePath}/questionHistory`),
+    videoStream:     ref(db, `${basePath}/videoStream`),
+    settings:        ref(db, `${basePath}/settings`),
+    callState:       ref(db, `${basePath}/callState`),
+    callHistory:     ref(db, `${basePath}/callHistory`),
+    bulletin:        ref(db, `${basePath}/bulletin`),
+    presence:        ref(db, `${basePath}/presence`),
+    entertainment:   ref(db, `${basePath}/entertainment`),
+    connectedInfo:   ref(db, `.info/connected`)
   },
   state: {
     streamData: { queue: [], currentIndex: 0, state: "paused", savedTimes: {}, viewCounts: {} },
@@ -60,8 +61,10 @@ export const NanaCore = {
     callSnap: { status: 'idle' },
     entSnap: { activeKey: 'off' },
     callHistorySnap: {},
+    questionHistorySnap: {},
     speakQuestionsDefault: true,
     familyComposerSilent: false,
+    batteryVoiceThresholdPct: 100,
     lastActivityOrCallMs: Date.now()
   },
   hooks: {
