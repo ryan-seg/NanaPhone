@@ -154,7 +154,7 @@ import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.2";
   };
   hooks.openVideoScreen = window.openVideoScreen;
 
-  function saveCurrentVideoTime(force = false) {
+function saveCurrentVideoTime(force = false) {
     const curItem = getCurrentQueueItem();
     if (!videoEl || !curItem) return;
     const cur = Math.floor(videoEl.currentTime || 0);
@@ -164,11 +164,23 @@ import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.2";
       if (!state.streamData.savedTimes) state.streamData.savedTimes = {};
       state.streamData.savedTimes[curItem.item.id] = cur;
       if (role === 'nana') {
-        update(refs.videoStream, { [`savedTimes/${curItem.item.id}`]: cur, updatedAt: Date.now() }).catch(() => {});
+        const isPlayingNow = !videoEl.paused && !videoEl.ended && $('video-screen')?.classList.contains('active');
+        update(refs.videoStream, {
+          state: isPlayingNow ? 'playing' : state.streamData.state,
+          [`savedTimes/${curItem.item.id}`]: cur,
+          updatedAt: Date.now()
+        }).catch(() => {});
+        if (isPlayingNow) {
+          update(refs.presence, {
+            online: true,
+            currentScreen: 'video_playing',
+            lastActivity: `Watching ${curItem.item.title || 'Video'}`,
+            lastPing: Date.now()
+          }).catch(() => {});
+        }
       }
     }
   }
-
   function syncVideoUI(customStatusMessage = null) {
     const curItem = getCurrentQueueItem();
     const playing = !!(videoEl && !videoEl.paused && !videoEl.ended && curItem);
@@ -316,11 +328,77 @@ import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.2";
     else startOrResumeVideo();
   };
 
+// --- RESTART VIDEO CONFIRMATION POP-UP FOR NANA ---
+  let restartConfirmTimer = null;
+  let wasPlayingBeforeRestartPrompt = false;
+
+  function ensureRestartVideoConfirmModal() {
+    let m = $('restart-video-confirm-modal');
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'restart-video-confirm-modal';
+      m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(9,13,22,0.93);z-index:10006;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;';
+      m.innerHTML = `
+        <div style="background:#1e293b;border:6px solid #facc15;border-radius:30px;padding:30px 34px;max-width:680px;width:92vw;box-shadow:0 16px 40px rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;gap:18px;">
+          <div style="font-size:clamp(1.8rem,3.2vw,2.4rem);font-weight:900;color:#fef08a;">⏮️ Start Episode From the Beginning?</div>
+          <div id="restart-video-confirm-sub" style="font-size:clamp(1.2rem,2.1vw,1.55rem);color:#e2e8f0;font-weight:700;line-height:1.35;">
+            Do you want to go back to the very start of this episode?
+          </div>
+          <div style="display:flex;gap:18px;width:100%;margin-top:8px;">
+            <button class="confirm-btn" style="flex:1;background:#22c55e;color:#000;border:4px solid #fff;font-size:clamp(1.3rem,2.3vw,1.7rem);padding:20px 14px;border-radius:20px;font-weight:900;" onclick="cancelRestartNanaVideo()">▶️ No, Keep Watching</button>
+            <button class="confirm-btn" style="flex:1;background:#dc2626;color:#fff;border:4px solid #fca5a5;font-size:clamp(1.3rem,2.3vw,1.7rem);padding:20px 14px;border-radius:20px;font-weight:900;" onclick="confirmRestartNanaVideoNow()">⏮️ Yes, Start Again</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(m);
+    }
+    return m;
+  }
+
   window.restartNanaVideoFromBeginning = () => {
     const curItem = getCurrentQueueItem();
     if (!videoEl || !curItem) return;
+
+    // If on Nana's tablet, show the big confirmation popup before wiping her saved timestamp
+    if (role === 'nana') {
+      wasPlayingBeforeRestartPrompt = !videoEl.paused;
+      if (wasPlayingBeforeRestartPrompt) videoEl.pause();
+      const modal = ensureRestartVideoConfirmModal();
+      const subEl = $('restart-video-confirm-sub');
+      if (subEl) {
+        subEl.textContent = `Are you sure you want to restart "${curItem.item.title || 'this video'}" back to the very beginning?`;
+      }
+      modal.style.display = 'flex';
+      clearTimeout(restartConfirmTimer);
+      // Auto-dismiss after 12 seconds if pressed by mistake
+      restartConfirmTimer = setTimeout(() => window.cancelRestartNanaVideo(), 12000);
+      return;
+    }
+
+    window.confirmRestartNanaVideoNow();
+  };
+
+  window.cancelRestartNanaVideo = () => {
+    clearTimeout(restartConfirmTimer);
+    if ($('restart-video-confirm-modal')) $('restart-video-confirm-modal').style.display = 'none';
+    if (wasPlayingBeforeRestartPrompt) {
+      wasPlayingBeforeRestartPrompt = false;
+      startOrResumeVideo();
+    }
+  };
+
+  window.confirmRestartNanaVideoNow = () => {
+    clearTimeout(restartConfirmTimer);
+    wasPlayingBeforeRestartPrompt = false;
+    if ($('restart-video-confirm-modal')) $('restart-video-confirm-modal').style.display = 'none';
+    const curItem = getCurrentQueueItem();
+    if (!videoEl || !curItem) return;
+    lastSavedTimeSec = 0;
     localStorage.setItem(`nana_vid_pos_${curItem.item.url}`, '0');
     if (state.streamData.savedTimes) state.streamData.savedTimes[curItem.item.id] = 0;
+    if (role === 'nana') {
+      update(refs.videoStream, { [`savedTimes/${curItem.item.id}`]: 0, updatedAt: Date.now() }).catch(() => {});
+    }
     try { videoEl.currentTime = 0; } catch (_) {}
     startOrResumeVideo();
   };
@@ -605,14 +683,14 @@ import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.2";
     state.streamData = normalizeStreamData(snap.val());
     const curItem = getCurrentQueueItem();
 
-    if (role === 'family') {
+  if (role === 'family') {
       renderFamilyQueueUI();
-      hooks.refreshFamilyPresence?.();
+      setTimeout(() => hooks.refreshFamilyPresence?.(), 20);
       const st = $('fam-vid-status');
       if (st) {
         if (!curItem) { st.innerText = 'Queue Empty'; st.style.color = '#94a3b8'; }
         else {
-          const isTrulyPlaying = state.presenceSnap?.currentScreen === 'video_playing';
+          const isTrulyPlaying = state.streamData.state === 'playing' || state.presenceSnap?.currentScreen === 'video_playing';
           const sec = getSavedTimeForItem(curItem.item, curItem.index);
           const mins = Math.floor(sec / 60), secs = String(sec % 60).padStart(2, '0');
           st.innerText = isTrulyPlaying
