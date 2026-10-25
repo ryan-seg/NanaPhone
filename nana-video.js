@@ -5,6 +5,11 @@ import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.2";
   const { role, isAdminFamily, senderName, refs, state, hooks } = NanaCore;
   const videoEl = $('nana-video-el');
 
+  // CRITICAL FIX 1: Remove crossorigin="anonymous" so external MKV/MP4 servers without CORS headers aren't blocked!
+  if (videoEl) {
+    videoEl.removeAttribute('crossorigin');
+  }
+
   if (isAdminFamily && $('btn-toggle-admin-drawer')) {
     $('btn-toggle-admin-drawer').style.display = 'block';
   }
@@ -164,7 +169,7 @@ import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.2";
     }
   }
 
-  function syncVideoUI() {
+  function syncVideoUI(customStatusMessage = null) {
     const curItem = getCurrentQueueItem();
     const playing = !!(videoEl && !videoEl.paused && !videoEl.ended && curItem);
     const overlay = $('video-tap-overlay'), icon = $('video-overlay-icon'), main = $('video-overlay-main'), sub = $('video-overlay-sub'), btn = $('btn-bottom-video-toggle');
@@ -178,16 +183,19 @@ import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.2";
       overlay?.classList.remove('playing-hidden');
       if (icon) icon.innerText = '🎬';
       if (main) main.innerText = 'No videos in queue yet';
-      if (sub) sub.innerText = 'Family can start a video from their phone';
-    } else if (playing) {
+      if (sub) sub.innerText = 'Family can add videos from their phone (Entertainment tab)';
+    } else if (playing && !customStatusMessage) {
       overlay?.classList.add('playing-hidden');
     } else {
       overlay?.classList.remove('playing-hidden');
       const rem = getSavedTimeForItem(curItem.item, curItem.index);
       const mins = Math.floor(rem / 60), secs = String(rem % 60).padStart(2, '0');
-      if (icon) icon.innerText = '⏸️';
-      if (main) main.innerText = rem > 2 ? `${curItem.item.title || 'Video'} — Paused at ${mins}:${secs}` : `Ready: ${curItem.item.title || 'Video'} (${curItem.index + 1} of ${curItem.total})`;
-      if (sub) sub.innerText = 'Tap anywhere on the video screen to play';
+      if (icon) icon.innerText = customStatusMessage ? '⏳' : '▶️';
+      if (main) {
+        main.innerText = customStatusMessage
+          || (rem > 2 ? `${curItem.item.title || 'Video'} — Paused at ${mins}:${secs}` : `Ready: ${curItem.item.title || 'Video'} (${curItem.index + 1} of ${curItem.total})`);
+      }
+      if (sub) sub.innerText = 'Tap anywhere on the video screen or press Play Video below';
     }
     if (btn) {
       btn.innerText = playing ? '⏸️ Pause Video' : '▶️ Play Video';
@@ -222,25 +230,47 @@ import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.2";
   }
   hooks.pauseVideo = pauseVideoAndSavePosition;
 
-  async function startOrResumeVideo() {
+  // CRITICAL FIX 2 & 3: Synchronously invoke videoEl.play() inside the tap gesture (no await before .play()!)
+  function startOrResumeVideo() {
     const curItem = getCurrentQueueItem();
-    if (!videoEl || !curItem) return;
-    window.stopRadioAndSync?.(true);
+    if (!videoEl || !curItem || !curItem.item.url) {
+      syncVideoUI('No video URL in queue yet — add one in Family Entertainment tab');
+      return;
+    }
+    window.stopRadioAndSync?.(false);
+
     const { item, index } = curItem;
-    if (lastLoadedVideoUrl !== item.url) {
+    videoEl.removeAttribute('crossorigin');
+
+    if (lastLoadedVideoUrl !== item.url || !videoEl.getAttribute('src')) {
       lastLoadedVideoUrl = item.url;
       videoEl.src = item.url;
-      videoEl.load();
     }
-    await attachSubtitleTrack(item.subtitleUrl || '');
+
+    // Load subtitles asynchronously in the background so we never block the synchronous tap gesture
+    attachSubtitleTrack(item.subtitleUrl || '');
+
     const targetResume = getSavedTimeForItem(item, index);
-    const playNow = () => {
+    const applySeek = () => {
       if (targetResume > 2 && Math.abs((videoEl.currentTime || 0) - targetResume) > 3) {
         try { videoEl.currentTime = targetResume; } catch (_) {}
       }
       if (videoEl.textTracks?.[0]) videoEl.textTracks[0].mode = 'showing';
-      applyVideoVolume(videoVolume);
-      videoEl.play().then(() => {
+    };
+
+    if (videoEl.readyState >= 1) {
+      applySeek();
+    } else {
+      syncVideoUI(`⏳ Loading "${item.title || 'Video'}"...`);
+      videoEl.addEventListener('loadedmetadata', applySeek, { once: true });
+    }
+
+    applyVideoVolume(videoVolume);
+    videoEl.muted = false;
+
+    const playPromise = videoEl.play();
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
         requestVideoWakeLock();
         keepScreenAwakeIfPlayingVideo();
         syncVideoUI();
@@ -253,7 +283,8 @@ import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.2";
             updatedAt: Date.now()
           }).catch(() => {});
         }
-      }).catch(() => {
+      }).catch((err) => {
+        console.warn("Video play interrupted or blocked:", err);
         syncVideoUI();
         startNormalDimCountdownOnPause();
         if (role === 'nana') {
@@ -261,22 +292,26 @@ import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.2";
           hooks.broadcastScreen?.();
         }
       });
-    };
-    if (videoEl.readyState >= 1) playNow();
-    else videoEl.addEventListener('loadedmetadata', playNow, { once: true });
+    }
   }
 
   window.handleVideoStageTap = (ev) => {
     if (ev) ev.stopPropagation();
     const curItem = getCurrentQueueItem();
-    if (!videoEl || !curItem) return;
+    if (!videoEl || !curItem) {
+      syncVideoUI('No video in queue yet');
+      return;
+    }
     if (!videoEl.paused) pauseVideoAndSavePosition('screen_touch');
     else startOrResumeVideo();
   };
 
   window.toggleNanaVideoPlayback = () => {
     const curItem = getCurrentQueueItem();
-    if (!videoEl || !curItem) return;
+    if (!videoEl || !curItem) {
+      syncVideoUI('No video in queue yet');
+      return;
+    }
     if (!videoEl.paused) pauseVideoAndSavePosition('button_tap');
     else startOrResumeVideo();
   };
@@ -336,9 +371,13 @@ import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.2";
 
   if (videoEl) {
     videoEl.addEventListener('timeupdate', () => { saveCurrentVideoTime(false); keepScreenAwakeIfPlayingVideo(); });
+    videoEl.addEventListener('playing', () => { syncVideoUI(); hooks.broadcastScreen?.(); });
     videoEl.addEventListener('pause', () => { syncVideoUI(); startNormalDimCountdownOnPause(); hooks.broadcastScreen?.(); });
     videoEl.addEventListener('play', () => { requestVideoWakeLock(); keepScreenAwakeIfPlayingVideo(); syncVideoUI(); hooks.broadcastScreen?.(); });
     videoEl.addEventListener('ended', () => { if (role === 'nana') handleVideoEndedOnNana(); });
+    videoEl.addEventListener('error', () => {
+      syncVideoUI('⚠️ Could not load video file — check video URL or format');
+    });
   }
 
   // Admin Drawer & Queue Management
@@ -587,9 +626,9 @@ import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.2";
       const subChanged = prevItem?.item?.subtitleUrl !== curItem?.item?.subtitleUrl;
       const idChanged  = prevItem?.item?.id !== curItem?.item?.id;
       if (curItem && (urlChanged || idChanged) && videoEl) {
+        videoEl.removeAttribute('crossorigin');
         lastLoadedVideoUrl = curItem.item.url;
         videoEl.src = curItem.item.url;
-        videoEl.load();
         attachSubtitleTrack(curItem.item.subtitleUrl || '', true);
       } else if (curItem && subChanged && videoEl) {
         attachSubtitleTrack(curItem.item.subtitleUrl || '', true);
