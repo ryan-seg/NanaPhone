@@ -4,87 +4,77 @@ import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from
   if (!NanaCore.SERVICE_TOKEN) return;
   const { SERVICE_TOKEN, PORTAL_NODE_ID, GOOGLE_SCRIPT_URL, basePath, db, role, senderName, refs, state, hooks } = NanaCore;
 
-  // 1. Inject Collapsible "Last 5 Questions" Drawer into the "Ask Nana" Tab on Family Screen
+  // 1. Inject Last 5 Questions History Container into the "Ask Nana" Tab on Family Screen
   const askPaneCard = document.querySelector('#fam-pane-ask .settings-card');
   if (askPaneCard && !$('fam-q-history-box')) {
-    const histDetails = document.createElement('details');
-    histDetails.className = 'fam-clean-Fold';
-    histDetails.innerHTML = `
-      <summary><span>🕘 Recent Questions & Ask Again (Last 5)</span></summary>
+    const histWrap = document.createElement('div');
+    histWrap.style.cssText = 'margin-top:12px;border-top:2px solid #334155;padding-top:10px;width:100%;';
+    histWrap.innerHTML = `
+      <div class="settings-sub" style="margin-bottom:4px;font-weight:800;color:#fef08a;">🕘 Last 5 Questions Asked by Family:</div>
       <div id="fam-q-history-box" class="fam-q-history-list"></div>
     `;
-    askPaneCard.appendChild(histDetails);
+    askPaneCard.appendChild(histWrap);
   }
 
-  // Generate half-hour time slots from 08:30 to 21:30
-  const HALF_HOUR_SLOTS = [];
-  for (let h = 8; h <= 21; h++) {
-    for (const m of [0, 30]) {
-      if (h === 8 && m === 0) continue;
-      HALF_HOUR_SLOTS.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+  let periodicConfig = {
+    showTodaysCallsBanner: true,
+    periodicPopupsEnabled: true,
+    unreadChatPopupMin: 30,
+    radioPromptHours: [10, 15],
+    videoPromptHours: [14, 19],
+    nightModeEnabled: true,
+    nightStartHour: 21,
+    nightEndHour: 8,
+    bulletinClearedAt: 0
+  };
+  NanaCore.periodicConfig = periodicConfig;
+
+  let activeQuestionData = null;
+  let lastUnreadChatPromptMs = Date.now();
+  let lastAnyPeriodicPromptMs = 0;
+
+  // 2. Inject Scheduled Prompts & Today's Calls Banner Toggle into Shared Settings Modal (wait until app.js populates cards)
+  function injectPeriodicSettingsCard() {
+    const sharedSettingsMount = $('shared-settings-cards');
+    if (!sharedSettingsMount || !sharedSettingsMount.children.length) {
+      setTimeout(injectPeriodicSettingsCard, 60);
+      return;
     }
-  }
+    if ($('lbl-periodic-summary')) return;
 
-  function normalizeSlotStr(val) {
-    if (typeof val === 'number' && !isNaN(val)) {
-      return `${String(val).padStart(2, '0')}:00`;
-    }
-    const s = String(val || '').trim();
-    if (/^\d{1,2}$/.test(s)) return `${ s.padStart(2, '0') }:00`;
-    if (/^\d{1,2}:\d{2}$/.test(s)) {
-      const [hh, mm] = s.split(':');
-      return `${hh.padStart(2, '0')}:${mm}`;
-    }
-    return null;
-  }
-
-  function parseSlotsArray(val, fallback) {
-    if (val === 'none') return [];
-    const raw = Array.isArray(val) ? val : (val && typeof val === 'object' ? Object.values(val) : null);
-    if (!raw) return fallback;
-    return Array.from(new Set(raw.map(normalizeSlotStr).filter(Boolean))).sort();
-  }
-
-  // 2. Inject Scheduled Prompts (with 30-Minute Granularity) & Today's Calls Banner Toggle into Settings
-  const sharedSettingsMount = $('shared-settings-cards');
-  if (sharedSettingsMount) {
     const buildIntervalBtns = (settingKey, options) => options.map(([val, lbl]) =>
       `<button class="opt-btn" data-ppset="${settingKey}" data-ppval="${val}" onclick="updatePeriodicPopupSetting('${settingKey}', ${val})">${lbl}</button>`
     ).join('');
 
-    const buildSlotToggles = (listKey, slots) => slots.map(slot =>
-      `<button class="opt-btn" data-ppslotlist="${listKey}" data-ppslot="${slot}" onclick="toggleScheduledPromptSlot('${listKey}', '${slot}')">${slot}</button>`
+    const buildHourToggles = (listKey, hours) => hours.map(h =>
+      `<button class="opt-btn" data-pphourlist="${listKey}" data-pphour="${h}" onclick="toggleScheduledPromptHour('${listKey}', ${h})">${String(h).padStart(2, '0')}:00</button>`
     ).join('');
 
     const periodicCard = document.createElement('div');
     periodicCard.className = 'settings-card';
     periodicCard.innerHTML = `
       <div class="settings-label">
-        <span>💚 Nana's Today's Calls Banner & Scheduled Prompts</span>
-        <span id="lbl-periodic-summary" style="color:#38bdf8;font-size:0.85rem;">Active</span>
+        <span>💚 Today's Calls Memory Banner & Scheduled Prompts</span>
+        <span id="lbl-periodic-summary" style="color:#38bdf8;font-size:0.88rem;">Active</span>
       </div>
-      <div class="settings-sub">Shows Nana a reassurance bar on her tablet of who she has spoken to today, and offers half-hourly radio/video prompts when idle.</div>
+      <div class="settings-sub">Reassures Nana with a summary of who she has spoken to today, and offers scheduled entertainment prompts.</div>
       <div class="opt-row" style="margin-bottom:8px;">
-        <button class="opt-btn" data-ppset="showTodaysCallsBanner" data-ppval="true" onclick="updatePeriodicPopupSetting('showTodaysCallsBanner', true)">💚 Show Today's Calls on Nana's Screen</button>
+        <button class="opt-btn" data-ppset="showTodaysCallsBanner" data-ppval="true" onclick="updatePeriodicPopupSetting('showTodaysCallsBanner', true)">💚 Show Today's Calls Banner</button>
         <button class="opt-btn" data-ppset="showTodaysCallsBanner" data-ppval="false" onclick="updatePeriodicPopupSetting('showTodaysCallsBanner', false)">🙈 Hide Today's Calls Banner</button>
       </div>
       <div class="opt-row" style="margin-bottom:8px;">
         <button class="opt-btn" data-ppset="periodicPopupsEnabled" data-ppval="true" onclick="updatePeriodicPopupSetting('periodicPopupsEnabled', true)">✅ Scheduled Pop-Ups ON</button>
         <button class="opt-btn" data-ppset="periodicPopupsEnabled" data-ppval="false" onclick="updatePeriodicPopupSetting('periodicPopupsEnabled', false)">🔕 Scheduled Pop-Ups OFF</button>
       </div>
-      <div class="settings-sub" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
-        <span>🎻 Classic FM Radio Prompt Times (30-min slots):</span>
-        <button class="opt-btn" style="background:#7f1d1d;color:#fff;padding:3px 10px;font-size:0.78rem;" onclick="clearScheduledPromptSlots('radioPromptHours')">Clear All</button>
+      <div class="settings-sub" style="margin-bottom:4px;">🎻 Classic FM Radio Prompt Times (Tap hours to toggle on/off):</div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        ${buildHourToggles('radioPromptHours', [9, 10, 11, 13, 14, 15, 16, 19])}
+        <button class="opt-btn" style="background:#7f1d1d;color:#fff;" onclick="clearScheduledPromptHours('radioPromptHours')">Off</button>
       </div>
-      <div class="half-hour-grid">
-        ${buildSlotToggles('radioPromptHours', HALF_HOUR_SLOTS)}
-      </div>
-      <div class="settings-sub" style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
-        <span>🎬 Judge John Deed Video Prompt Times (30-min slots):</span>
-        <button class="opt-btn" style="background:#7f1d1d;color:#fff;padding:3px 10px;font-size:0.78rem;" onclick="clearScheduledPromptSlots('videoPromptHours')">Clear All</button>
-      </div>
-      <div class="half-hour-grid">
-        ${buildSlotToggles('videoPromptHours', HALF_HOUR_SLOTS)}
+      <div class="settings-sub" style="margin-bottom:4px;">🎬 Judge John Deed Video Prompt Times (Tap hours to toggle on/off):</div>
+      <div class="opt-row" style="margin-bottom:8px;">
+        ${buildHourToggles('videoPromptHours', [11, 14, 16, 17, 18, 19, 20])}
+        <button class="opt-btn" style="background:#7f1d1d;color:#fff;" onclick="clearScheduledPromptHours('videoPromptHours')">Off</button>
       </div>
       <div class="settings-sub" style="margin-bottom:4px;">💬 Unread Family Chat Reminder ("You have unread messages, would you like to read them?"):</div>
       <div class="opt-row" style="margin-bottom:8px;">
@@ -97,24 +87,16 @@ import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from
       </div>
     `;
     sharedSettingsMount.appendChild(periodicCard);
+    refreshPeriodicSettingsUI();
   }
+  injectPeriodicSettingsCard();
 
-  let periodicConfig = {
-    showTodaysCallsBanner: true,
-    periodicPopupsEnabled: true,
-    unreadChatPopupMin: 30,
-    radioPromptHours: ['10:00', '15:00'],
-    videoPromptHours: ['14:00', '19:00'],
-    nightModeEnabled: true,
-    nightStartHour: 21,
-    nightEndHour: 8,
-    bulletinClearedAt: 0
-  };
-  NanaCore.periodicConfig = periodicConfig;
-
-  let activeQuestionData = null;
-  let lastUnreadChatPromptMs = Date.now();
-  let lastAnyPeriodicPromptMs = 0;
+  function parseHoursArray(val, fallback) {
+    if (Array.isArray(val)) return val.map(Number).filter(n => !isNaN(n));
+    if (val && typeof val === 'object') return Object.values(val).map(Number).filter(n => !isNaN(n));
+    if (val === 'none') return [];
+    return fallback;
+  }
 
   function refreshPeriodicSettingsUI() {
     document.querySelectorAll('[data-ppset]').forEach(btn => {
@@ -123,9 +105,9 @@ import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from
     });
     ['radioPromptHours', 'videoPromptHours'].forEach(listKey => {
       const arr = periodicConfig[listKey] || [];
-      document.querySelectorAll(`[data-ppslotlist="${listKey}"]`).forEach(btn => {
-        const slot = btn.dataset.ppslot;
-        btn.classList.toggle('selected', arr.includes(slot));
+      document.querySelectorAll(`[data-pphourlist="${listKey}"]`).forEach(btn => {
+        const hr = Number(btn.dataset.pphour);
+        btn.classList.toggle('selected', arr.includes(hr));
       });
     });
     const sumEl = $('lbl-periodic-summary');
@@ -134,9 +116,9 @@ import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from
         sumEl.innerText = '🔕 Pop-Ups Off';
         sumEl.style.color = '#fca5a5';
       } else {
-        const rCount = (periodicConfig.radioPromptHours || []).length;
-        const vCount = (periodicConfig.videoPromptHours || []).length;
-        sumEl.innerText = `Radio (${rCount} slots) • Video (${vCount} slots)`;
+        const rHrs = (periodicConfig.radioPromptHours || []).map(h => `${String(h).padStart(2,'0')}:00`).join(', ') || 'Off';
+        const vHrs = (periodicConfig.videoPromptHours || []).map(h => `${String(h).padStart(2,'0')}:00`).join(', ') || 'Off';
+        sumEl.innerText = `Radio [${rHrs}] • Video [${vHrs}]`;
         sumEl.style.color = '#38bdf8';
       }
     }
@@ -149,18 +131,18 @@ import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from
     await update(refs.settings, { [key]: val });
   };
 
-  window.toggleScheduledPromptSlot = async (listKey, slotStr) => {
+  window.toggleScheduledPromptHour = async (listKey, hour) => {
     const cur = [...(periodicConfig[listKey] || [])];
-    const idx = cur.indexOf(slotStr);
+    const idx = cur.indexOf(hour);
     if (idx >= 0) cur.splice(idx, 1);
-    else cur.push(slotStr);
-    cur.sort();
+    else cur.push(hour);
+    cur.sort((a, b) => a - b);
     periodicConfig[listKey] = cur;
     refreshPeriodicSettingsUI();
     await update(refs.settings, { [listKey]: cur.length ? cur : 'none' });
   };
 
-  window.clearScheduledPromptSlots = async (listKey) => {
+  window.clearScheduledPromptHours = async (listKey) => {
     periodicConfig[listKey] = [];
     refreshPeriodicSettingsUI();
     await update(refs.settings, { [listKey]: 'none' });
@@ -192,8 +174,8 @@ import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from
     ['showTodaysCallsBanner', 'periodicPopupsEnabled', 'unreadChatPopupMin', 'nightModeEnabled', 'nightStartHour', 'nightEndHour', 'bulletinClearedAt'].forEach(k => {
       if (s[k] !== undefined) periodicConfig[k] = s[k];
     });
-    if (s.radioPromptHours !== undefined) periodicConfig.radioPromptHours = parseSlotsArray(s.radioPromptHours, ['10:00', '15:00']);
-    if (s.videoPromptHours !== undefined) periodicConfig.videoPromptHours = parseSlotsArray(s.videoPromptHours, ['14:00', '19:00']);
+    if (s.radioPromptHours !== undefined) periodicConfig.radioPromptHours = parseHoursArray(s.radioPromptHours, [10, 15]);
+    if (s.videoPromptHours !== undefined) periodicConfig.videoPromptHours = parseHoursArray(s.videoPromptHours, [14, 19]);
     refreshPeriodicSettingsUI();
   });
 
@@ -227,12 +209,12 @@ import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from
     box.innerHTML = '';
     entries.forEach(item => {
       const askedStr = formatQuestionTimestamp(item.askedAt);
-      let ansBadge = `<span style="color:#facc15;">⏳ Pending</span>`;
+      let ansBadge = `<span style="color:#facc15;">⏳ Waiting for answer</span>`;
       if (item.status === 'answered') {
         const ansTime = item.answeredAt ? new Date(item.answeredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
         ansBadge = item.answer === 'YES'
-          ? `<span style="color:#4ade80;">✅ YES${ansTime ? ' (' + ansTime + ')' : ''}</span>`
-          : `<span style="color:#f87171;">✖ NO${ansTime ? ' (' + ansTime + ')' : ''}</span>`;
+          ? `<span style="color:#4ade80;">✅ Answered YES${ansTime ? ' at ' + ansTime : ''}</span>`
+          : `<span style="color:#f87171;">✖ Answered NO${ansTime ? ' at ' + ansTime : ''}</span>`;
       } else if (item.status === 'cleared') {
         ansBadge = `<span style="color:#94a3b8;">✖ Cleared</span>`;
       }
@@ -242,7 +224,7 @@ import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from
       row.innerHTML = `
         <div class="fam-q-hist-info">
           <div class="fam-q-hist-text">"${item.question}"</div>
-          <div class="fam-q-hist-meta">${item.askedBy || 'Family'} • ${askedStr} • ${ansBadge}</div>
+          <div class="fam-q-hist-meta">👤 ${item.askedBy || 'Family'} • ${askedStr} • ${ansBadge}</div>
         </div>
         <button class="fam-q-mini-btn" style="background:#059669;border-color:#4ade80;padding:6px 10px;white-space:nowrap;" title="Send this question to Nana's screen again">🔄 Ask Again</button>
       `;
@@ -256,7 +238,7 @@ import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from
     if (role === 'family') renderFamilyQuestionHistory();
   });
 
-  // --- 4. HALF-HOUR TIME-OF-DAY & UNREAD CHAT POP-UP ENGINE ---
+  // --- 4. TIME-OF-DAY & UNREAD CHAT POP-UP ENGINE ---
   function isInNightModeWindow() {
     if (!periodicConfig.nightModeEnabled) return false;
     const h = new Date().getHours();
@@ -311,51 +293,44 @@ import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from
 
     const d = new Date();
     const curHour = d.getHours(), curMin = d.getMinutes();
-    // Match either the :00 window (minutes 0–14) or the :30 window (minutes 30–44)
-    let activeHalfHourSlot = null;
-    if (curMin >= 0 && curMin < 15) {
-      activeHalfHourSlot = `${String(curHour).padStart(2, '0')}:00`;
-    } else if (curMin >= 30 && curMin < 45) {
-      activeHalfHourSlot = `${String(curHour).padStart(2, '0')}:30`;
-    }
+    const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}_${curHour}`;
 
-    if (!activeHalfHourSlot) return;
-    const dateSlotKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}_${activeHalfHourSlot}`;
-
-    if ((periodicConfig.radioPromptHours || []).includes(activeHalfHourSlot)) {
-      const storageKey = `nana_sched_radio_${dateSlotKey}`;
-      if (!localStorage.getItem(storageKey)) {
-        localStorage.setItem(storageKey, '1');
-        lastAnyPeriodicPromptMs = now;
-        await set(refs.quickQuestion, {
-          id: `q_schedradio_${now}`,
-          type: 'idle_radio_prompt',
-          question: 'Would you like to listen to Classic FM?',
-          askedBy: 'Classic FM Radio',
-          silent: !state.speakQuestionsDefault,
-          status: 'pending',
-          answer: null,
-          askedAt: now
-        });
-        return;
+    if (curMin <= 20) {
+      if ((periodicConfig.radioPromptHours || []).includes(curHour)) {
+        const storageKey = `nana_sched_radio_${dateKey}`;
+        if (!localStorage.getItem(storageKey)) {
+          localStorage.setItem(storageKey, '1');
+          lastAnyPeriodicPromptMs = now;
+          await set(refs.quickQuestion, {
+            id: `q_schedradio_${now}`,
+            type: 'idle_radio_prompt',
+            question: 'Would you like to listen to Classic FM?',
+            askedBy: 'Classic FM Radio',
+            silent: !state.speakQuestionsDefault,
+            status: 'pending',
+            answer: null,
+            askedAt: now
+          });
+          return;
+        }
       }
-    }
 
-    if ((periodicConfig.videoPromptHours || []).includes(activeHalfHourSlot)) {
-      const storageKey = `nana_sched_video_${dateSlotKey}`;
-      if (!localStorage.getItem(storageKey)) {
-        localStorage.setItem(storageKey, '1');
-        lastAnyPeriodicPromptMs = now;
-        await set(refs.quickQuestion, {
-          id: `q_schedvideo_${now}`,
-          type: 'idle_video_prompt',
-          question: 'Would you like to watch Judge John Deed?',
-          askedBy: 'Video Player',
-          silent: !state.speakQuestionsDefault,
-          status: 'pending',
-          answer: null,
-          askedAt: now
-        });
+      if ((periodicConfig.videoPromptHours || []).includes(curHour)) {
+        const storageKey = `nana_sched_video_${dateKey}`;
+        if (!localStorage.getItem(storageKey)) {
+          localStorage.setItem(storageKey, '1');
+          lastAnyPeriodicPromptMs = now;
+          await set(refs.quickQuestion, {
+            id: `q_schedvideo_${now}`,
+            type: 'idle_video_prompt',
+            question: 'Would you like to watch Judge John Deed?',
+            askedBy: 'Video Player',
+            silent: !state.speakQuestionsDefault,
+            status: 'pending',
+            answer: null,
+            askedAt: now
+          });
+        }
       }
     }
   }

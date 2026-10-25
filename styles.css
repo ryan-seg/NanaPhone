@@ -284,180 +284,30 @@ body.role-nana #nana-top-orientation-bar {
   color: #94a3b8;
   margin-top: 2px;
 }
-/* 1. Hide redundant clock pill on Nana's tablet (now in the top 68px bar) */
-body.role-nana #clock,
-body.role-nana .clock-pill {
-  display: none !important;
-}
 
-/* 2. Nana's Today's Calls Reassurance Banner on #grid-screen */
-/* Compact "Spoken to today" banner on Nana's screen */
-#todays-calls-reassurance-banner {
+/* Accidental End-Call Confirmation Modal on Family Screen */
+#end-call-confirm-modal {
   display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 13, 22, 0.92);
+  z-index: 10002;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  background: #064e3b;
-  border: 2px solid #34d399;
-  border-radius: 12px;
-  padding: 4px 10px !important;
-  margin: 0 12px 6px 12px !important;
-  color: #ecfdf5;
-  font-size: clamp(0.88rem, 1.35vw, 1.05rem) !important;
-  font-weight: 800;
-  min-height: 0 !important;
+  padding: 24px;
+  text-align: center;
 }
-
-.todays-call-pill {
-  background: #047857;
-  border: 1.5px solid #6ee7b7;
-  color: #ffffff;
-  padding: 2px 9px !important;
-  border-radius: 999px;
-  font-weight: 800;
-  font-size: 0.92em !important;
-  line-height: 1.2 !important;
-}
-
-/* Compact "Missed calls" banner on Nana's screen */
-#missed-call-banner {
-  padding: 4px 10px !important;
-  margin: 0 12px 6px 12px !important;
-  border-width: 2px !important;
-  border-radius: 12px !important;
-  gap: 6px !important;
-  min-height: 0 !important;
-  font-size: clamp(0.9rem, 1.4vw, 1.08rem) !important;
-}
-
-#missed-call-banner .missed-chip-btn {
-  padding: 4px 10px !important;
-  font-size: clamp(0.85rem, 1.3vw, 1rem) !important;
-  border-radius: 999px !important;
-  border-width: 2px !important;
-  line-height: 1.2 !important;
-}
-
-/* 3. Calm down sensory overload on Family Screen */
-body.role-family .settings-card {
-  background: #111827 !important;
-  border: 1px solid #334155 !important;
-  border-radius: 14px !important;
-  padding: 12px 14px !important;
-  margin-bottom: 10px !important;
-  box-shadow: none !important;
-}
-body.role-family .settings-sub {
-  font-size: 0.82rem !important;
-  color: #94a3b8 !important;
-}
-body.role-family #nana-presence-card {
-  padding: 10px 14px !important;
-  border-width: 2px !important;
-  border-radius: 14px !important;
-  background: #0f172a !important;
-  line-height: 1.4 !important;
-}
-.fam-clean-Fold {
-  width: 100%;
-  margin-top: 8px;
-  border-top: 1px solid #1e293b;
-  padding-top: 8px;
-}
-.fam-clean-Fold > summary {
-  cursor: pointer;
-  font-size: 0.88rem;
-  font-weight: 800;
-  color: #93c5fd;
-  list-style: none;
+.end-confirm-card {
+  background: var(--bg-card);
+  border: 5px solid #facc15;
+  border-radius: 28px;
+  padding: 24px;
+  max-width: 520px;
+  width: 92vw;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 4px 2px;
-}
-.fam-clean-Fold > summary::-webkit-details-marker {
-  display: none;
-}
-.fam-clean-Fold > summary::after {
-  content: "▾";
-  font-size: 0.9rem;
-  color: #64748b;
-}
-.fam-clean-Fold[open] > summary::after {
-  content: "▴";
-}
-
-/* Compact 30-min time slot buttons in Settings */
-.half-hour-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
-  gap: 6px;
-  width: 100%;
-  margin-bottom: 10px;
-}
-.half-hour-grid .opt-btn {
-  padding: 7px 4px !important;
-  font-size: 0.82rem !important;
-  min-width: 0 !important;
-}
-/* 1. Completely remove the old clock pill and overlapping "Tap a photo..." header title on Nana's screen */
-body.role-nana #clock,
-body.role-nana .clock-pill,
-body.role-nana #grid-header-title,
-#grid-screen #clock,
-#grid-screen #grid-header-title {
-  display: none !important;
-  visibility: hidden !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-}
-
-/* 2. Make "Family Calls" text crisp white like the other 3 top tabs */
-#nana-top-nav-tabs button,
-.nana-main-tab,
-.nana-tab-btn,
-button[onclick*="switchNanaMainTab"] {
-  color: #ffffff !important;
-}
-
-/* Give the active tab a clear highlight border & rich background while keeping text white */
-#nana-top-nav-tabs button.active,
-.nana-main-tab.active,
-.nana-tab-btn.active,
-button[onclick*="switchNanaMainTab('calls')"] {
-  background: #1d4ed8 !important;
-  color: #ffffff !important;
-  border-color: #facc15 !important;
-}
-/* Make profile photos larger on Nana's contact grid */
-body.role-nana .family-card {
-  padding: 8px 6px !important;
-  gap: 6px !important;
-  justify-content: space-between !important;
-}
-
-body.role-nana .family-card .photo-wrapper {
-  width: clamp(135px, 19vh, 210px) !important;
-  height: clamp(135px, 19vh, 210px) !important;
-  max-width: 92% !important;
-  aspect-ratio: 1 / 1 !important;
-  border-width: 4px !important;
-  flex-shrink: 1 !important;
-}
-
-body.role-nana .family-card .photo-wrapper img {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-}
-
-body.role-nana .family-card .contact-nameplate {
-  font-size: clamp(1.25rem, 2.2vw, 1.65rem) !important;
-  padding: 4px 10px !important;
-  margin-top: 2px !important;
+  gap: 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85);
 }

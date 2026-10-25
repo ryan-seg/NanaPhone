@@ -303,7 +303,7 @@ let tabletSettings = {
   callVolume: 85, radioVolume: 75, ringVolume: 85, ringDurationSec: 60, ringtone: 'uk-phone',
   voicePrompts: true, autoAnswer: false, speechRate: 0.9, awakeBrightness: 85, dimBrightness: 15,
   dimDelaySec: 120, nightModeEnabled: true, nightStartHour: 21, nightEndHour: 8, nightBlockCalls: false,
-  batteryVoiceMutedUntil: 0, batteryVoiceIntervalMin: 3, batteryVoiceVolume: 85,
+  batteryVoiceMutedUntil: 0, batteryVoiceIntervalMin: 3, batteryVoiceVolume: 85, batteryVoiceThresholdPct: 100,
   showBulletinBar: true, showReadAloud: false, colorTheme: 'classic-dark',
   keyboardLayout: 'qwerty', keyboardTimeoutSec: 60, keyGuardMs: 350, bulletinClearedAt: 0, callingEnabled: TEST_MODE
 };
@@ -917,7 +917,8 @@ function readTabletBatteryStatus() {
     try {
       const b = JSON.parse(window.AndroidBridge.getBatteryStatusJson());
       batteryLevel = b.level; isCharging = b.charging;
-      if (!isCharging && batteryLevel !== null && batteryLevel <= 25 && !isBatteryVoiceCurrentlyMuted()) {
+      const battThresh = Number(tabletSettings.batteryVoiceThresholdPct ?? 100);
+      if (!isCharging && batteryLevel !== null && batteryLevel <= battThresh && !isBatteryVoiceCurrentlyMuted()) {
         window.announceBatteryWarning("Please plug in the tablet charger.");
       }
     } catch (e) {}
@@ -967,19 +968,19 @@ function updateFamilyPresenceBanner() {
   const touchText = `👆 Last touched: ${formatDurationAgo(lastTouchTs)}`;
   const battText = latestPresenceData?.batteryLevel != null ? ` • ${latestPresenceData.isCharging ? "🔌 Charging" : "⚠️ UNPLUGGED"} (${latestPresenceData.batteryLevel}%)` : "";
   const radioStatus = (latestEntState?.activeKey && latestEntState.activeKey !== 'off') ? `<div style="color:#fef08a;font-weight:800;margin-top:2px;">🎻 Listening to Classic FM Radio</div>` : `<div style="color:#94a3b8;font-size:0.9rem;">🎻 Radio: Off</div>`;
-  const tgStatus = connectedMemberIds.includes(activeFamilyMember.id) ? `<span style="color:#4ade80;font-size:0.88rem;">✅ Your Telegram alerts are connected</span>` : `<span style="color:#fbbf24;font-size:0.88rem;">⚠️ Tap "1. Connect Telegram" below so Nana can call you</span>`;
+  const tgStatus = connectedMemberIds.includes(activeFamilyMember.id) ? `<span class="fam-tg-status-line" style="color:#4ade80;font-size:0.88rem;">✅ Your Telegram alerts are connected</span>` : `<span class="fam-tg-status-line" style="color:#fbbf24;font-size:0.88rem;">⚠️ Tap "1. Connect Telegram" below so Nana can call you</span>`;
   const st = latestCallData?.status || 'idle';
   if (st !== 'idle') {
     const otherId = latestCallData.callerId === 'nana' ? latestCallData.targetId : latestCallData.callerId;
     const withName = CONFIG.familyMembers.find(m => m.id === otherId)?.name || 'Family';
     card.style.borderColor = '#f87171';
-    card.innerHTML = `${st === 'connected' ? `🔴 <strong>On a video call with ${withName}</strong>` : `🟡 <strong>Ringing (${withName})</strong>`}<br><span style="color:#cbd5e1;font-size:0.9rem;">${touchText}${battText}</span><br>${tgStatus}`;
+    card.innerHTML = `${st === 'connected' ? `🔴 <strong>On a video call with ${withName}</strong>` : `🟡 <strong>Ringing (${withName})</strong>`}<br><span class="fam-touch-batt-line" style="color:#cbd5e1;font-size:0.9rem;">${touchText}${battText}</span><br>${tgStatus}`;
     if (ringBtn && otherId && otherId !== activeFamilyMember.id) ringBtn.disabled = true;
   } else {
     card.style.borderColor = tabletSettings.callingEnabled ? '#22c55e' : '#f59e0b';
     card.innerHTML = tabletSettings.callingEnabled
-      ? `🟢 <strong>Nana is available</strong>${radioStatus}<span style="color:#cbd5e1;font-size:0.9rem;">${touchText}${battText}</span><br>${tgStatus}`
-      : `📵 <strong>Video calling is switched off</strong><br><span style="color:#cbd5e1;font-size:0.9rem;">${touchText}${battText}</span><br>${tgStatus}`;
+      ? `🟢 <strong>Nana is available</strong>${radioStatus}<span class="fam-touch-batt-line" style="color:#cbd5e1;font-size:0.9rem;">${touchText}${battText}</span><br>${tgStatus}`
+      : `📵 <strong>Video calling is switched off</strong><br><span class="fam-touch-batt-line" style="color:#cbd5e1;font-size:0.9rem;">${touchText}${battText}</span><br>${tgStatus}`;
     if (ringBtn) ringBtn.disabled = !tabletSettings.callingEnabled;
   }
 }
@@ -1334,15 +1335,6 @@ async function joinDailyRoom() {
     }, { once: true });
   };
 
-  // Helper: only count opposite-role participants (never match Nana with a ghost Nana session!)
-  const getValidRemotePartner = () => {
-    if (callObject !== co) return null;
-    const remotes = Object.values(co.participants()).filter(p => !p.local);
-    return role === 'family'
-      ? (remotes.find(p => p.user_name === 'Nana_Tablet') || remotes.find(p => (p.user_name || '').startsWith('Nana')) || null)
-      : (remotes.find(p => (p.user_name || '').startsWith('Family_')) || null);
-  };
-
   const attachTracks = () => {
     if (callObject !== co) return;
     const parts = co.participants();
@@ -1350,7 +1342,8 @@ async function joinDailyRoom() {
     const lv = $('local-video');
     if (localTrack && lv && lv.srcObject?.getVideoTracks()[0] !== localTrack) { lv.srcObject = new MediaStream([localTrack]); lv.play().catch(() => {}); }
 
-    const target = getValidRemotePartner();
+    const remotes = Object.values(parts).filter(p => !p.local);
+    const target = role === 'family' ? (remotes.find(p => p.user_name === 'Nana_Tablet') || remotes.find(p => (p.user_name || '').startsWith('Nana')) || remotes[0]) : (remotes.find(p => (p.user_name || '').startsWith('Family_')) || remotes[0]);
     if (!target) return;
     hadRemote = true; clearTimeout(emptyTimer);
 
@@ -1374,39 +1367,13 @@ async function joinDailyRoom() {
   };
 
   ['joined-meeting', 'participant-joined', 'participant-updated', 'track-started', 'track-stopped'].forEach(ev => co.on(ev, attachTracks));
-
-  co.on('participant-joined', () => {
-    if (getValidRemotePartner()) {
-      clearTimeout(emptyTimer);
-      if (!soundBlocked) banner.style.display = 'none';
-    }
-  });
-
-  co.on('network-connection', (ev) => {
-    if (ev?.event === 'Interrupted') showProblem('📡 Weak signal — holding call & reconnecting...');
-    else if (ev?.event === 'Connected' && !soundBlocked) banner.style.display = 'none';
-  });
-
-  // If the family member leaves (or drops signal), wait 15s for a brief signal blip, OR exit immediately if Firebase callState is already 'idle'
   co.on('participant-left', () => {
     if (callObject !== co) return;
-    if (currentState === 'idle') { window.endCall(); return; }
-    if (!getValidRemotePartner()) {
-      clearTimeout(emptyTimer);
-      showProblem('📡 Reconnecting (waiting 15s)...');
-      emptyTimer = setTimeout(() => {
-        if (callObject === co && hadRemote && !getValidRemotePartner()) window.endCall();
-      }, 15000);
-    }
+    clearTimeout(emptyTimer);
+    emptyTimer = setTimeout(() => { if (callObject === co && hadRemote && !Object.values(co.participants()).some(p => !p.local)) window.endCall(); }, 10000);
   });
-
   co.on('camera-error', e => showProblem('⚠️ Camera/mic error: ' + (e?.errorMsg?.errorMsg || 'check permissions')));
-  co.on('error', e => {
-    showProblem('📡 Connection hiccup (' + (e?.errorMsg || 'reconnecting') + ')...');
-    setTimeout(() => {
-      if (callObject === co && !getValidRemotePartner()) window.endCall();
-    }, 15000);
-  });
+  co.on('error', e => { showProblem('⚠️ Video error: ' + (e?.errorMsg || 'reconnecting')); setTimeout(() => { if (callObject === co) window.endCall(); }, 8000); });
 
   try {
     await co.join({ url: CONFIG.dailyRoomUrl, userName: role === 'nana' ? (isRealAndroidTablet ? 'Nana_Tablet' : 'Nana_Browser') : `Family_${activeFamilyMember.id}` });
@@ -1414,7 +1381,7 @@ async function joinDailyRoom() {
     try { co.setBandwidth({ kbs: 1800, trackConstraints: { width: 1280, height: 720, frameRate: 30 } }); } catch (_) {}
   } catch (err) {
     showProblem('⚠️ Could not join video room'); isJoiningOrInRoom = false;
-    setTimeout(() => { if (callObject === co) window.endCall(); }, 10000);
+    setTimeout(() => { if (callObject === co) window.endCall(); }, 8000);
   }
 }
 
@@ -1552,7 +1519,7 @@ onValue(callStateRef, snap => {
     } else if (data.status === 'idle') {
       clearTimeout(outboundTimeout); clearTimeout(incomingRingTimeout); clearTimeout(autoAnswerTimeout);
       stopTelegramRingBurst(); stopRingingUI(); destroyDailyRoom();
-      if (!isRadioPlaying) showScreen('grid-screen');
+      if (!isRadioPlaying && !$('video-screen')?.classList.contains('active')) showScreen('grid-screen');
       window.wakeScreenAndResetDimTimer(); updateClock();
     }
   } else {

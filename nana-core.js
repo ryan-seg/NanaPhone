@@ -9,12 +9,16 @@ async function sha256Hex(str) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-const SERVICE_TOKEN = (localStorage.getItem('nana_service_token') || '').trim();
 const params = new URLSearchParams(window.location.search);
+if (params.get('key')) {
+  localStorage.setItem('nana_service_token', params.get('key').trim());
+}
+
+const SERVICE_TOKEN = (localStorage.getItem('nana_service_token') || '').trim();
 const TEST_MODE = params.get('test') === '1';
 const role = params.get('role') || 'nana';
 const callerId = (params.get('id') || 'ryan').toLowerCase();
-const isAdminFamily = (role === 'family' && callerId === 'ryan');
+const isAdminFamily = (role === 'family');
 
 const FAMILY_NAMES = {
   "phil": "Phil", "nicky-s": "Nicky S", "denise": "Denise", "gill": "Gill",

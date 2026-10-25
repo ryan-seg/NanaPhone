@@ -7,8 +7,11 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
 
   let activeCallConnectedAtMs = null, activeCallPartnerId = null;
 
-// --- 0. ACCIDENTAL "END CALL" CONFIRMATION MODAL (FAMILY ONLY) ---
+  // --- 0. ACCIDENTAL "END CALL" CONFIRMATION MODAL & JITTER GUARD ---
+  let endCallConfirmedByUser = false;
   let endCallModalTimer = null;
+  let jitterHoldTimer = null;
+  let origEndCall = null;
 
   if (role === 'family') {
     const ecModal = document.createElement('div');
@@ -36,7 +39,7 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
 
   window.promptEndCallConfirmation = () => {
     const m = $('end-call-confirm-modal');
-    if (!m) return window.endCall?.();
+    if (!m) return window.confirmFamilyEndCallNow();
     m.style.display = 'flex';
     clearTimeout(endCallModalTimer);
     endCallModalTimer = setTimeout(() => { m.style.display = 'none'; }, 8000);
@@ -49,20 +52,61 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
 
   window.confirmFamilyEndCallNow = async () => {
     clearTimeout(endCallModalTimer);
+    clearTimeout(jitterHoldTimer);
     if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
-    await window.endCall?.();
+    endCallConfirmedByUser = true;
+    await (origEndCall ? origEndCall() : window.endCall?.(true));
+    setTimeout(() => { endCallConfirmedByUser = false; }, 2000);
   };
-// --- 1. TOP 68PX NO-TOUCH AREA ORIENTATION BANNER ON NANA'S SCREEN ---
-  if (role === 'nana') {
-    // Physically remove the old clock pill and overlapping "Tap a photo..." title ("T")
-    $('clock')?.remove();
-    $('grid-header-title')?.remove();
 
-    // Ensure all top navigation tab buttons ("Family Calls", etc.) have white text
-    document.querySelectorAll('button[onclick*="switchNanaMainTab"]').forEach(btn => {
-      btn.style.setProperty('color', '#ffffff', 'important');
+  function bindAppJsHooksWhenReady() {
+    if (!window.endCall || !window.openFamilyBulletin) {
+      setTimeout(bindAppJsHooksWhenReady, 50);
+      return;
+    }
+    if (!origEndCall) {
+      origEndCall = window.endCall;
+      if (role === 'family') {
+        window.endCall = async (forceImmediate = false) => {
+          const isConnectedCall = state.callSnap?.status === 'connected' && $('call-screen')?.classList.contains('active');
+          if (!forceImmediate && !endCallConfirmedByUser && isConnectedCall) {
+            const banner = $('call-connecting-banner');
+            if (banner) {
+              banner.style.display = 'block';
+              banner.innerText = '📡 Signal dip — holding call for 35s to reconnect...';
+            }
+            clearTimeout(jitterHoldTimer);
+            jitterHoldTimer = setTimeout(async () => {
+              const rv = $('remote-video');
+              const videoRecovered = rv && rv.srcObject && !rv.paused && rv.readyState >= 2;
+              if (!videoRecovered && state.callSnap?.status === 'connected') {
+                await origEndCall();
+              } else if (banner) {
+                banner.style.display = 'none';
+              }
+            }, 35000);
+            return;
+          }
+          clearTimeout(jitterHoldTimer);
+          if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
+          return await origEndCall();
+        };
+      }
+    }
+
+    ['openFamilyBulletin', 'closeFamilyBulletin', 'openRadioScreen', 'closeRadioScreen', 'openSeniorKeyboard', 'closeSeniorKeyboard'].forEach(fnName => {
+      const orig = window[fnName];
+      if (typeof orig === 'function' && !orig.__telemetryWrapped) {
+        const wrapped = (...args) => { orig(...args); broadcastNanaCurrentScreen(); };
+        wrapped.__telemetryWrapped = true;
+        window[fnName] = wrapped;
+      }
     });
+  }
+  bindAppJsHooksWhenReady();
 
+  // --- 1. TOP 68PX NO-TOUCH AREA ORIENTATION BANNER (DAY, TIME OF DAY, DATE & CLOCK) ---
+  if (role === 'nana') {
     const topBar = document.createElement('div');
     topBar.id = 'nana-top-orientation-bar';
     document.body.appendChild(topBar);
@@ -87,31 +131,39 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
   }
 
   // --- 2. ADJUSTABLE BATTERY UNPLUGGED VOICE THRESHOLD (%) IN SETTINGS ---
-  const battMuteLbl = document.querySelector('.lbl-battery-mute');
-  const battCard = battMuteLbl?.closest('.settings-card');
-  if (battCard && !$('batt-threshold-row')) {
-    const sub = document.createElement('div');
-    sub.className = 'settings-sub';
-    sub.style.marginBottom = '4px';
-    sub.textContent = '🔌 Start Speaking When Unplugged At or Below:';
+  function injectBatteryThresholdUI() {
+    const battMuteLbl = document.querySelector('.lbl-battery-mute');
+    const battCard = battMuteLbl?.closest('.settings-card');
+    if (!battCard) {
+      setTimeout(injectBatteryThresholdUI, 60);
+      return;
+    }
+    if (!$('batt-threshold-row')) {
+      const sub = document.createElement('div');
+      sub.className = 'settings-sub';
+      sub.style.marginBottom = '4px';
+      sub.textContent = '🔌 Start Speaking When Unplugged At or Below:';
 
-    const row = document.createElement('div');
-    row.id = 'batt-threshold-row';
-    row.className = 'opt-row';
-    row.style.marginBottom = '8px';
-    row.innerHTML = [
-      [100, '100% (Immediately)'],
-      [80, '80%'],
-      [50, '50%'],
-      [35, '35%'],
-      [25, '25%']
-    ].map(([pct, lbl]) =>
-      `<button class="opt-btn" data-battthresh="${pct}" onclick="setBatteryVoiceThresholdPct(${pct})">${lbl}</button>`
-    ).join('');
+      const row = document.createElement('div');
+      row.id = 'batt-threshold-row';
+      row.className = 'opt-row';
+      row.style.marginBottom = '8px';
+      row.innerHTML = [
+        [100, '100% (Immediately)'],
+        [80, '80%'],
+        [50, '50%'],
+        [35, '35%'],
+        [25, '25%']
+      ].map(([pct, lbl]) =>
+        `<button class="opt-btn" data-battthresh="${pct}" onclick="setBatteryVoiceThresholdPct(${pct})">${lbl}</button>`
+      ).join('');
 
-    battCard.insertBefore(sub, battMuteLbl.nextSibling);
-    battCard.insertBefore(row, sub.nextSibling);
+      battCard.insertBefore(sub, battMuteLbl.nextSibling);
+      battCard.insertBefore(row, sub.nextSibling);
+      refreshBatteryThresholdUI();
+    }
   }
+  injectBatteryThresholdUI();
 
   function refreshBatteryThresholdUI() {
     const cur = Number(state.batteryVoiceThresholdPct ?? 100);
@@ -151,29 +203,7 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     setTimeout(checkCustomBatteryThresholdOnNana, 4000);
   }
 
-// --- 3. TODAY'S COMPLETED CALLS BANNER (FOR NANA'S HOME SCREEN ONLY, NO DURATION) ---
-  function ensureNanaTodaysCallsBannerElement() {
-    if (role !== 'nana') return null;
-    let banner = $('todays-calls-reassurance-banner');
-    if (!banner) {
-      const gridScreen = $('grid-screen');
-      const familyGrid = $('family-grid');
-      if (!gridScreen) return null;
-      banner = document.createElement('div');
-      banner.id = 'todays-calls-reassurance-banner';
-      banner.innerHTML = `
-        <span>💚 Spoken to today:</span>
-        <div id="todays-calls-chips-container" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
-      `;
-      if (familyGrid && familyGrid.parentNode === gridScreen) {
-        gridScreen.insertBefore(banner, familyGrid);
-      } else {
-        gridScreen.prepend(banner);
-      }
-    }
-    return banner;
-  }
-
+  // --- 3. TODAY'S COMPLETED CALLS LOGGING & REASSURANCE BANNER ---
   function getTodaysCompletedCallsList() {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -184,8 +214,7 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
   }
 
   function renderTodaysCallsBanner() {
-    if (role !== 'nana') return;
-    const banner = ensureNanaTodaysCallsBannerElement();
+    const banner = $('todays-calls-reassurance-banner');
     const chipsBox = $('todays-calls-chips-container');
     if (!banner || !chipsBox) return;
 
@@ -204,21 +233,22 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     callsToday.forEach(c => {
       const name = FAMILY_NAMES[c.partnerId] || c.partnerName || 'Family';
       const timeStr = c.startedAt ? new Date(c.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+      const mins = Math.max(1, Math.round((Number(c.durationSec) || 60) / 60));
       const pill = document.createElement('span');
       pill.className = 'todays-call-pill';
-      pill.textContent = timeStr ? `✓ ${name} at ${timeStr}` : `✓ ${name}`;
+      pill.textContent = `✓ ${name} at ${timeStr} (${mins}m chat)`;
       chipsBox.appendChild(pill);
     });
     banner.style.display = 'flex';
   }
   hooks.renderTodaysCallsBanner = renderTodaysCallsBanner;
 
-onValue(query(refs.callHistory, limitToLast(25)), snap => {
+  onValue(query(refs.callHistory, limitToLast(25)), snap => {
     state.callHistorySnap = snap.val() || {};
-    if (role === 'nana') renderTodaysCallsBanner();
+    renderTodaysCallsBanner();
     if (role === 'family') setTimeout(applySimpleFamilyPresenceCard, 20);
   });
-  if (role === 'nana') setInterval(renderTodaysCallsBanner, 60000);
+  setInterval(renderTodaysCallsBanner, 60000);
 
   // --- 4. TABLET DISCONNECT, WIFI, BACKGROUND & BATTERY TELEMETRY ---
   if (role === 'nana') {
@@ -317,25 +347,8 @@ onValue(query(refs.callHistory, limitToLast(25)), snap => {
     setTimeout(broadcastNanaCurrentScreen, 1500);
   }
 
-  ['openFamilyBulletin', 'closeFamilyBulletin', 'openRadioScreen', 'closeRadioScreen', 'openSeniorKeyboard', 'closeSeniorKeyboard'].forEach(fnName => {
-    const orig = window[fnName];
-    if (typeof orig === 'function') {
-      window[fnName] = (...args) => { orig(...args); broadcastNanaCurrentScreen(); };
-    }
-  });
-
-// --- 5. FAMILY PRESENCE STATUS (ACTIVITY + LAST TOUCHED + CHARGING/BATTERY %) ---
-  function formatTouchAgo(ts) {
-    if (!ts) return "No recent touch";
-    const mins = Math.max(0, Math.floor((Date.now() - Number(ts)) / 60000));
-    if (mins < 1) return "Just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60), remMins = mins % 60;
-    if (hrs < 24) return remMins > 0 ? `${hrs}h ${remMins}m ago` : `${hrs}h ago`;
-    return `${Math.floor(hrs / 24)}d ${hrs % 24}h ago`;
-  }
-
-function getSimpleNanaStatusSummary() {
+  // --- 5. CONCISE SINGLE-LINE FAMILY PRESENCE STATUS ---
+  function getSimpleNanaStatusSummary() {
     const p = state.presenceSnap || {};
     const now = Date.now();
     const lastSeenMs = Math.max(Number(p.lastPing || 0), Number(p.disconnectedAt || 0), Number(p.appStateChangedAt || 0));
@@ -350,7 +363,7 @@ function getSimpleNanaStatusSummary() {
       const withName = FAMILY_NAMES[otherId] || 'Family';
       return {
         border: '#f87171',
-        text: st === 'connected' ? `🔴 In a video call with ${withName}` : `🟡 Ringing (${withName})`
+        text: st === 'connected' ? `🔴 In a call with ${withName}` : `🟡 Ringing (${withName})`
       };
     }
 
@@ -359,7 +372,7 @@ function getSimpleNanaStatusSummary() {
         return { border: '#ef4444', text: `🔴 Offline (Ran out of battery)` };
       }
       if (p.appState === 'backgrounded' || p.appState === 'closed' || p.lastExitHint === 'backed_out_or_notification' || p.lastExitHint === 'app_closed_or_backed_out') {
-        return { border: '#f59e0b', text: `🟠 Left the app` };
+        return { border: '#ef4444', text: `🟠 Left the app` };
       }
       if (p.lastExitHint === 'wifi_turned_off' || p.appState === 'shade_or_overlay' || p.lastExitHint === 'notification_shade_or_overlay') {
         return { border: '#ef4444', text: `🔴 Offline (Wi-Fi turned off)` };
@@ -367,78 +380,58 @@ function getSimpleNanaStatusSummary() {
       return { border: '#ef4444', text: `🔴 Offline (Disconnected from internet)` };
     }
     if (p.appState === 'backgrounded') {
-      return { border: '#f59e0b', text: `🟠 Left the app` };
+      return { border: '#facc15', text: `🟠 Left the app` };
     }
 
     const curItem = NanaCore.getCurrentQueueItem?.();
     const scr = p.currentScreen || 'home';
-    const isVideoStreamPlaying = state.streamData?.state === 'playing';
-
-    if (scr === 'video_playing' || isVideoStreamPlaying) {
-      const savedSec = curItem ? Number(state.streamData?.savedTimes?.[curItem.item.id] || 0) : 0;
-      const posStr = savedSec > 0 ? ` (${Math.floor(savedSec / 60)}:${String(savedSec % 60).padStart(2, '0')})` : '';
+    if (scr === 'video_playing') {
       return {
         border: '#a855f7',
-        text: `🎬 Watching video${curItem?.item?.title ? `: ${curItem.item.title}` : ''}${posStr}`
-      };
-    }
-    if (scr === 'video_paused') {
-      return {
-        border: '#a855f7',
-        text: `⏸️ On Video Screen (Paused${curItem?.item?.title ? `: ${curItem.item.title}` : ''})`
+        text: `🎬 Video is playing${curItem?.item?.title ? ` (${curItem.item.title})` : ''}`
       };
     }
 
-    if (scr === 'radio' || (state.entSnap?.activeKey && state.entSnap.activeKey !== 'off')) {
-      return { border: '#22c55e', text: `🎻 Listening to Classic FM Radio` };
+    if (state.entSnap?.activeKey && state.entSnap.activeKey !== 'off') {
+      return { border: '#22c55e', text: `🎻 Listening to the radio` };
     }
 
-    if (scr === 'chat_typing') return { border: '#38bdf8', text: `⌨️ On Family Chat (Typing a message)` };
-    if (scr === 'chat') return { border: '#38bdf8', text: `✈️ On Family Chat (Reading messages)` };
+    if (scr === 'chat_typing') return { border: '#38bdf8', text: `⌨️ On the family chat (typing)` };
+    if (scr === 'chat') return { border: '#38bdf8', text: `✈️ On the family chat (reading)` };
 
-    return { border: '#22c55e', text: `🟢 Available on Home Screen (Idle)` };
+    return { border: '#22c55e', text: `🟢 Not doing anything` };
   }
 
-function applySimpleFamilyPresenceCard() {
+  function applySimpleFamilyPresenceCard() {
     if (role !== 'family') return;
     const card = $('nana-presence-card');
     if (!card) return;
 
-    const p = state.presenceSnap || {};
     const summary = getSimpleNanaStatusSummary();
     card.style.borderColor = summary.border;
 
-    // 1. Last touched timestamp directly from presenceSnap
-    const lastTouchTs = p.lastTouched || p.lastActive || null;
-    const touchHtml = `<span>👆 Last touched: <strong style="color:#f8fafc;">${formatTouchAgo(lastTouchTs)}</strong></span>`;
+    const spans = Array.from(card.querySelectorAll('span')).filter(s => !s.classList.contains('fam-today-calls-line'));
+    const touchSpan = card.querySelector('.fam-touch-batt-line') || spans[0];
+    const tgSpan = card.querySelector('.fam-tg-status-line') || spans[1];
+    if (touchSpan) touchSpan.classList.add('fam-touch-batt-line');
+    if (tgSpan) tgSpan.classList.add('fam-tg-status-line');
 
-    // 2. Charging / Unplugged + Battery % directly from presenceSnap
-    let battHtml = '';
-    if (p.batteryLevel != null) {
-      const pct = Number(p.batteryLevel);
-      const isCharging = !!p.isCharging;
-      const battColor = isCharging ? '#4ade80' : (pct <= 25 ? '#f87171' : '#fbbf24');
-      const battLabel = isCharging ? `🔌 Charging (${pct}%)` : `⚠️ UNPLUGGED (${pct}%)`;
-      battHtml = ` • <span style="color:${battColor};font-weight:800;">${battLabel}</span>`;
-    }
+    const touchBattHtml = touchSpan ? touchSpan.outerHTML : '';
+    const tgStatusHtml = tgSpan ? `<br>${tgSpan.outerHTML}` : '';
 
-    // 3. Today's completed calls (Name + Time only, no duration)
     const callsToday = getTodaysCompletedCallsList();
-    let todayCallsHtml = '';
+    let todayLineHtml = '';
     if (callsToday.length) {
-      const items = callsToday.map(c => {
+      const summaryItems = callsToday.map(c => {
         const name = FAMILY_NAMES[c.partnerId] || c.partnerName || 'Family';
         const t = c.startedAt ? new Date(c.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
-        return t ? `${name} (${t})` : name;
+        const m = Math.max(1, Math.round((Number(c.durationSec) || 60) / 60));
+        return `${name} (${t}, ${m}m)`;
       }).join(' • ');
-      todayCallsHtml = `<div style="font-size:0.85rem;color:#86efac;font-weight:800;margin-top:4px;">💚 Spoken to today: ${items}</div>`;
+      todayLineHtml = `<br><span class="fam-today-calls-line" style="color:#86efac;font-size:0.84rem;font-weight:800;">💚 Calls today: ${summaryItems}</span>`;
     }
 
-    const cleanHtml = `
-      <div style="font-size:1.02rem;font-weight:900;color:#fef08a;margin-bottom:4px;">${summary.text}</div>
-      <div style="font-size:0.88rem;color:#cbd5e1;font-weight:600;">${touchHtml}${battHtml}</div>
-      ${todayCallsHtml}
-    `;
+    const cleanHtml = `<div style="font-size:1.05rem;font-weight:900;color:#fef08a;margin-bottom:2px;">${summary.text}</div>${touchBattHtml}${todayLineHtml}${tgStatusHtml}`;
     if (card.innerHTML !== cleanHtml) card.innerHTML = cleanHtml;
   }
   hooks.refreshFamilyPresence = applySimpleFamilyPresenceCard;
@@ -474,7 +467,11 @@ function applySimpleFamilyPresenceCard() {
     state.lastActivityOrCallMs = Date.now();
     if (role === 'family') setTimeout(applySimpleFamilyPresenceCard, 20);
 
-if (call.status === 'idle') {
+    if (call.status === 'idle') {
+      clearTimeout(jitterHoldTimer);
+      if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
+    }
+
     if (role === 'nana') {
       if (call.status === 'connected') {
         if (!activeCallConnectedAtMs) {
