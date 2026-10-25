@@ -1,4 +1,4 @@
-import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } from "./nana-core.js?v=2.9.2";
+import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } from "./nana-core.js?v=2.9.3";
 
 (function initNanaTelemetry() {
   if (!NanaCore.SERVICE_TOKEN) return;
