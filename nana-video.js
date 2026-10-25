@@ -1,4 +1,4 @@
-import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.2";
+import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.3";
 
 (function initNanaVideo() {
   if (!NanaCore.SERVICE_TOKEN) return;
