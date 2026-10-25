@@ -34,6 +34,21 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
         window.promptEndCallConfirmation();
       };
     }
+
+    // Declutter Family Availability Tab: tuck secondary schedule controls into a clean collapsible drawer
+    const schedBadge = $('call-hours-tz-badge');
+    const schedCard = schedBadge?.closest('.settings-card');
+    if (schedCard && !schedCard.dataset.simplified) {
+      schedCard.dataset.simplified = '1';
+      const children = Array.from(schedCard.children);
+      const details = document.createElement('details');
+      details.className = 'fam-clean-Fold';
+      const summary = document.createElement('summary');
+      summary.innerHTML = `<span>⏰ Automatic Calling Hours Schedule</span>`;
+      details.appendChild(summary);
+      children.forEach(ch => details.appendChild(ch));
+      schedCard.appendChild(details);
+    }
   }
 
   window.promptEndCallConfirmation = () => {
@@ -86,8 +101,11 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     };
   }
 
-  // --- 1. TOP 68PX NO-TOUCH AREA ORIENTATION BANNER (DAY, TIME OF DAY, DATE & CLOCK) ---
+  // --- 1. TOP 68PX NO-TOUCH AREA ORIENTATION BANNER ON NANA'S SCREEN ---
   if (role === 'nana') {
+    // Hide old clock pill if present
+    if ($('clock')) $('clock').style.display = 'none';
+
     const topBar = document.createElement('div');
     topBar.id = 'nana-top-orientation-bar';
     document.body.appendChild(topBar);
@@ -176,7 +194,29 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     setTimeout(checkCustomBatteryThresholdOnNana, 4000);
   }
 
-  // --- 3. TODAY'S COMPLETED CALLS LOGGING & REASSURANCE BANNER ---
+  // --- 3. TODAY'S COMPLETED CALLS BANNER (FOR NANA'S HOME SCREEN ONLY) ---
+  function ensureNanaTodaysCallsBannerElement() {
+    if (role !== 'nana') return null;
+    let banner = $('todays-calls-reassurance-banner');
+    if (!banner) {
+      const gridScreen = $('grid-screen');
+      const familyGrid = $('family-grid');
+      if (!gridScreen) return null;
+      banner = document.createElement('div');
+      banner.id = 'todays-calls-reassurance-banner';
+      banner.innerHTML = `
+        <span>💚 Spoken to today:</span>
+        <div id="todays-calls-chips-container" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"></div>
+      `;
+      if (familyGrid && familyGrid.parentNode === gridScreen) {
+        gridScreen.insertBefore(banner, familyGrid);
+      } else {
+        gridScreen.prepend(banner);
+      }
+    }
+    return banner;
+  }
+
   function getTodaysCompletedCallsList() {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -187,7 +227,8 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
   }
 
   function renderTodaysCallsBanner() {
-    const banner = $('todays-calls-reassurance-banner');
+    if (role !== 'nana') return;
+    const banner = ensureNanaTodaysCallsBannerElement();
     const chipsBox = $('todays-calls-chips-container');
     if (!banner || !chipsBox) return;
 
@@ -209,7 +250,7 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
       const mins = Math.max(1, Math.round((Number(c.durationSec) || 60) / 60));
       const pill = document.createElement('span');
       pill.className = 'todays-call-pill';
-      pill.textContent = `✓ ${name} at ${timeStr} (${mins}m chat)`;
+      pill.textContent = `✓ ${name} at ${timeStr} (${mins}m)`;
       chipsBox.appendChild(pill);
     });
     banner.style.display = 'flex';
@@ -218,10 +259,9 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
 
   onValue(query(refs.callHistory, limitToLast(25)), snap => {
     state.callHistorySnap = snap.val() || {};
-    renderTodaysCallsBanner();
-    if (role === 'family') setTimeout(applySimpleFamilyPresenceCard, 20);
+    if (role === 'nana') renderTodaysCallsBanner();
   });
-  setInterval(renderTodaysCallsBanner, 60000);
+  if (role === 'nana') setInterval(renderTodaysCallsBanner, 60000);
 
   // --- 4. TABLET DISCONNECT, WIFI, BACKGROUND & BATTERY TELEMETRY ---
   if (role === 'nana') {
@@ -327,7 +367,7 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     }
   });
 
-  // --- 5. CONCISE SINGLE-LINE FAMILY PRESENCE STATUS ---
+  // --- 5. CALM, TWO-LINE FAMILY PRESENCE STATUS ---
   function getSimpleNanaStatusSummary() {
     const p = state.presenceSnap || {};
     const now = Date.now();
@@ -349,18 +389,18 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
 
     if (isOffline) {
       if (batt !== null && !charging && (batt <= 6 || (batt <= 14 && silenceSec > 600))) {
-        return { border: '#ef4444', text: `🔴 Offline (Ran out of battery)` };
+        return { border: '#ef4444', text: `🔴 Offline (Battery empty)` };
       }
       if (p.appState === 'backgrounded' || p.appState === 'closed' || p.lastExitHint === 'backed_out_or_notification' || p.lastExitHint === 'app_closed_or_backed_out') {
-        return { border: '#ef4444', text: `🟠 Left the app` };
+        return { border: '#f59e0b', text: `🟠 Left the app` };
       }
       if (p.lastExitHint === 'wifi_turned_off' || p.appState === 'shade_or_overlay' || p.lastExitHint === 'notification_shade_or_overlay') {
-        return { border: '#ef4444', text: `🔴 Offline (Wi-Fi turned off)` };
+        return { border: '#ef4444', text: `🔴 Offline (Wi-Fi off)` };
       }
-      return { border: '#ef4444', text: `🔴 Offline (Disconnected from internet)` };
+      return { border: '#ef4444', text: `🔴 Offline` };
     }
     if (p.appState === 'backgrounded') {
-      return { border: '#facc15', text: `🟠 Left the app` };
+      return { border: '#f59e0b', text: `🟠 Left the app` };
     }
 
     const curItem = NanaCore.getCurrentQueueItem?.();
@@ -368,18 +408,18 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     if (scr === 'video_playing') {
       return {
         border: '#a855f7',
-        text: `🎬 Video is playing${curItem?.item?.title ? ` (${curItem.item.title})` : ''}`
+        text: `🎬 Watching ${curItem?.item?.title || 'a video'}`
       };
     }
 
     if (state.entSnap?.activeKey && state.entSnap.activeKey !== 'off') {
-      return { border: '#22c55e', text: `🎻 Listening to the radio` };
+      return { border: '#22c55e', text: `🎻 Listening to Classic FM` };
     }
 
-    if (scr === 'chat_typing') return { border: '#38bdf8', text: `⌨️ On the family chat (typing)` };
-    if (scr === 'chat') return { border: '#38bdf8', text: `✈️ On the family chat (reading)` };
+    if (scr === 'chat_typing') return { border: '#38bdf8', text: `⌨️ Typing in Family Chat` };
+    if (scr === 'chat') return { border: '#38bdf8', text: `✈️ Reading Family Chat` };
 
-    return { border: '#22c55e', text: `🟢 Not doing anything` };
+    return { border: '#22c55e', text: `🟢 Available on Home Screen` };
   }
 
   function applySimpleFamilyPresenceCard() {
@@ -390,23 +430,12 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     const summary = getSimpleNanaStatusSummary();
     card.style.borderColor = summary.border;
 
-    const spans = Array.from(card.querySelectorAll('span')).filter(s => !s.classList.contains('fam-today-calls-line'));
-    const touchBattHtml = spans[0] ? spans[0].outerHTML : '';
-    const tgStatusHtml = spans[1] ? `<br>${spans[1].outerHTML}` : '';
+    const spans = Array.from(card.querySelectorAll('span'));
+    const touchBattHtml = spans[0] ? `<div style="color:#94a3b8;font-size:0.82rem;font-weight:600;">${spans[0].textContent}</div>` : '';
+    const needsTelegramWarning = spans[1] && spans[1].textContent.includes('Connect Telegram');
+    const tgWarnHtml = needsTelegramWarning ? `<div style="color:#fbbf24;font-size:0.78rem;margin-top:2px;">${spans[1].textContent}</div>` : '';
 
-    const callsToday = getTodaysCompletedCallsList();
-    let todayLineHtml = '';
-    if (callsToday.length) {
-      const summaryItems = callsToday.map(c => {
-        const name = FAMILY_NAMES[c.partnerId] || c.partnerName || 'Family';
-        const t = c.startedAt ? new Date(c.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
-        const m = Math.max(1, Math.round((Number(c.durationSec) || 60) / 60));
-        return `${name} (${t}, ${m}m)`;
-      }).join(' • ');
-      todayLineHtml = `<br><span class="fam-today-calls-line" style="color:#86efac;font-size:0.84rem;font-weight:800;">💚 Calls today: ${summaryItems}</span>`;
-    }
-
-    const cleanHtml = `<div style="font-size:1.05rem;font-weight:900;color:#fef08a;margin-bottom:2px;">${summary.text}</div>${touchBattHtml}${todayLineHtml}${tgStatusHtml}`;
+    const cleanHtml = `<div style="font-size:1rem;font-weight:800;color:#f8fafc;">${summary.text}</div>${touchBattHtml}${tgWarnHtml}`;
     if (card.innerHTML !== cleanHtml) card.innerHTML = cleanHtml;
   }
   hooks.refreshFamilyPresence = applySimpleFamilyPresenceCard;
