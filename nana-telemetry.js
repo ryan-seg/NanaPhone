@@ -232,7 +232,7 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
       .sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
   }
 
-  function renderTodaysCallsBanner() {
+function renderTodaysCallsBanner() {
     if (role !== 'nana') return;
     const banner = ensureNanaTodaysCallsBannerElement();
     const chipsBox = $('todays-calls-chips-container');
@@ -253,10 +253,9 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     callsToday.forEach(c => {
       const name = FAMILY_NAMES[c.partnerId] || c.partnerName || 'Family';
       const timeStr = c.startedAt ? new Date(c.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
-      const mins = Math.max(1, Math.round((Number(c.durationSec) || 60) / 60));
       const pill = document.createElement('span');
       pill.className = 'todays-call-pill';
-      pill.textContent = `✓ ${name} at ${timeStr} (${mins}m)`;
+      pill.textContent = timeStr ? `✓ ${name} at ${timeStr}` : `✓ ${name}`;
       chipsBox.appendChild(pill);
     });
     banner.style.display = 'flex';
