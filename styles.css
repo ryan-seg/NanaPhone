@@ -379,3 +379,36 @@ body.role-family #nana-presence-card {
   font-size: 0.82rem !important;
   min-width: 0 !important;
 }
+/* 1. Completely remove the old clock pill and overlapping "Tap a photo..." header title on Nana's screen */
+body.role-nana #clock,
+body.role-nana .clock-pill,
+body.role-nana #grid-header-title,
+#grid-screen #clock,
+#grid-screen #grid-header-title {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+/* 2. Make "Family Calls" text crisp white like the other 3 top tabs */
+#nana-top-nav-tabs button,
+.nana-main-tab,
+.nana-tab-btn,
+button[onclick*="switchNanaMainTab"] {
+  color: #ffffff !important;
+}
+
+/* Give the active tab a clear highlight border & rich background while keeping text white */
+#nana-top-nav-tabs button.active,
+.nana-main-tab.active,
+.nana-tab-btn.active,
+button[onclick*="switchNanaMainTab('calls')"] {
+  background: #1d4ed8 !important;
+  color: #ffffff !important;
+  border-color: #facc15 !important;
+}
