@@ -7,11 +7,12 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
 
   let activeCallConnectedAtMs = null, activeCallPartnerId = null;
 
-  // --- 0. ACCIDENTAL "END CALL" CONFIRMATION MODAL & JITTER GUARD ---
+// --- 0. ACCIDENTAL "END CALL" CONFIRMATION MODAL & JITTER GUARD ---
   let endCallConfirmedByUser = false;
   let endCallModalTimer = null;
   let jitterHoldTimer = null;
 
+  const hangupBtn = $('hangup-btn');
   if (role === 'family') {
     const ecModal = document.createElement('div');
     ecModal.id = 'end-call-confirm-modal';
@@ -27,28 +28,19 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     `;
     document.body.appendChild(ecModal);
 
-    const hangupBtn = $('hangup-btn');
     if (hangupBtn) {
       hangupBtn.onclick = (ev) => {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
         window.promptEndCallConfirmation();
       };
     }
-
-    // Declutter Family Availability Tab: tuck secondary schedule controls into a clean collapsible drawer
-    const schedBadge = $('call-hours-tz-badge');
-    const schedCard = schedBadge?.closest('.settings-card');
-    if (schedCard && !schedCard.dataset.simplified) {
-      schedCard.dataset.simplified = '1';
-      const children = Array.from(schedCard.children);
-      const details = document.createElement('details');
-      details.className = 'fam-clean-Fold';
-      const summary = document.createElement('summary');
-      summary.innerHTML = `<span>⏰ Automatic Calling Hours Schedule</span>`;
-      details.appendChild(summary);
-      children.forEach(ch => details.appendChild(ch));
-      schedCard.appendChild(details);
-    }
+  } else if (role === 'nana' && hangupBtn) {
+    // When Nana taps End Call herself, hang up immediately without triggering the jitter hold
+    hangupBtn.addEventListener('pointerdown', () => {
+      endCallConfirmedByUser = true;
+      clearTimeout(jitterHoldTimer);
+      setTimeout(() => { endCallConfirmedByUser = false; }, 3000);
+    }, { capture: true });
   }
 
   window.promptEndCallConfirmation = () => {
@@ -71,17 +63,30 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
     endCallConfirmedByUser = true;
     await origEndCall?.();
-    setTimeout(() => { endCallConfirmedByUser = false; }, 2000);
+    setTimeout(() => { endCallConfirmedByUser = false; }, 3000);
   };
 
   if (typeof origEndCall === 'function') {
     window.endCall = async (forceImmediate = false) => {
+      clearTimeout(jitterHoldTimer);
+      if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
+
+      // If forceImmediate is passed, or user tapped End Call, or Firebase already says 'idle', exit immediately!
       const isConnectedCall = state.callSnap?.status === 'connected' && $('call-screen')?.classList.contains('active');
-      if (!forceImmediate && !endCallConfirmedByUser && isConnectedCall) {
+      if (forceImmediate || endCallConfirmedByUser || !isConnectedCall) {
+        return await origEndCall();
+      }
+
+      // Wait 600ms to let Firebase callState sync in case the other person intentionally pressed End Call
+      setTimeout(async () => {
+        if (state.callSnap?.status !== 'connected' || endCallConfirmedByUser) {
+          await origEndCall();
+          return;
+        }
         const banner = $('call-connecting-banner');
         if (banner) {
           banner.style.display = 'block';
-          banner.innerText = '📡 Signal dip — holding call for 35s to reconnect...';
+          banner.innerText = '📡 Signal dip — holding call for 30s to reconnect...';
         }
         clearTimeout(jitterHoldTimer);
         jitterHoldTimer = setTimeout(async () => {
@@ -92,15 +97,10 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
           } else if (banner) {
             banner.style.display = 'none';
           }
-        }, 35000);
-        return;
-      }
-      clearTimeout(jitterHoldTimer);
-      if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
-      return await origEndCall();
+        }, 30000);
+      }, 600);
     };
   }
-
 // --- 1. TOP 68PX NO-TOUCH AREA ORIENTATION BANNER ON NANA'S SCREEN ---
   if (role === 'nana') {
     // Physically remove the old clock pill and overlapping "Tap a photo..." title ("T")
@@ -519,11 +519,15 @@ function applySimpleFamilyPresenceCard() {
     state.lastActivityOrCallMs = Date.now();
     if (role === 'family') setTimeout(applySimpleFamilyPresenceCard, 20);
 
-    if (call.status === 'idle') {
+if (call.status === 'idle') {
       clearTimeout(jitterHoldTimer);
       if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
+      if (role === 'nana' && $('call-screen')?.classList.contains('active')) {
+        origEndCall?.();
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        $('grid-screen')?.classList.add('active');
+      }
     }
-
     if (role === 'nana') {
       if (call.status === 'connected') {
         if (!activeCallConnectedAtMs) {
