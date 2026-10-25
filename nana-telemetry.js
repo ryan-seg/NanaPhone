@@ -335,7 +335,7 @@ onValue(query(refs.callHistory, limitToLast(25)), snap => {
     return `${Math.floor(hrs / 24)}d ${hrs % 24}h ago`;
   }
 
-  function getSimpleNanaStatusSummary() {
+function getSimpleNanaStatusSummary() {
     const p = state.presenceSnap || {};
     const now = Date.now();
     const lastSeenMs = Math.max(Number(p.lastPing || 0), Number(p.disconnectedAt || 0), Number(p.appStateChangedAt || 0));
@@ -372,10 +372,14 @@ onValue(query(refs.callHistory, limitToLast(25)), snap => {
 
     const curItem = NanaCore.getCurrentQueueItem?.();
     const scr = p.currentScreen || 'home';
-    if (scr === 'video_playing') {
+    const isVideoStreamPlaying = state.streamData?.state === 'playing';
+
+    if (scr === 'video_playing' || isVideoStreamPlaying) {
+      const savedSec = curItem ? Number(state.streamData?.savedTimes?.[curItem.item.id] || 0) : 0;
+      const posStr = savedSec > 0 ? ` (${Math.floor(savedSec / 60)}:${String(savedSec % 60).padStart(2, '0')})` : '';
       return {
         border: '#a855f7',
-        text: `🎬 Watching video${curItem?.item?.title ? `: ${curItem.item.title}` : ''}`
+        text: `🎬 Watching video${curItem?.item?.title ? `: ${curItem.item.title}` : ''}${posStr}`
       };
     }
     if (scr === 'video_paused') {
@@ -385,7 +389,7 @@ onValue(query(refs.callHistory, limitToLast(25)), snap => {
       };
     }
 
-    if (state.entSnap?.activeKey && state.entSnap.activeKey !== 'off') {
+    if (scr === 'radio' || (state.entSnap?.activeKey && state.entSnap.activeKey !== 'off')) {
       return { border: '#22c55e', text: `🎻 Listening to Classic FM Radio` };
     }
 
