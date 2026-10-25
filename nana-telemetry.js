@@ -101,10 +101,16 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     };
   }
 
-  // --- 1. TOP 68PX NO-TOUCH AREA ORIENTATION BANNER ON NANA'S SCREEN ---
+// --- 1. TOP 68PX NO-TOUCH AREA ORIENTATION BANNER ON NANA'S SCREEN ---
   if (role === 'nana') {
-    // Hide old clock pill if present
-    if ($('clock')) $('clock').style.display = 'none';
+    // Physically remove the old clock pill and overlapping "Tap a photo..." title ("T")
+    $('clock')?.remove();
+    $('grid-header-title')?.remove();
+
+    // Ensure all top navigation tab buttons ("Family Calls", etc.) have white text
+    document.querySelectorAll('button[onclick*="switchNanaMainTab"]').forEach(btn => {
+      btn.style.setProperty('color', '#ffffff', 'important');
+    });
 
     const topBar = document.createElement('div');
     topBar.id = 'nana-top-orientation-bar';
