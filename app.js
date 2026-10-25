@@ -1334,6 +1334,15 @@ async function joinDailyRoom() {
     }, { once: true });
   };
 
+  // Helper: only count opposite-role participants (never match Nana with a ghost Nana session!)
+  const getValidRemotePartner = () => {
+    if (callObject !== co) return null;
+    const remotes = Object.values(co.participants()).filter(p => !p.local);
+    return role === 'family'
+      ? (remotes.find(p => p.user_name === 'Nana_Tablet') || remotes.find(p => (p.user_name || '').startsWith('Nana')) || null)
+      : (remotes.find(p => (p.user_name || '').startsWith('Family_')) || null);
+  };
+
   const attachTracks = () => {
     if (callObject !== co) return;
     const parts = co.participants();
@@ -1341,8 +1350,7 @@ async function joinDailyRoom() {
     const lv = $('local-video');
     if (localTrack && lv && lv.srcObject?.getVideoTracks()[0] !== localTrack) { lv.srcObject = new MediaStream([localTrack]); lv.play().catch(() => {}); }
 
-    const remotes = Object.values(parts).filter(p => !p.local);
-    const target = role === 'family' ? (remotes.find(p => p.user_name === 'Nana_Tablet') || remotes.find(p => (p.user_name || '').startsWith('Nana')) || remotes[0]) : (remotes.find(p => (p.user_name || '').startsWith('Family_')) || remotes[0]);
+    const target = getValidRemotePartner();
     if (!target) return;
     hadRemote = true; clearTimeout(emptyTimer);
 
@@ -1366,13 +1374,39 @@ async function joinDailyRoom() {
   };
 
   ['joined-meeting', 'participant-joined', 'participant-updated', 'track-started', 'track-stopped'].forEach(ev => co.on(ev, attachTracks));
+
+  co.on('participant-joined', () => {
+    if (getValidRemotePartner()) {
+      clearTimeout(emptyTimer);
+      if (!soundBlocked) banner.style.display = 'none';
+    }
+  });
+
+  co.on('network-connection', (ev) => {
+    if (ev?.event === 'Interrupted') showProblem('📡 Weak signal — holding call & reconnecting...');
+    else if (ev?.event === 'Connected' && !soundBlocked) banner.style.display = 'none';
+  });
+
+  // If the family member leaves (or drops signal), wait 15s for a brief signal blip, OR exit immediately if Firebase callState is already 'idle'
   co.on('participant-left', () => {
     if (callObject !== co) return;
-    clearTimeout(emptyTimer);
-    emptyTimer = setTimeout(() => { if (callObject === co && hadRemote && !Object.values(co.participants()).some(p => !p.local)) window.endCall(); }, 10000);
+    if (currentState === 'idle') { window.endCall(); return; }
+    if (!getValidRemotePartner()) {
+      clearTimeout(emptyTimer);
+      showProblem('📡 Reconnecting (waiting 15s)...');
+      emptyTimer = setTimeout(() => {
+        if (callObject === co && hadRemote && !getValidRemotePartner()) window.endCall();
+      }, 15000);
+    }
   });
+
   co.on('camera-error', e => showProblem('⚠️ Camera/mic error: ' + (e?.errorMsg?.errorMsg || 'check permissions')));
-  co.on('error', e => { showProblem('⚠️ Video error: ' + (e?.errorMsg || 'reconnecting')); setTimeout(() => { if (callObject === co) window.endCall(); }, 8000); });
+  co.on('error', e => {
+    showProblem('📡 Connection hiccup (' + (e?.errorMsg || 'reconnecting') + ')...');
+    setTimeout(() => {
+      if (callObject === co && !getValidRemotePartner()) window.endCall();
+    }, 15000);
+  });
 
   try {
     await co.join({ url: CONFIG.dailyRoomUrl, userName: role === 'nana' ? (isRealAndroidTablet ? 'Nana_Tablet' : 'Nana_Browser') : `Family_${activeFamilyMember.id}` });
@@ -1380,7 +1414,7 @@ async function joinDailyRoom() {
     try { co.setBandwidth({ kbs: 1800, trackConstraints: { width: 1280, height: 720, frameRate: 30 } }); } catch (_) {}
   } catch (err) {
     showProblem('⚠️ Could not join video room'); isJoiningOrInRoom = false;
-    setTimeout(() => { if (callObject === co) window.endCall(); }, 8000);
+    setTimeout(() => { if (callObject === co) window.endCall(); }, 10000);
   }
 }
 
