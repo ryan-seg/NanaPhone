@@ -6,9 +6,9 @@
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="nanaphone-page-version" content="2.9.2">
+  <meta name="nanaphone-page-version" content="2.9.3">
   <script>
-    window.__NANA_PAGE_VERSION = "2.9.2";
+    window.__NANA_PAGE_VERSION = "2.9.3";
     (function () {
       function ok() {
         var sv = (getComputedStyle(document.documentElement).getPropertyValue('--nana-styles-version') || '').replace(/["'\s]/g, '');
@@ -18,7 +18,7 @@
         if (ok() || !document.body) return;
         var d = document.createElement('div');
         d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7c2d12;color:#fff;font:700 20px sans-serif;padding:14px;text-align:center;';
-        d.innerText = 'Loading NanaPhone... (page v2.9.2) - retrying';
+        d.innerText = 'Loading NanaPhone... (page v2.9.3) - retrying';
         document.body.appendChild(d);
       }, 15000);
       setInterval(function () { if (!ok()) window.location.reload(); }, 60000);
@@ -26,7 +26,7 @@
   </script>
   <title>NanaPhone Portal</title>
   <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
-  <link rel="stylesheet" href="styles.css?v=2.9.2">
+  <link rel="stylesheet" href="styles.css?v=2.9.3">
 </head>
 <body>
   <div id="brightness-overlay" onclick="wakeScreenAndResetDimTimer()"></div>
@@ -154,7 +154,7 @@
         <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
         <div class="nav-pill-btn video-pill-x" onclick="openVideoScreen()">🎬 Video</div>
         <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.9.2</div>
+        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.9.3</div>
       </div>
     </div>
     <div id="message-ticker-bar" class="message-ticker-bar" onclick="openFamilyBulletin()">
@@ -426,10 +426,10 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2.9.2"></script>
-  <script type="module" src="nana-core.js?v=2.9.2"></script>
-  <script type="module" src="nana-video.js?v=2.9.2"></script>
-  <script type="module" src="nana-popups.js?v=2.9.2"></script>
-  <script type="module" src="nana-telemetry.js?v=2.9.2"></script>
+  <script type="module" src="app.js?v=2.9.3"></script>
+  <script type="module" src="nana-core.js?v=2.9.3"></script>
+  <script type="module" src="nana-video.js?v=2.9.3"></script>
+  <script type="module" src="nana-popups.js?v=2.9.3"></script>
+  <script type="module" src="nana-telemetry.js?v=2.9.3"></script>
 </body>
 </html>
