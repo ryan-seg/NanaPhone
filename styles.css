@@ -291,30 +291,52 @@ body.role-nana .clock-pill {
 }
 
 /* 2. Nana's Today's Calls Reassurance Banner on #grid-screen */
+/* Compact "Spoken to today" banner on Nana's screen */
 #todays-calls-reassurance-banner {
   display: none;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px;
   background: #064e3b;
-  border: 3px solid #34d399;
-  border-radius: 18px;
-  padding: 10px 16px;
-  margin: 0 14px 10px 14px;
+  border: 2px solid #34d399;
+  border-radius: 12px;
+  padding: 4px 10px !important;
+  margin: 0 12px 6px 12px !important;
   color: #ecfdf5;
-  font-size: clamp(1.15rem, 1.9vw, 1.45rem);
+  font-size: clamp(0.88rem, 1.35vw, 1.05rem) !important;
   font-weight: 800;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+  min-height: 0 !important;
 }
+
 .todays-call-pill {
   background: #047857;
-  border: 2px solid #6ee7b7;
+  border: 1.5px solid #6ee7b7;
   color: #ffffff;
-  padding: 4px 12px;
+  padding: 2px 9px !important;
   border-radius: 999px;
   font-weight: 800;
-  font-size: 0.95em;
+  font-size: 0.92em !important;
+  line-height: 1.2 !important;
+}
+
+/* Compact "Missed calls" banner on Nana's screen */
+#missed-call-banner {
+  padding: 4px 10px !important;
+  margin: 0 12px 6px 12px !important;
+  border-width: 2px !important;
+  border-radius: 12px !important;
+  gap: 6px !important;
+  min-height: 0 !important;
+  font-size: clamp(0.9rem, 1.4vw, 1.08rem) !important;
+}
+
+#missed-call-banner .missed-chip-btn {
+  padding: 4px 10px !important;
+  font-size: clamp(0.85rem, 1.3vw, 1rem) !important;
+  border-radius: 999px !important;
+  border-width: 2px !important;
+  line-height: 1.2 !important;
 }
 
 /* 3. Calm down sensory overload on Family Screen */
