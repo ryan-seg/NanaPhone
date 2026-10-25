@@ -412,3 +412,30 @@ button[onclick*="switchNanaMainTab('calls')"] {
   color: #ffffff !important;
   border-color: #facc15 !important;
 }
+/* Make profile photos larger on Nana's contact grid */
+body.role-nana .family-card {
+  padding: 8px 6px !important;
+  gap: 6px !important;
+  justify-content: space-between !important;
+}
+
+body.role-nana .family-card .photo-wrapper {
+  width: clamp(135px, 19vh, 210px) !important;
+  height: clamp(135px, 19vh, 210px) !important;
+  max-width: 92% !important;
+  aspect-ratio: 1 / 1 !important;
+  border-width: 4px !important;
+  flex-shrink: 1 !important;
+}
+
+body.role-nana .family-card .photo-wrapper img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+body.role-nana .family-card .contact-nameplate {
+  font-size: clamp(1.25rem, 2.2vw, 1.65rem) !important;
+  padding: 4px 10px !important;
+  margin-top: 2px !important;
+}
