@@ -200,7 +200,7 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     setTimeout(checkCustomBatteryThresholdOnNana, 4000);
   }
 
-  // --- 3. TODAY'S COMPLETED CALLS BANNER (FOR NANA'S HOME SCREEN ONLY) ---
+// --- 3. TODAY'S COMPLETED CALLS BANNER (FOR NANA'S HOME SCREEN ONLY, NO DURATION) ---
   function ensureNanaTodaysCallsBannerElement() {
     if (role !== 'nana') return null;
     let banner = $('todays-calls-reassurance-banner');
@@ -212,7 +212,7 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
       banner.id = 'todays-calls-reassurance-banner';
       banner.innerHTML = `
         <span>💚 Spoken to today:</span>
-        <div id="todays-calls-chips-container" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"></div>
+        <div id="todays-calls-chips-container" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
       `;
       if (familyGrid && familyGrid.parentNode === gridScreen) {
         gridScreen.insertBefore(banner, familyGrid);
@@ -232,7 +232,7 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
       .sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
   }
 
-function renderTodaysCallsBanner() {
+  function renderTodaysCallsBanner() {
     if (role !== 'nana') return;
     const banner = ensureNanaTodaysCallsBannerElement();
     const chipsBox = $('todays-calls-chips-container');
@@ -372,7 +372,17 @@ function renderTodaysCallsBanner() {
     }
   });
 
-  // --- 5. CALM, TWO-LINE FAMILY PRESENCE STATUS ---
+// --- 5. FAMILY PRESENCE STATUS (ACTIVITY + LAST TOUCHED + CHARGING/BATTERY %) ---
+  function formatTouchAgo(ts) {
+    if (!ts) return "No recent touch";
+    const mins = Math.max(0, Math.floor((Date.now() - Number(ts)) / 60000));
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60), remMins = mins % 60;
+    if (hrs < 24) return remMins > 0 ? `${hrs}h ${remMins}m ago` : `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ${hrs % 24}h ago`;
+  }
+
   function getSimpleNanaStatusSummary() {
     const p = state.presenceSnap || {};
     const now = Date.now();
@@ -388,21 +398,21 @@ function renderTodaysCallsBanner() {
       const withName = FAMILY_NAMES[otherId] || 'Family';
       return {
         border: '#f87171',
-        text: st === 'connected' ? `🔴 In a call with ${withName}` : `🟡 Ringing (${withName})`
+        text: st === 'connected' ? `🔴 In a video call with ${withName}` : `🟡 Ringing (${withName})`
       };
     }
 
     if (isOffline) {
       if (batt !== null && !charging && (batt <= 6 || (batt <= 14 && silenceSec > 600))) {
-        return { border: '#ef4444', text: `🔴 Offline (Battery empty)` };
+        return { border: '#ef4444', text: `🔴 Offline (Ran out of battery)` };
       }
       if (p.appState === 'backgrounded' || p.appState === 'closed' || p.lastExitHint === 'backed_out_or_notification' || p.lastExitHint === 'app_closed_or_backed_out') {
         return { border: '#f59e0b', text: `🟠 Left the app` };
       }
       if (p.lastExitHint === 'wifi_turned_off' || p.appState === 'shade_or_overlay' || p.lastExitHint === 'notification_shade_or_overlay') {
-        return { border: '#ef4444', text: `🔴 Offline (Wi-Fi off)` };
+        return { border: '#ef4444', text: `🔴 Offline (Wi-Fi turned off)` };
       }
-      return { border: '#ef4444', text: `🔴 Offline` };
+      return { border: '#ef4444', text: `🔴 Offline (Disconnected from internet)` };
     }
     if (p.appState === 'backgrounded') {
       return { border: '#f59e0b', text: `🟠 Left the app` };
@@ -413,18 +423,24 @@ function renderTodaysCallsBanner() {
     if (scr === 'video_playing') {
       return {
         border: '#a855f7',
-        text: `🎬 Watching ${curItem?.item?.title || 'a video'}`
+        text: `🎬 Watching video${curItem?.item?.title ? `: ${curItem.item.title}` : ''}`
+      };
+    }
+    if (scr === 'video_paused') {
+      return {
+        border: '#a855f7',
+        text: `⏸️ On Video Screen (Paused${curItem?.item?.title ? `: ${curItem.item.title}` : ''})`
       };
     }
 
     if (state.entSnap?.activeKey && state.entSnap.activeKey !== 'off') {
-      return { border: '#22c55e', text: `🎻 Listening to Classic FM` };
+      return { border: '#22c55e', text: `🎻 Listening to Classic FM Radio` };
     }
 
-    if (scr === 'chat_typing') return { border: '#38bdf8', text: `⌨️ Typing in Family Chat` };
-    if (scr === 'chat') return { border: '#38bdf8', text: `✈️ Reading Family Chat` };
+    if (scr === 'chat_typing') return { border: '#38bdf8', text: `⌨️ On Family Chat (Typing a message)` };
+    if (scr === 'chat') return { border: '#38bdf8', text: `✈️ On Family Chat (Reading messages)` };
 
-    return { border: '#22c55e', text: `🟢 Available on Home Screen` };
+    return { border: '#22c55e', text: `🟢 Available on Home Screen (Idle)` };
   }
 
   function applySimpleFamilyPresenceCard() {
@@ -432,15 +448,28 @@ function renderTodaysCallsBanner() {
     const card = $('nana-presence-card');
     if (!card) return;
 
+    const p = state.presenceSnap || {};
     const summary = getSimpleNanaStatusSummary();
     card.style.borderColor = summary.border;
 
-    const spans = Array.from(card.querySelectorAll('span'));
-    const touchBattHtml = spans[0] ? `<div style="color:#94a3b8;font-size:0.82rem;font-weight:600;">${spans[0].textContent}</div>` : '';
-    const needsTelegramWarning = spans[1] && spans[1].textContent.includes('Connect Telegram');
-    const tgWarnHtml = needsTelegramWarning ? `<div style="color:#fbbf24;font-size:0.78rem;margin-top:2px;">${spans[1].textContent}</div>` : '';
+    // 1. Last touched timestamp directly from presenceSnap
+    const lastTouchTs = p.lastTouched || p.lastActive || null;
+    const touchHtml = `<span>👆 Last touched: <strong style="color:#f8fafc;">${formatTouchAgo(lastTouchTs)}</strong></span>`;
 
-    const cleanHtml = `<div style="font-size:1rem;font-weight:800;color:#f8fafc;">${summary.text}</div>${touchBattHtml}${tgWarnHtml}`;
+    // 2. Charging / Unplugged + Battery % directly from presenceSnap
+    let battHtml = '';
+    if (p.batteryLevel != null) {
+      const pct = Number(p.batteryLevel);
+      const isCharging = !!p.isCharging;
+      const battColor = isCharging ? '#4ade80' : (pct <= 25 ? '#f87171' : '#fbbf24');
+      const battLabel = isCharging ? `🔌 Charging (${pct}%)` : `⚠️ UNPLUGGED (${pct}%)`;
+      battHtml = ` • <span style="color:${battColor};font-weight:800;">${battLabel}</span>`;
+    }
+
+    const cleanHtml = `
+      <div style="font-size:1.02rem;font-weight:900;color:#fef08a;margin-bottom:4px;">${summary.text}</div>
+      <div style="font-size:0.88rem;color:#cbd5e1;font-weight:600;">${touchHtml}${battHtml}</div>
+    `;
     if (card.innerHTML !== cleanHtml) card.innerHTML = cleanHtml;
   }
   hooks.refreshFamilyPresence = applySimpleFamilyPresenceCard;
