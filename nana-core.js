@@ -1,4 +1,4 @@
-import { getApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getApps, getApp, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, update, push, onValue, onDisconnect, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 export const $ = (id) => document.getElementById(id);
@@ -22,12 +22,14 @@ const FAMILY_NAMES = {
 };
 const senderName = FAMILY_NAMES[callerId] || "Family";
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsFHE8oyj1RBGxLJT79bbPsvJ2hTkVrF9dCoj369ApEREXyrdQKE_vA0QrobBOeLE2/exec";
+const FIREBASE_CONFIG = { databaseURL: "https://nanaphone-f644b-default-rtdb.europe-west1.firebasedatabase.app" };
 
 const keyHash = SERVICE_TOKEN ? await sha256Hex("nana-v2-salt:" + SERVICE_TOKEN) : "";
 const PORTAL_NODE_ID = `nana_${keyHash.slice(0, 24)}`;
 const basePath = TEST_MODE ? `portals/${PORTAL_NODE_ID}__test` : `portals/${PORTAL_NODE_ID}`;
 
-const app = getApp();
+// Safely get existing Firebase app (or initialize it if app.js top-level await hasn't finished yet)
+const app = getApps().length ? getApp() : initializeApp(FIREBASE_CONFIG);
 const db = getDatabase(app);
 
 export const NanaCore = {
@@ -71,7 +73,9 @@ export const NanaCore = {
     pauseVideo: null,
     openVideoScreen: null,
     broadcastScreen: null,
-    refreshFamilyPresence: null
+    refreshFamilyPresence: null,
+    renderTodaysCallsBanner: null,
+    startNormalDimCountdownOnPause: null
   }
 };
 
