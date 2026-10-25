@@ -7,6 +7,85 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
 
   let activeCallConnectedAtMs = null, activeCallPartnerId = null;
 
+  // --- 0. ACCIDENTAL "END CALL" CONFIRMATION MODAL & JITTER GUARD ---
+  let endCallConfirmedByUser = false;
+  let endCallModalTimer = null;
+  let jitterHoldTimer = null;
+
+  if (role === 'family') {
+    const ecModal = document.createElement('div');
+    ecModal.id = 'end-call-confirm-modal';
+    ecModal.innerHTML = `
+      <div class="end-confirm-card">
+        <div style="font-size:1.85rem;font-weight:900;color:#fef08a;">☎️ End Call with Nana?</div>
+        <div style="font-size:1.05rem;color:#cbd5e1;font-weight:700;">Tap "Keep Talking" if you pressed End Call by accident.</div>
+        <div style="display:flex;gap:14px;width:100%;margin-top:6px;">
+          <button class="confirm-btn" style="flex:1;background:#22c55e;color:#000;font-size:1.25rem;padding:14px 10px;" onclick="dismissEndCallConfirm()">📞 Keep Talking</button>
+          <button class="confirm-btn" style="flex:1;background:#ef4444;color:#fff;font-size:1.25rem;padding:14px 10px;" onclick="confirmFamilyEndCallNow()">☎️ Yes, End Call</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(ecModal);
+
+    const hangupBtn = $('hangup-btn');
+    if (hangupBtn) {
+      hangupBtn.onclick = (ev) => {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        window.promptEndCallConfirmation();
+      };
+    }
+  }
+
+  window.promptEndCallConfirmation = () => {
+    const m = $('end-call-confirm-modal');
+    if (!m) return window.confirmFamilyEndCallNow();
+    m.style.display = 'flex';
+    clearTimeout(endCallModalTimer);
+    endCallModalTimer = setTimeout(() => { m.style.display = 'none'; }, 8000);
+  };
+
+  window.dismissEndCallConfirm = () => {
+    clearTimeout(endCallModalTimer);
+    if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
+  };
+
+  const origEndCall = window.endCall;
+  window.confirmFamilyEndCallNow = async () => {
+    clearTimeout(endCallModalTimer);
+    clearTimeout(jitterHoldTimer);
+    if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
+    endCallConfirmedByUser = true;
+    await origEndCall?.();
+    setTimeout(() => { endCallConfirmedByUser = false; }, 2000);
+  };
+
+  if (typeof origEndCall === 'function') {
+    window.endCall = async (forceImmediate = false) => {
+      const isConnectedCall = state.callSnap?.status === 'connected' && $('call-screen')?.classList.contains('active');
+      if (!forceImmediate && !endCallConfirmedByUser && isConnectedCall) {
+        const banner = $('call-connecting-banner');
+        if (banner) {
+          banner.style.display = 'block';
+          banner.innerText = '📡 Signal dip — holding call for 35s to reconnect...';
+        }
+        clearTimeout(jitterHoldTimer);
+        jitterHoldTimer = setTimeout(async () => {
+          const rv = $('remote-video');
+          const videoRecovered = rv && rv.srcObject && !rv.paused && rv.readyState >= 2;
+          if (!videoRecovered && state.callSnap?.status === 'connected') {
+            await origEndCall();
+          } else if (banner) {
+            banner.style.display = 'none';
+          }
+        }, 35000);
+        return;
+      }
+      clearTimeout(jitterHoldTimer);
+      if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
+      return await origEndCall();
+    };
+  }
+
   // --- 1. TOP 68PX NO-TOUCH AREA ORIENTATION BANNER (DAY, TIME OF DAY, DATE & CLOCK) ---
   if (role === 'nana') {
     const topBar = document.createElement('div');
@@ -87,7 +166,6 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
       const level = b.level, charging = b.charging;
       const threshold = Number(state.batteryVoiceThresholdPct ?? 100);
       if (!charging && level !== null && level <= threshold) {
-        // window.announceBatteryWarning in app.js already enforces mute status & batteryVoiceIntervalMin!
         window.announceBatteryWarning?.("Please plug in the tablet charger.");
       }
     } catch (_) {}
@@ -216,22 +294,18 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
   function broadcastNanaCurrentScreen() {
     if (role !== 'nana') return;
     let screenState = 'home';
-    const isActuallyPlayingVideo = !!(
+    const isPlayingVideo = !!(
       $('video-screen')?.classList.contains('active') &&
       videoEl &&
       !videoEl.paused &&
-      !videoEl.ended &&
-      videoEl.readyState >= 2
+      !videoEl.ended
     );
     if ($('bulletin-modal')?.style.display === 'flex') {
       screenState = $('bulletin-modal')?.classList.contains('kb-fullscreen') ? 'chat_typing' : 'chat';
     } else if ($('video-screen')?.classList.contains('active')) {
-      screenState = isActuallyPlayingVideo ? 'video_playing' : 'video_paused';
+      screenState = isPlayingVideo ? 'video_playing' : 'video_paused';
     } else if ($('radio-screen')?.classList.contains('active')) {
       screenState = 'radio';
-    }
-    if (state.streamData.state === 'playing' && !isActuallyPlayingVideo) {
-      update(refs.videoStream, { state: 'paused', updatedAt: Date.now() }).catch(() => {});
     }
     update(refs.presence, {
       online: true,
@@ -367,6 +441,11 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     state.callSnap = call;
     state.lastActivityOrCallMs = Date.now();
     if (role === 'family') setTimeout(applySimpleFamilyPresenceCard, 20);
+
+    if (call.status === 'idle') {
+      clearTimeout(jitterHoldTimer);
+      if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
+    }
 
     if (role === 'nana') {
       if (call.status === 'connected') {
