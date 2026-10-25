@@ -262,9 +262,10 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
   }
   hooks.renderTodaysCallsBanner = renderTodaysCallsBanner;
 
-  onValue(query(refs.callHistory, limitToLast(25)), snap => {
+onValue(query(refs.callHistory, limitToLast(25)), snap => {
     state.callHistorySnap = snap.val() || {};
     if (role === 'nana') renderTodaysCallsBanner();
+    if (role === 'family') setTimeout(applySimpleFamilyPresenceCard, 20);
   });
   if (role === 'nana') setInterval(renderTodaysCallsBanner, 60000);
 
@@ -443,7 +444,7 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     return { border: '#22c55e', text: `🟢 Available on Home Screen (Idle)` };
   }
 
-  function applySimpleFamilyPresenceCard() {
+function applySimpleFamilyPresenceCard() {
     if (role !== 'family') return;
     const card = $('nana-presence-card');
     if (!card) return;
@@ -466,9 +467,22 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
       battHtml = ` • <span style="color:${battColor};font-weight:800;">${battLabel}</span>`;
     }
 
+    // 3. Today's completed calls (Name + Time only, no duration)
+    const callsToday = getTodaysCompletedCallsList();
+    let todayCallsHtml = '';
+    if (callsToday.length) {
+      const items = callsToday.map(c => {
+        const name = FAMILY_NAMES[c.partnerId] || c.partnerName || 'Family';
+        const t = c.startedAt ? new Date(c.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+        return t ? `${name} (${t})` : name;
+      }).join(' • ');
+      todayCallsHtml = `<div style="font-size:0.85rem;color:#86efac;font-weight:800;margin-top:4px;">💚 Spoken to today: ${items}</div>`;
+    }
+
     const cleanHtml = `
       <div style="font-size:1.02rem;font-weight:900;color:#fef08a;margin-bottom:4px;">${summary.text}</div>
       <div style="font-size:0.88rem;color:#cbd5e1;font-weight:600;">${touchHtml}${battHtml}</div>
+      ${todayCallsHtml}
     `;
     if (card.innerHTML !== cleanHtml) card.innerHTML = cleanHtml;
   }
