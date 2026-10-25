@@ -7,12 +7,9 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
 
   let activeCallConnectedAtMs = null, activeCallPartnerId = null;
 
-// --- 0. ACCIDENTAL "END CALL" CONFIRMATION MODAL & JITTER GUARD ---
-  let endCallConfirmedByUser = false;
+// --- 0. ACCIDENTAL "END CALL" CONFIRMATION MODAL (FAMILY ONLY) ---
   let endCallModalTimer = null;
-  let jitterHoldTimer = null;
 
-  const hangupBtn = $('hangup-btn');
   if (role === 'family') {
     const ecModal = document.createElement('div');
     ecModal.id = 'end-call-confirm-modal';
@@ -28,24 +25,18 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     `;
     document.body.appendChild(ecModal);
 
+    const hangupBtn = $('hangup-btn');
     if (hangupBtn) {
       hangupBtn.onclick = (ev) => {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
         window.promptEndCallConfirmation();
       };
     }
-  } else if (role === 'nana' && hangupBtn) {
-    // When Nana taps End Call herself, hang up immediately without triggering the jitter hold
-    hangupBtn.addEventListener('pointerdown', () => {
-      endCallConfirmedByUser = true;
-      clearTimeout(jitterHoldTimer);
-      setTimeout(() => { endCallConfirmedByUser = false; }, 3000);
-    }, { capture: true });
   }
 
   window.promptEndCallConfirmation = () => {
     const m = $('end-call-confirm-modal');
-    if (!m) return window.confirmFamilyEndCallNow();
+    if (!m) return window.endCall?.();
     m.style.display = 'flex';
     clearTimeout(endCallModalTimer);
     endCallModalTimer = setTimeout(() => { m.style.display = 'none'; }, 8000);
@@ -56,51 +47,11 @@ import { $, NanaCore, update, push, onValue, onDisconnect, query, limitToLast } 
     if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
   };
 
-  const origEndCall = window.endCall;
   window.confirmFamilyEndCallNow = async () => {
     clearTimeout(endCallModalTimer);
-    clearTimeout(jitterHoldTimer);
     if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
-    endCallConfirmedByUser = true;
-    await origEndCall?.();
-    setTimeout(() => { endCallConfirmedByUser = false; }, 3000);
+    await window.endCall?.();
   };
-
-  if (typeof origEndCall === 'function') {
-    window.endCall = async (forceImmediate = false) => {
-      clearTimeout(jitterHoldTimer);
-      if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
-
-      // If forceImmediate is passed, or user tapped End Call, or Firebase already says 'idle', exit immediately!
-      const isConnectedCall = state.callSnap?.status === 'connected' && $('call-screen')?.classList.contains('active');
-      if (forceImmediate || endCallConfirmedByUser || !isConnectedCall) {
-        return await origEndCall();
-      }
-
-      // Wait 600ms to let Firebase callState sync in case the other person intentionally pressed End Call
-      setTimeout(async () => {
-        if (state.callSnap?.status !== 'connected' || endCallConfirmedByUser) {
-          await origEndCall();
-          return;
-        }
-        const banner = $('call-connecting-banner');
-        if (banner) {
-          banner.style.display = 'block';
-          banner.innerText = '📡 Signal dip — holding call for 30s to reconnect...';
-        }
-        clearTimeout(jitterHoldTimer);
-        jitterHoldTimer = setTimeout(async () => {
-          const rv = $('remote-video');
-          const videoRecovered = rv && rv.srcObject && !rv.paused && rv.readyState >= 2;
-          if (!videoRecovered && state.callSnap?.status === 'connected') {
-            await origEndCall();
-          } else if (banner) {
-            banner.style.display = 'none';
-          }
-        }, 30000);
-      }, 600);
-    };
-  }
 // --- 1. TOP 68PX NO-TOUCH AREA ORIENTATION BANNER ON NANA'S SCREEN ---
   if (role === 'nana') {
     // Physically remove the old clock pill and overlapping "Tap a photo..." title ("T")
@@ -520,14 +471,6 @@ function applySimpleFamilyPresenceCard() {
     if (role === 'family') setTimeout(applySimpleFamilyPresenceCard, 20);
 
 if (call.status === 'idle') {
-      clearTimeout(jitterHoldTimer);
-      if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
-      if (role === 'nana' && $('call-screen')?.classList.contains('active')) {
-        origEndCall?.();
-        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        $('grid-screen')?.classList.add('active');
-      }
-    }
     if (role === 'nana') {
       if (call.status === 'connected') {
         if (!activeCallConnectedAtMs) {
