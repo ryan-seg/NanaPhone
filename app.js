@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, update, push, onValue, remove, runTransaction, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-const APP_VERSION = "2.9.2";
+const APP_VERSION = "2.9.3";
 const $ = (id) => document.getElementById(id);
 
 (function versionGuard() {
