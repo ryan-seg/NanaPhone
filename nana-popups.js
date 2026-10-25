@@ -1,4 +1,4 @@
-import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from "./nana-core.js?v=2.9.2";
+import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from "./nana-core.js?v=2.9.3";
 
 (function initNanaPopups() {
   if (!NanaCore.SERVICE_TOKEN) return;
