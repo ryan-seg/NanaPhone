@@ -157,8 +157,11 @@ hooks.openVideoScreen = window.openVideoScreen;
 
 function saveCurrentVideoTime(force = false) {
   const curItem = getCurrentQueueItem();
-  if (!videoEl || !curItem) return;
+  if (!videoEl || !curItem || videoEl.ended) return;
+  const dur = Number(videoEl.duration) || 0;
   const cur = Math.floor(videoEl.currentTime || 0);
+  // Don't overwrite 0 reset when video is at the very end
+  if (dur > 0 && dur - cur <= 2) return;
   if (cur > 0 && (force || Math.abs(cur - lastSavedTimeSec) >= 4)) {
     lastSavedTimeSec = cur;
     localStorage.setItem(`nana_vid_pos_${curItem.item.url}`, String(cur));
@@ -346,18 +349,35 @@ async function handleVideoEndedOnNana() {
   startNormalDimCountdownOnPause();
   const curItem = getCurrentQueueItem();
   if (!curItem) return;
-  localStorage.setItem(`nana_vid_pos_${curItem.item.url}`, '0');
-  if (state.streamData.savedTimes) state.streamData.savedTimes[curItem.item.id] = 0;
 
+  // 1. Reset saved playback position for the finished video
+  lastSavedTimeSec = 0;
+  localStorage.setItem(`nana_vid_pos_${curItem.item.url}`, '0');
+  if (!state.streamData.savedTimes) state.streamData.savedTimes = {};
+  state.streamData.savedTimes[curItem.item.id] = 0;
+
+  // 2. Increment view count for the finished video
   const newViewCount = getViewCountForItem(curItem.item) + 1;
   if (!state.streamData.viewCounts) state.streamData.viewCounts = {};
   state.streamData.viewCounts[curItem.item.id] = newViewCount;
 
+  // 3. Advance currentIndex immediately to the NEXT video in the queue
   const nextIndex = (curItem.index + 1) % curItem.total;
   const nextItem = state.streamData.queue[nextIndex];
+  state.streamData.currentIndex = nextIndex;
+  state.streamData.state = 'paused';
+  state.streamData.savedTimes[nextItem.id] = 0;
   localStorage.setItem(`nana_vid_pos_${nextItem.url}`, '0');
 
+  // Pre-load the next video into <video> right away so any tap plays the new episode
+  if (videoEl && nextItem.url) {
+    lastLoadedVideoUrl = nextItem.url;
+    videoEl.src = nextItem.url;
+    attachSubtitleTrack(nextItem.subtitleUrl || '', true);
+  }
+
   await update(refs.videoStream, {
+    currentIndex: nextIndex,
     state: 'paused',
     [`savedTimes/${curItem.item.id}`]: 0,
     [`savedTimes/${nextItem.id}`]: 0,

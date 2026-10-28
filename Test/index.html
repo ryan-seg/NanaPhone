@@ -269,22 +269,32 @@
     <button class="giant-btn" style="pointer-events:none;">📞 TOUCH ANYWHERE<br>TO ANSWER</button>
   </div>
 
-  <!-- 4. Active Video Call Screen -->
-  <div id="call-screen" class="screen" onclick="resetIdleTimer()">
+<!-- 4. Active Video Call Screen -->
+  <div id="call-screen" class="screen" onclick="wakeInCallControls()">
     <div id="call-status-pill">🟢 Connected — Speak Normally</div>
     <div id="call-connecting-banner">📹 Connecting video...</div>
-    <div id="in-call-volume-bar" style="flex-wrap:wrap;justify-content:flex-end;">
-      <span>🔊 Tablet Vol: <strong id="in-call-vol-label" style="color:#fef08a;">85%</strong></span>
-      <button class="vol-step-btn" onclick="stepNanaCallVolume(-15)">−</button>
-      <button class="vol-step-btn" onclick="stepNanaCallVolume(15)">+</button>
-      <button id="btn-family-voice-boost" class="vol-step-btn" style="background:#7c3aed;border-color:#fef08a;" onclick="cycleFamilyVoiceBoost()" title="Amplify Nana's incoming voice on your phone/laptop up to 300%">📢 Boost Nana: 180%</button>
-      <button class="vol-step-btn" style="background:#0f766e;" onclick="switchFamilyCamera()">🔄 Flip Cam</button>
-      <button id="in-call-settings-btn" class="vol-step-btn" style="background:#334155;display:none;" onclick="openSettingsModal()">⚙️</button>
+
+    <!-- Compact Top-Right Cog & Collapsible Options Popover -->
+    <div id="in-call-menu-wrap" onclick="event.stopPropagation()">
+      <button id="in-call-cog-btn" class="in-call-cog-btn" onclick="toggleInCallMenu(event)" title="Call Options">⚙️</button>
+      <div id="in-call-volume-bar" class="in-call-options-drawer">
+        <div class="in-call-drawer-row">
+          <span>🔊 Tablet Vol: <strong id="in-call-vol-label" style="color:#fef08a;">85%</strong></span>
+          <div style="display:flex;gap:6px;">
+            <button class="vol-step-btn" onclick="stepNanaCallVolume(-15)">−</button>
+            <button class="vol-step-btn" onclick="stepNanaCallVolume(15)">+</button>
+          </div>
+        </div>
+        <button id="btn-family-voice-boost" class="vol-step-btn" style="width:100%;background:#7c3aed;border-color:#fef08a;" onclick="cycleFamilyVoiceBoost()">📢 Boost Nana: 180%</button>
+        <button class="vol-step-btn" style="width:100%;background:#0f766e;" onclick="switchFamilyCamera()">🔄 Flip Camera</button>
+        <button id="in-call-settings-btn" class="vol-step-btn" style="width:100%;background:#334155;display:none;" onclick="openSettingsModal()">⚙️ All Tablet Controls</button>
+      </div>
     </div>
+
     <video id="remote-video" autoplay playsinline muted poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
     <audio id="remote-audio" autoplay playsinline></audio>
     <video id="local-video" autoplay playsinline muted poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
-    <button id="hangup-btn" class="hangup-btn" onclick="promptEndCallConfirmation()">End Call</button>
+    <button id="hangup-btn" class="hangup-btn" onclick="event.stopPropagation(); promptEndCallConfirmation()">End Call</button>
   </div>
 
   <!-- 5. Family Member Screen (Organized into 3 Clean Tabs) -->

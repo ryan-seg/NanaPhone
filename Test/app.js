@@ -42,6 +42,33 @@ const radioPlayer = $('nana-radio-stream');
 
 // --- 1. DISPLAY ADAPTERS & AUDIO UNLOCK ---
 (function initVideoCallStageAdapters() {
+let inCallTouchWakeTimer = null;
+let inCallMenuAutoCloseTimer = null;
+
+window.wakeInCallControls = () => {
+  window.resetIdleTimer?.();
+  const cs = $('call-screen');
+  if (!cs) return;
+  cs.classList.add('touch-awake');
+  // Close the cog popover if the user tapped on the video background
+  $('in-call-menu-wrap')?.classList.remove('menu-open');
+  clearTimeout(inCallTouchWakeTimer);
+  inCallTouchWakeTimer = setTimeout(() => {
+    cs.classList.remove('touch-awake');
+  }, 5000);
+};
+
+window.toggleInCallMenu = (ev) => {
+  if (ev) ev.stopPropagation();
+  window.wakeInCallControls();
+  const wrap = $('in-call-menu-wrap');
+  if (!wrap) return;
+  const isOpen = wrap.classList.toggle('menu-open');
+  clearTimeout(inCallMenuAutoCloseTimer);
+  if (isOpen) {
+    inCallMenuAutoCloseTimer = setTimeout(() => wrap.classList.remove('menu-open'), 8000);
+  }
+};
   const rv = $('remote-video');
   if (rv) {
     const apply = () => {
@@ -556,7 +583,8 @@ window.switchFamilyCamera = async () => {
 };
 
 async function joinDailyRoom() {
-  if (isJoiningOrInRoom || callObject) return;
+window.wakeInCallControls(); 
+ if (isJoiningOrInRoom || callObject) return;
   isJoiningOrInRoom = true;
   currentFacingMode = 'user';
   const banner = $('call-connecting-banner');
@@ -1025,7 +1053,6 @@ if (role === 'family') {
     img.onerror = () => { img.src = activeFamilyMember.fallback; };
     img.src = activeFamilyMember.photo;
   }
-  if ($('in-call-volume-bar')) $('in-call-volume-bar').style.display = 'flex';
   if ($('telegram-link-btn')) $('telegram-link-btn').href = `https://t.me/${CONFIG.telegramBotUsername}?start=${activeFamilyMember.id}_${SERVICE_TOKEN}`;
   if ($('family-controls-btn')) $('family-controls-btn').style.display = isAdminFamilyMember ? 'inline-block' : 'none';
   if ($('in-call-settings-btn')) $('in-call-settings-btn').style.display = isAdminFamilyMember ? 'inline-block' : 'none';
