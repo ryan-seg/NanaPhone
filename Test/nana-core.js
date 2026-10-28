@@ -246,15 +246,42 @@ window.switchFamilyPortalTab = (tab) => {
   });
 };
 
+// Direct fallback handlers so top buttons work even if a secondary module is still loading
+window.openFamilyBulletin = window.openFamilyBulletin || (() => {
+  const m = $('bulletin-modal');
+  if (m) { m.classList.remove('kb-fullscreen'); m.style.display = 'flex'; }
+});
+
+window.closeFamilyBulletin = window.closeFamilyBulletin || (() => {
+  if ($('bulletin-modal')) $('bulletin-modal').style.display = 'none';
+});
+
+window.openRadioScreen = window.openRadioScreen || (() => {
+  showScreen('radio-screen');
+});
+
+window.openVideoScreen = window.openVideoScreen || (() => {
+  showScreen('video-screen');
+});
+
 window.switchNanaMainTab = (tab) => {
   if (tab !== 'video') hooks.pauseVideo?.('switched_tab');
-  if (tab !== 'chat' && $('bulletin-modal')?.style.display === 'flex') window.closeFamilyBulletin?.();
+  if (tab !== 'chat' && $('bulletin-modal')?.style.display === 'flex') {
+    window.closeFamilyBulletin?.();
+  }
   if (tab !== 'radio') window.stopRadioAndSync?.(true);
 
-  if (tab === 'calls') showScreen('grid-screen');
-  else if (tab === 'chat') window.openFamilyBulletin?.();
-  else if (tab === 'radio') window.openRadioScreen?.();
-  else if (tab === 'video') hooks.openVideoScreen?.();
+  if (tab === 'calls') {
+    showScreen('grid-screen');
+  } else if (tab === 'chat') {
+    window.openFamilyBulletin?.();
+  } else if (tab === 'radio') {
+    showScreen('radio-screen');
+    window.openRadioScreen?.();
+  } else if (tab === 'video') {
+    showScreen('video-screen');
+    hooks.openVideoScreen?.();
+  }
 
   hooks.broadcastScreen?.();
 };

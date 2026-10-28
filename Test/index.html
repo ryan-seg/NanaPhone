@@ -159,15 +159,15 @@
     <button class="cancel-btn" style="background:#22c55e;color:#000;padding:12px 40px;font-size:1.35rem;" onclick="closePhoneGuideModal()">✔ Got It</button>
   </div>
 
-  <!-- 1. Nana's Main Grid Screen -->
-  <div id="grid-screen" class="screen">
+<!-- 1. Nana's Main Grid Screen -->
+  <div id="grid-screen" class="screen active">
     <div class="header-bar">
       <div class="header-title" id="grid-header-title">Tap a photo to call family</div>
       <div class="header-pills">
         <div class="nav-pill-btn calls-pill active-tab" onclick="switchNanaMainTab('calls')">📞 Family Calls</div>
-        <div class="chat-pill" onclick="openFamilyBulletin()">✈️ Family Chat <span id="chat-unread-badge" class="chat-unread-badge">NEW</span></div>
-        <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
-        <div class="nav-pill-btn video-pill-x" onclick="openVideoScreen()">🎬 Video</div>
+        <div class="chat-pill" onclick="switchNanaMainTab('chat')">✈️ Family Chat <span id="chat-unread-badge" class="chat-unread-badge">NEW</span></div>
+        <div class="radio-pill" onclick="switchNanaMainTab('radio')">🎻 Classic FM</div>
+        <div class="nav-pill-btn video-pill-x" onclick="switchNanaMainTab('video')">🎬 Video</div>
         <div id="clock" class="clock-pill">12:00</div>
         <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.9.3</div>
       </div>
