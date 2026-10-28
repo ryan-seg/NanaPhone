@@ -27,12 +27,10 @@ let autoAnswerTimeout = null;
 let activeMp3Ringtone = null;
 let activeCallConnectedAtMs = null;
 let activeCallPartnerId = null;
+let hadRemoteMediaInCurrentCall = false;
 let endCallConfirmedByUser = false;
 let endCallModalTimer = null;
 let jitterHoldTimer = null;
-let activeCallConnectedAtMs = null;
-let activeCallPartnerId = null;
-let hadRemoteMediaInCurrentCall = false;
 
 // Web Audio DSP Nodes (Outbound Nana Mic & Inbound Family Voice Boost)
 let nanaRawMicStream = null;
@@ -85,7 +83,6 @@ async function buildNanaProcessedMicTrack() {
   cleanupNanaMicDsp();
   try {
     if (audioCtx.state === 'suspended') await audioCtx.resume();
-    // Request hardware AEC, noiseSuppression, and AGC on the raw hardware stream first
     nanaRawMicStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
@@ -98,26 +95,22 @@ async function buildNanaProcessedMicTrack() {
 
     const source = audioCtx.createMediaStreamSource(nanaRawMicStream);
 
-    // 1. High-Pass Filter (~130 Hz): Cuts room rumble, AC hum, trolley vibrations, distant TV bass
     const hp = audioCtx.createBiquadFilter();
     hp.type = 'highpass';
     hp.frequency.value = 130;
     hp.Q.value = 0.7;
 
-    // 2. Low-Pass Filter (~4,200 Hz): Cuts high-frequency hiss and crockery clatter
     const lp = audioCtx.createBiquadFilter();
     lp.type = 'lowpass';
     lp.frequency.value = 4200;
     lp.Q.value = 0.7;
 
-    // 3. Vocal Presence Peaking EQ (~2,200 Hz): Lifts consonant clarity
     const presence = audioCtx.createBiquadFilter();
     presence.type = 'peaking';
     presence.frequency.value = 2200;
     presence.Q.value = 1.1;
     presence.gain.value = 4.5;
 
-    // 4. Dynamics Compressor + Upward Make-Up Gain: Boosts quiet speech & clamps sudden loud bangs
     const comp = audioCtx.createDynamicsCompressor();
     comp.threshold.value = -34;
     comp.knee.value = 18;
@@ -175,7 +168,6 @@ function attachFamilyVoiceAmplifier(aTrack) {
     const stream = new MediaStream([aTrack]);
     const source = audioCtx.createMediaStreamSource(stream);
 
-    // Subtle vocal clarity shaping + brickwall limiter so 250%-300% boost never distorts
     const hp = audioCtx.createBiquadFilter();
     hp.type = 'highpass';
     hp.frequency.value = 115;
@@ -576,7 +568,6 @@ async function joinDailyRoom() {
     return;
   }
 
-  // Build custom vocal-bandpass + upward compressor mic track on Nana's tablet
   const customAudioSource = role === 'nana' ? await buildNanaProcessedMicTrack() : true;
 
   const co = window.DailyIframe.createCallObject({
@@ -626,7 +617,7 @@ async function joinDailyRoom() {
       : (remotes.find(p => (p.user_name || '').startsWith('Family_')) || remotes[0]);
     if (!target) return;
     hadRemote = true;
-	hadRemoteMediaInCurrentCall = true;
+    hadRemoteMediaInCurrentCall = true;
     clearTimeout(emptyTimer);
 
     const vTrack = target.tracks?.video?.persistentTrack || target.tracks?.video?.track;
@@ -634,7 +625,6 @@ async function joinDailyRoom() {
     const rv = $('remote-video'), ra = $('remote-audio');
 
     if (role === 'family') {
-      // Family View: Keep <video> purely visual & route Nana's voice through the 100%-300% Web Audio Amplifier
       if (vTrack && rv) {
         if (!soundBlocked) banner.style.display = 'none';
         if (rv.srcObject?.getVideoTracks()[0] !== vTrack) {
@@ -648,7 +638,6 @@ async function joinDailyRoom() {
         if (ra) {
           ra.removeAttribute('src');
           if (boostedOk) {
-            // Keep <audio> element muted so we don't double-play alongside audioCtx.destination
             ra.srcObject = null;
             ra.muted = true;
             if (audioCtx.state === 'suspended') promptTapToUnmute();
@@ -661,7 +650,6 @@ async function joinDailyRoom() {
         }
       }
     } else {
-      // Nana's Tablet View: Standard low-latency playback at her configured callVolume
       if (vTrack && rv) {
         if (!soundBlocked) banner.style.display = 'none';
         if (rv.srcObject?.getVideoTracks()[0] !== vTrack || (aTrack && rv.srcObject?.getAudioTracks()[0] !== aTrack)) {
@@ -703,7 +691,6 @@ async function joinDailyRoom() {
     co.setLocalVideo(true);
     co.setLocalAudio(true);
 
-    // Enable Daily.co Krisp AI noise cancellation wherever supported by the browser
     if (typeof co.updateInputSettings === 'function') {
       co.updateInputSettings({ audio: { processor: { type: 'krisp' } } }).catch(() => {});
     }
@@ -935,32 +922,32 @@ onValue(refs.callState, snap => {
   }
 
   if (role === 'nana') {
-if (data.status === 'connected') {
-    if (!activeCallConnectedAtMs) {
-      activeCallConnectedAtMs = Date.now();
-      activeCallPartnerId = data.callerId === 'nana' ? data.targetId : data.callerId;
+    if (data.status === 'connected') {
+      if (!activeCallConnectedAtMs) {
+        activeCallConnectedAtMs = Date.now();
+        activeCallPartnerId = data.callerId === 'nana' ? data.targetId : data.callerId;
+      }
+    } else if (data.status === 'idle' && activeCallConnectedAtMs) {
+      const endedAt = Date.now();
+      const durationSec = Math.round((endedAt - activeCallConnectedAtMs) / 1000);
+      const partnerId = activeCallPartnerId || 'family';
+      const startedAt = activeCallConnectedAtMs;
+      const wasMediaConnected = hadRemoteMediaInCurrentCall;
+      activeCallConnectedAtMs = null;
+      activeCallPartnerId = null;
+      hadRemoteMediaInCurrentCall = false;
+      // Strictly log only genuinely connected two-way calls lasting >= 15s
+      if (wasMediaConnected && durationSec >= 15) {
+        push(refs.callHistory, {
+          partnerId,
+          partnerName: FAMILY_NAMES[partnerId] || 'Family',
+          connected: true,
+          startedAt,
+          endedAt,
+          durationSec
+        }).catch(() => {});
+      }
     }
-  } else if (data.status === 'idle' && activeCallConnectedAtMs) {
-    const endedAt = Date.now();
-    const durationSec = Math.round((endedAt - activeCallConnectedAtMs) / 1000);
-    const partnerId = activeCallPartnerId || 'family';
-    const startedAt = activeCallConnectedAtMs;
-    const wasMediaConnected = hadRemoteMediaInCurrentCall;
-    activeCallConnectedAtMs = null;
-    activeCallPartnerId = null;
-    hadRemoteMediaInCurrentCall = false;
-    // Strictly log only genuinely connected two-way calls lasting >= 15s
-    if (wasMediaConnected && durationSec >= 15) {
-      push(refs.callHistory, {
-        partnerId,
-        partnerName: FAMILY_NAMES[partnerId] || 'Family',
-        connected: true,
-        startedAt,
-        endedAt,
-        durationSec
-      }).catch(() => {});
-    }
-  }
 
     const act = isRealAndroidTablet || TEST_MODE || didManuallyInitiateOrAnswerOnThisTab;
     if (data.status === 'ringing_nana') {
@@ -1053,7 +1040,6 @@ if (role === 'family') {
   window.wakeScreenAndResetDimTimer?.();
 }
 
-// Fallback safety: ensure a screen is visibly active if all Firebase status calls were idle
 if (!document.querySelector('.screen.active')) {
   showScreen(role === 'family' ? 'family-screen' : 'grid-screen');
 }
