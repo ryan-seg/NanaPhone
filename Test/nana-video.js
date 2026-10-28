@@ -178,6 +178,9 @@ function syncVideoUI(customStatusMessage = null) {
   const playing = !!(videoEl && !videoEl.paused && !videoEl.ended && curItem);
   const overlay = $('video-tap-overlay'), icon = $('video-overlay-icon'), main = $('video-overlay-main'), sub = $('video-overlay-sub'), btn = $('btn-bottom-video-toggle');
 
+  // Toggle compact bars while playing so the video stage gets maximum screen space
+  $('video-screen')?.classList.toggle('video-is-playing', playing && !customStatusMessage);
+  
   if ($('video-title-banner')) {
     $('video-title-banner').innerText = curItem
       ? `🎬 (${curItem.index + 1}/${curItem.total}) ${curItem.item.title || 'Family Video'}${curItem.item.subtitleUrl ? ' [CC]' : ''}`

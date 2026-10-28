@@ -43,14 +43,14 @@ const radioPlayer = $('nana-radio-stream');
 // --- 1. DISPLAY ADAPTERS & AUDIO UNLOCK ---
 (function initVideoCallStageAdapters() {
 let inCallTouchWakeTimer = null;
-let inCallMenuAutoCloseTimer = null;
 
 window.wakeInCallControls = () => {
   window.resetIdleTimer?.();
   const cs = $('call-screen');
   if (!cs) return;
+  // Make End Call button opaque for 5 seconds, then fade back to translucent
   cs.classList.add('touch-awake');
-  // Close the cog popover if the user tapped on the video background
+  // Close the top-right gear menu if the user tapped on the video screen
   $('in-call-menu-wrap')?.classList.remove('menu-open');
   clearTimeout(inCallTouchWakeTimer);
   inCallTouchWakeTimer = setTimeout(() => {
@@ -60,14 +60,9 @@ window.wakeInCallControls = () => {
 
 window.toggleInCallMenu = (ev) => {
   if (ev) ev.stopPropagation();
-  window.wakeInCallControls();
   const wrap = $('in-call-menu-wrap');
   if (!wrap) return;
-  const isOpen = wrap.classList.toggle('menu-open');
-  clearTimeout(inCallMenuAutoCloseTimer);
-  if (isOpen) {
-    inCallMenuAutoCloseTimer = setTimeout(() => wrap.classList.remove('menu-open'), 8000);
-  }
+  wrap.classList.toggle('menu-open');
 };
   const rv = $('remote-video');
   if (rv) {
@@ -583,10 +578,10 @@ window.switchFamilyCamera = async () => {
 };
 
 async function joinDailyRoom() {
-window.wakeInCallControls(); 
- if (isJoiningOrInRoom || callObject) return;
+  if (isJoiningOrInRoom || callObject) return;
   isJoiningOrInRoom = true;
   currentFacingMode = 'user';
+  window.wakeInCallControls();
   const banner = $('call-connecting-banner');
   banner.style.display = 'block';
   banner.innerText = '📹 Connecting video...';

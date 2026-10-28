@@ -270,16 +270,16 @@
   </div>
 
 <!-- 4. Active Video Call Screen -->
-  <div id="call-screen" class="screen" onclick="wakeInCallControls()">
+  <div id="call-screen" class="screen" onpointerdown="wakeInCallControls()">
     <div id="call-status-pill">🟢 Connected — Speak Normally</div>
     <div id="call-connecting-banner">📹 Connecting video...</div>
 
-    <!-- Compact Top-Right Cog & Collapsible Options Popover -->
-    <div id="in-call-menu-wrap" onclick="event.stopPropagation()">
+    <!-- Top-Right Gear Cog & Hidden Dropdown Menu (Family Only) -->
+    <div id="in-call-menu-wrap" onpointerdown="event.stopPropagation()">
       <button id="in-call-cog-btn" class="in-call-cog-btn" onclick="toggleInCallMenu(event)" title="Call Options">⚙️</button>
-      <div id="in-call-volume-bar" class="in-call-options-drawer">
+      <div id="in-call-options-drawer" class="in-call-options-drawer">
         <div class="in-call-drawer-row">
-          <span>🔊 Tablet Vol: <strong id="in-call-vol-label" style="color:#fef08a;">85%</strong></span>
+          <span>🔊 Nana Vol: <strong id="in-call-vol-label" style="color:#fef08a;">85%</strong></span>
           <div style="display:flex;gap:6px;">
             <button class="vol-step-btn" onclick="stepNanaCallVolume(-15)">−</button>
             <button class="vol-step-btn" onclick="stepNanaCallVolume(15)">+</button>
@@ -294,7 +294,7 @@
     <video id="remote-video" autoplay playsinline muted poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
     <audio id="remote-audio" autoplay playsinline></audio>
     <video id="local-video" autoplay playsinline muted poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
-    <button id="hangup-btn" class="hangup-btn" onclick="event.stopPropagation(); promptEndCallConfirmation()">End Call</button>
+    <button id="hangup-btn" class="hangup-btn" onpointerdown="event.stopPropagation()" onclick="promptEndCallConfirmation()">End Call</button>
   </div>
 
   <!-- 5. Family Member Screen (Organized into 3 Clean Tabs) -->
