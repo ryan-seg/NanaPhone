@@ -21,6 +21,13 @@ function parseHoursArray(val, fallback) {
   return fallback;
 }
 
+export function formatPromptSlotLabel(slot) {
+  const num = Number(slot);
+  const hr = Math.floor(num);
+  const mins = Math.round((num - hr) * 60) === 30 ? '30' : '00';
+  return `${String(hr).padStart(2, '0')}:${mins}`;
+}
+
 const fmtDelay = (sec) => {
   const s = Number(sec ?? 120);
   return s === 0 ? "Never" : (s < 60 ? `${s}s` : `${Math.round(s / 60)}m`);
@@ -59,9 +66,12 @@ const fmtDelay = (sec) => {
     `<button class="opt-btn" data-skey="${key}" data-sval="${val}" onclick="${fn}('${key}', ${typeof val === 'string' ? `'${val}'` : val})">${lbl}</button>`
   ).join('');
 
-  const hourToggles = (listKey, hours) => hours.map(h =>
-    `<button class="opt-btn" data-pphourlist="${listKey}" data-pphour="${h}" onclick="toggleScheduledPromptHour('${listKey}', ${h})">${String(h).padStart(2, '0')}:00</button>`
+  const hourToggles = (listKey, slots) => slots.map(slot =>
+    `<button class="opt-btn" style="min-width:62px;padding:7px 6px;font-size:0.86rem;" data-pphourlist="${listKey}" data-pphour="${slot}" onclick="toggleScheduledPromptHour('${listKey}', ${slot})">${formatPromptSlotLabel(slot)}</button>`
   ).join('');
+
+  const radioTimeSlots = [9, 9.5, 10, 10.5, 11, 11.5, 13, 13.5, 14, 14.5, 15, 15.5, 16, 16.5, 19, 19.5];
+  const videoTimeSlots = [11, 11.5, 14, 14.5, 16, 16.5, 17, 17.5, 18, 18.5, 19, 19.5, 20, 20.5];
 
   sc.innerHTML = `
     <div class="settings-card">
@@ -173,18 +183,18 @@ const fmtDelay = (sec) => {
         <span>💚 Today's Calls Memory Banner & Scheduled Prompts</span>
         <span id="lbl-periodic-summary" style="color:#38bdf8;font-size:0.88rem;">Active</span>
       </div>
-      <div class="settings-sub">Reassures Nana with a summary of who she has spoken to today, and offers scheduled entertainment prompts.</div>
+      <div class="settings-sub">Reassures Nana with a summary of who she has spoken to today, and offers scheduled entertainment prompts (supports on-the-hour and half-past times).</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('showTodaysCallsBanner', [[true,"💚 Show Today's Calls Banner"],[false,"🙈 Hide Today's Calls Banner"]])}</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('periodicPopupsEnabled', [[true,'✅ Scheduled Pop-Ups ON'],[false,'🔕 Scheduled Pop-Ups OFF']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">🎻 Classic FM Radio Prompt Times (Tap hours to toggle on/off):</div>
+      <div class="settings-sub" style="margin-bottom:4px;">🎻 Classic FM Radio Prompt Times (Tap times to toggle on/off):</div>
       <div class="opt-row" style="margin-bottom:8px;">
-        ${hourToggles('radioPromptHours', [9, 10, 11, 13, 14, 15, 16, 19])}
-        <button class="opt-btn" style="background:#7f1d1d;color:#fff;" onclick="clearScheduledPromptHours('radioPromptHours')">Off</button>
+        ${hourToggles('radioPromptHours', radioTimeSlots)}
+        <button class="opt-btn" style="background:#7f1d1d;color:#fff;min-width:62px;" onclick="clearScheduledPromptHours('radioPromptHours')">Off</button>
       </div>
-      <div class="settings-sub" style="margin-bottom:4px;">🎬 Judge John Deed Video Prompt Times (Tap hours to toggle on/off):</div>
+      <div class="settings-sub" style="margin-bottom:4px;">🎬 Judge John Deed Video Prompt Times (Tap times to toggle on/off):</div>
       <div class="opt-row" style="margin-bottom:8px;">
-        ${hourToggles('videoPromptHours', [11, 14, 16, 17, 18, 19, 20])}
-        <button class="opt-btn" style="background:#7f1d1d;color:#fff;" onclick="clearScheduledPromptHours('videoPromptHours')">Off</button>
+        ${hourToggles('videoPromptHours', videoTimeSlots)}
+        <button class="opt-btn" style="background:#7f1d1d;color:#fff;min-width:62px;" onclick="clearScheduledPromptHours('videoPromptHours')">Off</button>
       </div>
       <div class="settings-sub" style="margin-bottom:4px;">💬 Unread Family Chat Reminder ("You have unread messages, would you like to read them?"):</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('unreadChatPopupMin', [[0,'Off'],[15,'15m'],[30,'30m'],[60,'1h'],[120,'2h']])}</div>
@@ -372,11 +382,12 @@ window.setGlobalQuestionSpeak = async (_key, speakOn) => {
   await update(refs.settings, { speakQuestions: val });
 };
 
-window.toggleScheduledPromptHour = async (listKey, hour) => {
-  const cur = [...(settings[listKey] || [])];
-  const idx = cur.indexOf(hour);
+window.toggleScheduledPromptHour = async (listKey, slot) => {
+  const numSlot = Number(slot);
+  const cur = [...(settings[listKey] || [])].map(Number);
+  const idx = cur.indexOf(numSlot);
   if (idx >= 0) cur.splice(idx, 1);
-  else cur.push(hour);
+  else cur.push(numSlot);
   cur.sort((a, b) => a - b);
   settings[listKey] = cur;
   refreshSettingsUI();
@@ -427,7 +438,7 @@ export function refreshSettingsUI() {
   document.body.classList.remove('theme-yellow-black', 'theme-white-black', 'theme-black-cream');
   if (theme !== 'classic-dark') document.body.classList.add(`theme-${theme}`);
 
-  const callVol = Number(settings.callVolume ?? 85), radVol = Number(settings.radioVolume ?? 75), ringVol = Number(settings.ringVolume ?? 85);
+  const callVol = Number(settings.callVolume ?? 85), radVol = Number(settings.radioVolume ?? 75);
   const boostPct = Number(settings.familyVoiceBoostPct ?? 180);
   const dspMode = settings.nanaMicDspMode || 'vocal-boost';
   const awakeB = Number(settings.awakeBrightness ?? 85), dimB = Number(settings.dimBrightness ?? 15), dimSec = Number(settings.dimDelaySec ?? 120);
@@ -471,7 +482,7 @@ export function refreshSettingsUI() {
   });
 
   ['radioPromptHours', 'videoPromptHours'].forEach(listKey => {
-    const arr = settings[listKey] || [];
+    const arr = (settings[listKey] || []).map(Number);
     document.querySelectorAll(`[data-pphourlist="${listKey}"]`).forEach(btn => {
       btn.classList.toggle('selected', arr.includes(Number(btn.dataset.pphour)));
     });
@@ -483,8 +494,8 @@ export function refreshSettingsUI() {
       sumEl.innerText = '🔕 Pop-Ups Off';
       sumEl.style.color = '#fca5a5';
     } else {
-      const rHrs = (settings.radioPromptHours || []).map(h => `${String(h).padStart(2,'0')}:00`).join(', ') || 'Off';
-      const vHrs = (settings.videoPromptHours || []).map(h => `${String(h).padStart(2,'0')}:00`).join(', ') || 'Off';
+      const rHrs = (settings.radioPromptHours || []).map(formatPromptSlotLabel).join(', ') || 'Off';
+      const vHrs = (settings.videoPromptHours || []).map(formatPromptSlotLabel).join(', ') || 'Off';
       sumEl.innerText = `Radio [${rHrs}] • Video [${vHrs}]`;
       sumEl.style.color = '#38bdf8';
     }

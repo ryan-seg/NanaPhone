@@ -67,7 +67,7 @@ onValue(query(refs.questionHistory, limitToLast(10)), snap => {
   if (role === 'family') renderFamilyQuestionHistory();
 });
 
-// --- 2. TIME-OF-DAY & UNREAD CHAT POP-UP ENGINE ---
+// --- 2. TIME-OF-DAY (:00 & :30) & UNREAD CHAT POP-UP ENGINE ---
 function hasUnreadFamilyChatMessages() {
   return Object.values(state.bulletinSnap).some(item => NanaCore.isMessageUnreadByNana?.(item));
 }
@@ -108,11 +108,19 @@ async function evaluateScheduledPopupsOnNana() {
 
   const d = new Date();
   const curHour = d.getHours(), curMin = d.getMinutes();
-  const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}_${curHour}`;
 
-  if (curMin <= 20) {
-    if ((settings.radioPromptHours || []).includes(curHour)) {
-      const storageKey = `nana_sched_radio_${dateKey}`;
+  // Match either :00 window (mins 0..20) or :30 window (mins 30..50)
+  let activeSlot = null;
+  if (curMin >= 0 && curMin <= 20) activeSlot = curHour;
+  else if (curMin >= 30 && curMin <= 50) activeSlot = curHour + 0.5;
+
+  if (activeSlot !== null) {
+    const slotKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}_${activeSlot}`;
+    const radioList = (settings.radioPromptHours || []).map(Number);
+    const videoList = (settings.videoPromptHours || []).map(Number);
+
+    if (radioList.includes(activeSlot)) {
+      const storageKey = `nana_sched_radio_${slotKey}`;
       if (!localStorage.getItem(storageKey)) {
         localStorage.setItem(storageKey, '1');
         lastAnyPeriodicPromptMs = now;
@@ -130,8 +138,8 @@ async function evaluateScheduledPopupsOnNana() {
       }
     }
 
-    if ((settings.videoPromptHours || []).includes(curHour)) {
-      const storageKey = `nana_sched_video_${dateKey}`;
+    if (videoList.includes(activeSlot)) {
+      const storageKey = `nana_sched_video_${slotKey}`;
       if (!localStorage.getItem(storageKey)) {
         localStorage.setItem(storageKey, '1');
         lastAnyPeriodicPromptMs = now;
