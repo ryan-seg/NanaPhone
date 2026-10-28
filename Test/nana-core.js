@@ -66,6 +66,9 @@ if (computedKeyHash !== EXPECTED_KEY_HASH) {
   localStorage.removeItem('nana_service_token');
   showScreen('auth-error-screen');
   throw new Error("Unauthorized: Valid access key required.");
+} else {
+  // Immediately show the appropriate home screen as soon as auth succeeds
+  showScreen(role === 'family' ? 'family-screen' : 'grid-screen');
 }
 
 const PORTAL_NODE_ID = `nana_${computedKeyHash.slice(0, 24)}`;

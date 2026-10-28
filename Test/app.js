@@ -1032,12 +1032,14 @@ if (data.status === 'connected') {
 
 // --- 8. INITIALIZATION ---
 if (role === 'family') {
-  $('family-greeting').innerText = `Call Nana (as ${activeFamilyMember.name})`;
+  if ($('family-greeting')) $('family-greeting').innerText = `Call Nana (as ${activeFamilyMember.name})`;
   const img = $('family-self-photo');
-  img.onerror = () => { img.src = activeFamilyMember.fallback; };
-  img.src = activeFamilyMember.photo;
-  $('in-call-volume-bar').style.display = 'flex';
-  $('telegram-link-btn').href = `https://t.me/${CONFIG.telegramBotUsername}?start=${activeFamilyMember.id}_${SERVICE_TOKEN}`;
+  if (img) {
+    img.onerror = () => { img.src = activeFamilyMember.fallback; };
+    img.src = activeFamilyMember.photo;
+  }
+  if ($('in-call-volume-bar')) $('in-call-volume-bar').style.display = 'flex';
+  if ($('telegram-link-btn')) $('telegram-link-btn').href = `https://t.me/${CONFIG.telegramBotUsername}?start=${activeFamilyMember.id}_${SERVICE_TOKEN}`;
   if ($('family-controls-btn')) $('family-controls-btn').style.display = isAdminFamilyMember ? 'inline-block' : 'none';
   if ($('in-call-settings-btn')) $('in-call-settings-btn').style.display = isAdminFamilyMember ? 'inline-block' : 'none';
   window.syncConnectedFamilyFromTelegram();
@@ -1049,4 +1051,9 @@ if (role === 'family') {
   setInterval(updateClock, 10000);
   updateClock();
   window.wakeScreenAndResetDimTimer?.();
+}
+
+// Fallback safety: ensure a screen is visibly active if all Firebase status calls were idle
+if (!document.querySelector('.screen.active')) {
+  showScreen(role === 'family' ? 'family-screen' : 'grid-screen');
 }
