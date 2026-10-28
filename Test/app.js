@@ -42,28 +42,42 @@ const radioPlayer = $('nana-radio-stream');
 
 // --- 1. DISPLAY ADAPTERS & AUDIO UNLOCK ---
 (function initVideoCallStageAdapters() {
-let inCallTouchWakeTimer = null;
+  let inCallTouchWakeTimer = null;
 
-window.wakeInCallControls = () => {
-  window.resetIdleTimer?.();
-  const cs = $('call-screen');
-  if (!cs) return;
-  // Make End Call button opaque for 5 seconds, then fade back to translucent
-  cs.classList.add('touch-awake');
-  // Close the top-right gear menu if the user tapped on the video screen
-  $('in-call-menu-wrap')?.classList.remove('menu-open');
-  clearTimeout(inCallTouchWakeTimer);
-  inCallTouchWakeTimer = setTimeout(() => {
-    cs.classList.remove('touch-awake');
-  }, 5000);
-};
+  window.wakeInCallControls = (ev) => {
+    window.resetIdleTimer?.();
+    const cs = $('call-screen');
+    if (!cs) return;
 
-window.toggleInCallMenu = (ev) => {
-  if (ev) ev.stopPropagation();
-  const wrap = $('in-call-menu-wrap');
-  if (!wrap) return;
-  wrap.classList.toggle('menu-open');
-};
+    // Show translucent End Call button & status pill for 5 seconds
+    cs.classList.add('touch-awake');
+
+    // Close the top-right cog drawer if tapping outside the menu
+    if (!ev || !ev.target?.closest?.('#in-call-menu-wrap')) {
+      $('in-call-menu-wrap')?.classList.remove('menu-open');
+    }
+
+    clearTimeout(inCallTouchWakeTimer);
+    inCallTouchWakeTimer = setTimeout(() => {
+      cs.classList.remove('touch-awake');
+    }, 5000);
+  };
+
+  window.toggleInCallMenu = (ev) => {
+    if (ev) ev.stopPropagation();
+    const wrap = $('in-call-menu-wrap');
+    if (!wrap) return;
+    const isOpen = wrap.classList.toggle('menu-open');
+    if (isOpen) {
+      // Also wake the screen controls while adjusting settings
+      $('call-screen')?.classList.add('touch-awake');
+      clearTimeout(inCallTouchWakeTimer);
+      inCallTouchWakeTimer = setTimeout(() => {
+        $('call-screen')?.classList.remove('touch-awake');
+      }, 5000);
+    }
+  };
+
   const rv = $('remote-video');
   if (rv) {
     const apply = () => {
@@ -76,12 +90,18 @@ window.toggleInCallMenu = (ev) => {
     window.addEventListener('resize', apply);
   }
 
-  $('call-screen')?.addEventListener('pointerdown', () => {
-    if (audioCtx?.state === 'suspended') audioCtx.resume();
-    const ra = $('remote-audio');
-    if (ra?.srcObject && !familyBoostNodes) { ra.muted = false; ra.play().catch(() => {}); }
-    if (rv?.srcObject && rv.paused) rv.play().catch(() => {});
-  }, { passive: true });
+  const cs = $('call-screen');
+  if (cs) {
+    ['pointerdown', 'touchstart'].forEach(evtName => {
+      cs.addEventListener(evtName, (ev) => {
+        window.wakeInCallControls(ev);
+        if (audioCtx?.state === 'suspended') audioCtx.resume();
+        const ra = $('remote-audio');
+        if (ra?.srcObject && !familyBoostNodes) { ra.muted = false; ra.play().catch(() => {}); }
+        if (rv?.srcObject && rv.paused) rv.play().catch(() => {});
+      }, { passive: true });
+    });
+  }
 })();
 
 // --- 2. OUTBOUND NANA MIC DSP PIPELINE & INBOUND FAMILY VOICE AMPLIFIER ---
@@ -1065,3 +1085,4 @@ if (role === 'family') {
 if (!document.querySelector('.screen.active')) {
   showScreen(role === 'family' ? 'family-screen' : 'grid-screen');
 }
+```[cite: 6]

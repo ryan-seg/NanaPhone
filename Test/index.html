@@ -160,15 +160,15 @@
     <button class="cancel-btn" style="background:#22c55e;color:#000;padding:12px 40px;font-size:1.35rem;" onclick="closePhoneGuideModal()">✔ Got It</button>
   </div>
 
-<!-- 1. Nana's Main Grid Screen -->
+  <!-- 1. Nana's Main Grid Screen -->
   <div id="grid-screen" class="screen active">
     <div class="header-bar">
       <div class="header-title" id="grid-header-title">Tap a photo to call family</div>
       <div class="header-pills">
-        <div class="nav-pill-btn calls-pill active-tab" onclick="switchNanaMainTab('calls')">📞 Family Calls</div>
-        <div class="chat-pill" onclick="switchNanaMainTab('chat')">✈️ Family Chat <span id="chat-unread-badge" class="chat-unread-badge">NEW</span></div>
-        <div class="radio-pill" onclick="switchNanaMainTab('radio')">🎻 Classic FM</div>
-        <div class="nav-pill-btn video-pill-x" onclick="switchNanaMainTab('video')">🎬 Video</div>
+        <button class="nav-pill-btn calls-pill active-tab" onclick="switchNanaMainTab('calls')">📞 Family Calls</button>
+        <button class="nav-pill-btn chat-pill-x" onclick="switchNanaMainTab('chat')">✈️ Family Chat <span id="chat-unread-badge" class="chat-unread-badge">NEW</span></button>
+        <button class="nav-pill-btn radio-pill-x" onclick="switchNanaMainTab('radio')">🎻 Classic FM</button>
+        <button class="nav-pill-btn video-pill-x" onclick="switchNanaMainTab('video')">🎬 Video</button>
         <div id="clock" class="clock-pill">12:00</div>
         <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.9.3</div>
       </div>
@@ -241,15 +241,15 @@
         <div id="video-overlay-sub" style="font-size:1.35rem;color:#cbd5e1;font-weight:700;">Touching the screen while playing pauses the video</div>
       </div>
     </div>
-	<div class="video-bottom-bar">
+    <div class="video-bottom-bar">
       <div style="font-size:1.35rem;font-weight:900;color:var(--text-accent);">🔊 Video Vol: <span id="nana-video-vol-display">80%</span></div>
-      <div style="display:flex;gap:12px;">
-        <button class="vol-step-btn" style="font-size:1.45rem;padding:10px 22px;" onclick="adjustNanaVideoVolume(-15)">🔉 Quieter</button>
-        <button class="vol-step-btn" style="font-size:1.45rem;padding:10px 22px;background:#0284c7;" onclick="adjustNanaVideoVolume(15)">🔊 Louder</button>
+      <div>
+        <button class="vol-step-btn" onclick="adjustNanaVideoVolume(-15)">🔉 Quieter</button>
+        <button class="vol-step-btn" style="background:#0284c7;" onclick="adjustNanaVideoVolume(15)">🔊 Louder</button>
       </div>
-      <div style="display:flex;gap:10px;">
-        <button id="btn-bottom-video-toggle" class="cancel-btn" style="font-size:1.35rem;padding:10px 22px;background:#059669;border-color:#4ade80;color:#fff;" onclick="toggleNanaVideoPlayback()">▶️ Play Video</button>
-        <button class="cancel-btn" style="font-size:1.2rem;padding:10px 16px;background:#334155;border-color:#94a3b8;color:#fff;" onclick="restartNanaVideoFromBeginning()">⏮️ Restart</button>
+      <div>
+        <button id="btn-bottom-video-toggle" class="cancel-btn" style="background:#059669;border-color:#4ade80;color:#fff;" onclick="toggleNanaVideoPlayback()">▶️ Play Video</button>
+        <button class="cancel-btn" style="background:#334155;border-color:#94a3b8;color:#fff;" onclick="restartNanaVideoFromBeginning()">⏮️ Restart</button>
       </div>
     </div>
   </div>
@@ -269,13 +269,13 @@
     <button class="giant-btn" style="pointer-events:none;">📞 TOUCH ANYWHERE<br>TO ANSWER</button>
   </div>
 
-<!-- 4. Active Video Call Screen -->
-  <div id="call-screen" class="screen" onpointerdown="wakeInCallControls()">
+  <!-- 4. Active Video Call Screen -->
+  <div id="call-screen" class="screen" onpointerdown="wakeInCallControls(event)" ontouchstart="wakeInCallControls(event)">
     <div id="call-status-pill">🟢 Connected — Speak Normally</div>
     <div id="call-connecting-banner">📹 Connecting video...</div>
 
     <!-- Top-Right Gear Cog & Hidden Dropdown Menu (Family Only) -->
-    <div id="in-call-menu-wrap" onpointerdown="event.stopPropagation()">
+    <div id="in-call-menu-wrap" onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
       <button id="in-call-cog-btn" class="in-call-cog-btn" onclick="toggleInCallMenu(event)" title="Call Options">⚙️</button>
       <div id="in-call-options-drawer" class="in-call-options-drawer">
         <div class="in-call-drawer-row">
@@ -294,7 +294,7 @@
     <video id="remote-video" autoplay playsinline muted poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
     <audio id="remote-audio" autoplay playsinline></audio>
     <video id="local-video" autoplay playsinline muted poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
-    <button id="hangup-btn" class="hangup-btn" onpointerdown="event.stopPropagation()" onclick="promptEndCallConfirmation()">End Call</button>
+    <button id="hangup-btn" class="hangup-btn" onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()" onclick="promptEndCallConfirmation()">End Call</button>
   </div>
 
   <!-- 5. Family Member Screen (Organized into 3 Clean Tabs) -->
