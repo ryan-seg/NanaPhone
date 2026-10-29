@@ -49,7 +49,7 @@ const radioPlayer = $('nana-radio-stream');
     const cs = $('call-screen');
     if (!cs) return;
 
-    // Show translucent End Call button & status pill for 5 seconds
+    // Show translucent End Call button & status pill as opaque for 5 seconds
     cs.classList.add('touch-awake');
 
     // Close the top-right cog drawer if tapping outside the menu
@@ -479,6 +479,9 @@ onValue(refs.entertainment, snap => {
       }
       return;
     }
+    if ($('video-screen')?.classList.contains('active')) {
+      hooks.pauseVideo?.('switched_to_radio');
+    }
     if (!$('radio-screen').classList.contains('active')) showScreen('radio-screen');
     if (!state.isRadioPlaying) startLocalRadioStream();
     hooks.broadcastScreen?.();
@@ -864,7 +867,15 @@ async function executeEndCallCleanup() {
   if ($('family-ring-btn')) $('family-ring-btn').disabled = !settings.callingEnabled;
   await set(refs.callState, { status: 'idle', timestamp: Date.now() });
   await destroyDailyRoom();
-  showScreen(role === 'family' ? 'family-screen' : 'grid-screen');
+  if (role === 'family') {
+    showScreen('family-screen');
+  } else if (state.returnToVideoAfterCall) {
+    state.returnToVideoAfterCall = false;
+    showScreen('video-screen');
+    hooks.openVideoScreen?.();
+  } else {
+    showScreen('grid-screen');
+  }
 }
 
 window.promptEndCallConfirmation = () => {
@@ -960,6 +971,10 @@ onValue(refs.callState, snap => {
     window.closeSeniorKeyboard?.(false);
     if (role === 'nana') {
       if (state.isRadioPlaying) window.stopRadioAndSync(true);
+      // Remember if Nana was on the video screen when the call started, and pause/save position immediately without confirmation
+      if ($('video-screen')?.classList.contains('active')) {
+        state.returnToVideoAfterCall = true;
+      }
       hooks.pauseVideo?.('incoming_call');
     }
   }
@@ -1048,7 +1063,13 @@ onValue(refs.callState, snap => {
       stopTelegramRingBurst();
       stopRingingUI();
       destroyDailyRoom();
-      if (!state.isRadioPlaying && !$('video-screen')?.classList.contains('active')) showScreen('grid-screen');
+      if (state.returnToVideoAfterCall) {
+        state.returnToVideoAfterCall = false;
+        showScreen('video-screen');
+        hooks.openVideoScreen?.();
+      } else if (!state.isRadioPlaying && !$('video-screen')?.classList.contains('active')) {
+        showScreen('grid-screen');
+      }
       window.wakeScreenAndResetDimTimer?.();
       updateClock();
     }
@@ -1085,4 +1106,3 @@ if (role === 'family') {
 if (!document.querySelector('.screen.active')) {
   showScreen(role === 'family' ? 'family-screen' : 'grid-screen');
 }
-```[cite: 6]

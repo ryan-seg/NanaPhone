@@ -166,6 +166,7 @@ export const state = {
   settingsLoaded: false,
   currentState: 'idle',
   isRadioPlaying: false,
+  returnToVideoAfterCall: false,
   callSnap: { status: 'idle' },
   presenceSnap: {},
   bulletinSnap: {},
@@ -184,7 +185,10 @@ export const state = {
 export const hooks = {
   onSettingsChanged: [],
   pauseVideo: null,
+  resumeVideo: null,
+  syncVideoUI: null,
   openVideoScreen: null,
+  confirmRestartVideo: null,
   broadcastScreen: null,
   refreshFamilyPresence: null,
   renderTodaysCallsBanner: null,
@@ -264,8 +268,35 @@ window.openVideoScreen = window.openVideoScreen || (() => {
   showScreen('video-screen');
 });
 
-window.switchNanaMainTab = (tab) => {
-  if (tab !== 'video') hooks.pauseVideo?.('switched_tab');
+window.switchNanaMainTab = async (tab, forceLeaveVideo = false) => {
+  // If Nana is actively watching a video and taps another tab, pause & ask for confirmation first
+  if (role === 'nana' && tab !== 'video' && !forceLeaveVideo && NanaCore.isNanaVideoActivelyPlaying?.()) {
+    hooks.pauseVideo?.('confirm_leave_video');
+    const tabLabels = {
+      calls: 'Family Calls',
+      chat: 'Family Chat',
+      radio: 'Classic FM Radio'
+    };
+    const destName = tabLabels[tab] || 'another screen';
+    await set(refs.quickQuestion, {
+      id: `q_leavevid_${Date.now()}`,
+      type: 'leave_video_prompt',
+      targetTab: tab,
+      question: `Your video is paused. Are you sure you want to leave the video to open ${destName}?`,
+      askedBy: 'Video Player',
+      silent: !settings.speakQuestions,
+      status: 'pending',
+      answer: null,
+      askedAt: Date.now()
+    });
+    return;
+  }
+
+  // Always pause and save exact video position when leaving the video screen
+  if (tab !== 'video') {
+    state.returnToVideoAfterCall = false;
+    hooks.pauseVideo?.('switched_tab');
+  }
   if (tab !== 'chat' && $('bulletin-modal')?.style.display === 'flex') {
     window.closeFamilyBulletin?.();
   }

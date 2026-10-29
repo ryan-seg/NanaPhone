@@ -226,6 +226,17 @@ window.submitNanaQuestionAnswer = async (choice) => {
     }).catch(() => {});
   }
 
+  // Handle "Are you sure you want to leave the video?" confirmation
+  if (qData.type === 'leave_video_prompt') {
+    if (choice === 'YES') {
+      window.switchNanaMainTab?.(qData.targetTab || 'calls', true);
+    } else {
+      // Stay on video screen and resume playing from saved position
+      hooks.resumeVideo?.();
+    }
+    return;
+  }
+
   // Handle "Are you sure you want to return to the start of the episode?"
   if (qData.type === 'restart_video_prompt') {
     if (choice === 'YES') {
@@ -309,6 +320,7 @@ onValue(refs.quickQuestion, snap => {
       hooks.pauseVideo?.('question_popup');
       const isSilent = !!(q.silent || !settings.speakQuestions);
       const badgeMap = {
+        leave_video_prompt: '🎬 Leave Video Player?',
         restart_video_prompt: '⏮️ Restart Video?',
         next_video_prompt: '🎬 Up Next in Video Queue',
         unread_chat_prompt: '✈️ Unread Family Chat Messages',

@@ -150,6 +150,27 @@ window.openVideoScreen = () => {
   window.stopRadioAndSync?.(true);
   showScreen('video-screen');
   window.wakeScreenAndResetDimTimer?.();
+
+  // Ensure the cued video & its saved position are loaded ready on the screen
+  const curItem = getCurrentQueueItem();
+  if (videoEl && curItem && curItem.item.url) {
+    if (lastLoadedVideoUrl !== curItem.item.url || !videoEl.getAttribute('src')) {
+      lastLoadedVideoUrl = curItem.item.url;
+      videoEl.src = curItem.item.url;
+      attachSubtitleTrack(curItem.item.subtitleUrl || '', true);
+    }
+    const savedSec = getSavedTimeForItem(curItem.item, curItem.index);
+    if (savedSec >= 1 && videoEl.paused) {
+      const seekWhenReady = () => {
+        if (Math.abs((videoEl.currentTime || 0) - savedSec) > 1) {
+          try { videoEl.currentTime = savedSec; } catch (_) {}
+        }
+      };
+      if (videoEl.readyState >= 1) seekWhenReady();
+      else videoEl.addEventListener('loadedmetadata', seekWhenReady, { once: true });
+    }
+  }
+
   update(refs.presence, { online: true, lastActivity: "Opened Video Player", currentScreen: "video_paused", lastTouched: Date.now() }).catch(() => {});
   syncVideoUI();
 };
@@ -162,7 +183,7 @@ function saveCurrentVideoTime(force = false) {
   const cur = Math.floor(videoEl.currentTime || 0);
   // Don't overwrite 0 reset when video is at the very end
   if (dur > 0 && dur - cur <= 2) return;
-  if (cur > 0 && (force || Math.abs(cur - lastSavedTimeSec) >= 4)) {
+  if (cur >= 1 && (force || Math.abs(cur - lastSavedTimeSec) >= 4)) {
     lastSavedTimeSec = cur;
     localStorage.setItem(`nana_vid_pos_${curItem.item.url}`, String(cur));
     if (!state.streamData.savedTimes) state.streamData.savedTimes = {};
@@ -173,7 +194,7 @@ function saveCurrentVideoTime(force = false) {
   }
 }
 
-function syncVideoUI(customStatusMessage = null) {
+export function syncVideoUI(customStatusMessage = null) {
   const curItem = getCurrentQueueItem();
   const playing = !!(videoEl && !videoEl.paused && !videoEl.ended && curItem);
   const overlay = $('video-tap-overlay'), icon = $('video-overlay-icon'), main = $('video-overlay-main'), sub = $('video-overlay-sub'), btn = $('btn-bottom-video-toggle');
@@ -200,7 +221,7 @@ function syncVideoUI(customStatusMessage = null) {
     if (icon) icon.innerText = customStatusMessage ? '⏳' : '▶️';
     if (main) {
       main.innerText = customStatusMessage
-        || (rem > 2 ? `${curItem.item.title || 'Video'} — Paused at ${mins}:${secs}` : `Ready: ${curItem.item.title || 'Video'} (${curItem.index + 1} of ${curItem.total})`);
+        || (rem >= 1 ? `${curItem.item.title || 'Video'} — Paused at ${mins}:${secs}` : `Ready: ${curItem.item.title || 'Video'} (${curItem.index + 1} of ${curItem.total})`);
     }
     if (sub) sub.innerText = 'Tap anywhere on the video screen or press Play Video below';
   }
@@ -210,29 +231,43 @@ function syncVideoUI(customStatusMessage = null) {
     btn.style.borderColor = playing ? '#fde047' : '#4ade80';
   }
 }
+hooks.syncVideoUI = syncVideoUI;
 
 function pauseVideoAndSavePosition(reason = 'manual') {
+  const curItem = getCurrentQueueItem();
   if (!videoEl || videoEl.paused) {
+    saveCurrentVideoTime(true);
     startNormalDimCountdownOnPause();
     if (role === 'nana' && state.streamData.state === 'playing') {
-      update(refs.videoStream, { state: 'paused', pauseReason: reason, updatedAt: Date.now() }).catch(() => {});
+      const savedPos = curItem ? Math.max(Math.floor(videoEl?.currentTime || 0), getSavedTimeForItem(curItem.item, curItem.index)) : 0;
+      const payload = { state: 'paused', pauseReason: reason, updatedAt: Date.now() };
+      if (curItem && savedPos >= 1) payload[`savedTimes/${curItem.item.id}`] = savedPos;
+      update(refs.videoStream, payload).catch(() => {});
     }
+    syncVideoUI();
     hooks.broadcastScreen?.();
     return;
   }
+
   saveCurrentVideoTime(true);
   videoEl.pause();
   syncVideoUI();
   startNormalDimCountdownOnPause();
   hooks.broadcastScreen?.();
-  const curItem = getCurrentQueueItem();
   if (role === 'nana' && curItem) {
-    update(refs.videoStream, {
+    const exactSec = Math.max(Math.floor(videoEl.currentTime || 0), getSavedTimeForItem(curItem.item, curItem.index));
+    const payload = {
       state: 'paused',
-      [`savedTimes/${curItem.item.id}`]: Math.floor(videoEl.currentTime || 0),
       pauseReason: reason,
       updatedAt: Date.now()
-    }).catch(() => {});
+    };
+    if (exactSec >= 1) {
+      localStorage.setItem(`nana_vid_pos_${curItem.item.url}`, String(exactSec));
+      if (!state.streamData.savedTimes) state.streamData.savedTimes = {};
+      state.streamData.savedTimes[curItem.item.id] = exactSec;
+      payload[`savedTimes/${curItem.item.id}`] = exactSec;
+    }
+    update(refs.videoStream, payload).catch(() => {});
   }
 }
 hooks.pauseVideo = pauseVideoAndSavePosition;
@@ -257,7 +292,7 @@ function startOrResumeVideo() {
 
   const targetResume = getSavedTimeForItem(item, index);
   const applySeek = () => {
-    if (targetResume > 2 && Math.abs((videoEl.currentTime || 0) - targetResume) > 3) {
+    if (targetResume >= 1 && Math.abs((videoEl.currentTime || 0) - targetResume) > 1.5) {
       try { videoEl.currentTime = targetResume; } catch (_) {}
     }
     if (videoEl.textTracks?.[0]) videoEl.textTracks[0].mode = 'showing';
@@ -298,6 +333,7 @@ function startOrResumeVideo() {
     });
   }
 }
+hooks.resumeVideo = startOrResumeVideo;
 
 window.handleVideoStageTap = (ev) => {
   if (ev) ev.stopPropagation();
@@ -412,7 +448,7 @@ async function handleVideoEndedOnNana() {
 if (videoEl) {
   videoEl.addEventListener('timeupdate', () => { saveCurrentVideoTime(false); keepScreenAwakeIfPlayingVideo(); });
   videoEl.addEventListener('playing', () => { syncVideoUI(); hooks.broadcastScreen?.(); });
-  videoEl.addEventListener('pause', () => { syncVideoUI(); startNormalDimCountdownOnPause(); hooks.broadcastScreen?.(); });
+  videoEl.addEventListener('pause', () => { saveCurrentVideoTime(true); syncVideoUI(); startNormalDimCountdownOnPause(); hooks.broadcastScreen?.(); });
   videoEl.addEventListener('play', () => { requestVideoWakeLock(); keepScreenAwakeIfPlayingVideo(); syncVideoUI(); hooks.broadcastScreen?.(); });
   videoEl.addEventListener('ended', () => { if (role === 'nana') handleVideoEndedOnNana(); });
   videoEl.addEventListener('error', () => syncVideoUI('⚠️ Could not load video file — check video URL or format'));
