@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="nanaphone-page-version" content="2.9.3">
@@ -29,6 +30,9 @@
   <link rel="stylesheet" href="styles.css?v=2.9.3">
 </head>
 <body>
+  <!-- Top 62px No-Touch Orientation Banner (Day, Time of Day, Date & Clock) -->
+  <div id="nana-top-orientation-bar"></div>
+
   <div id="brightness-overlay" onclick="wakeScreenAndResetDimTimer()"></div>
 
   <div id="night-dimmer" onclick="wakeFromNightMode()">
@@ -69,6 +73,18 @@
     <div class="confirm-btn-row">
       <button class="confirm-btn" style="background:#22c55e;color:#000;" onclick="executeConfirmedCall()">📞 YES, CALL NOW</button>
       <button class="confirm-btn" style="background:#ef4444;color:#fff;" onclick="dismissCallConfirm()">✖ NO, GO BACK</button>
+    </div>
+  </div>
+
+  <!-- Accidental End-Call Confirmation Modal on Family Screen -->
+  <div id="end-call-confirm-modal">
+    <div class="end-confirm-card">
+      <div style="font-size:1.85rem;font-weight:900;color:#fef08a;">☎️ End Call with Nana?</div>
+      <div style="font-size:1.05rem;color:#cbd5e1;font-weight:700;">Tap "Keep Talking" if you pressed End Call by accident.</div>
+      <div style="display:flex;gap:14px;width:100%;margin-top:6px;">
+        <button class="confirm-btn" style="flex:1;background:#22c55e;color:#000;font-size:1.25rem;padding:14px 10px;" onclick="dismissEndCallConfirm()">📞 Keep Talking</button>
+        <button class="confirm-btn" style="flex:1;background:#ef4444;color:#fff;font-size:1.25rem;padding:14px 10px;" onclick="confirmFamilyEndCallNow()">☎️ Yes, End Call</button>
+      </div>
     </div>
   </div>
 
@@ -145,14 +161,14 @@
   </div>
 
   <!-- 1. Nana's Main Grid Screen -->
-  <div id="grid-screen" class="screen">
+  <div id="grid-screen" class="screen active">
     <div class="header-bar">
       <div class="header-title" id="grid-header-title">Tap a photo to call family</div>
       <div class="header-pills">
-        <div class="nav-pill-btn calls-pill active-tab" onclick="switchNanaMainTab('calls')">📞 Family Calls</div>
-        <div class="chat-pill" onclick="openFamilyBulletin()">✈️ Family Chat <span id="chat-unread-badge" class="chat-unread-badge">NEW</span></div>
-        <div class="radio-pill" onclick="openRadioScreen()">🎻 Classic FM</div>
-        <div class="nav-pill-btn video-pill-x" onclick="openVideoScreen()">🎬 Video</div>
+        <button class="nav-pill-btn calls-pill active-tab" onclick="switchNanaMainTab('calls')">📞 Family Calls</button>
+        <button class="nav-pill-btn chat-pill-x" onclick="switchNanaMainTab('chat')">✈️ Family Chat <span id="chat-unread-badge" class="chat-unread-badge">NEW</span></button>
+        <button class="nav-pill-btn radio-pill-x" onclick="switchNanaMainTab('radio')">🎻 Classic FM</button>
+        <button class="nav-pill-btn video-pill-x" onclick="switchNanaMainTab('video')">🎬 Video</button>
         <div id="clock" class="clock-pill">12:00</div>
         <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.9.3</div>
       </div>
@@ -227,13 +243,13 @@
     </div>
     <div class="video-bottom-bar">
       <div style="font-size:1.35rem;font-weight:900;color:var(--text-accent);">🔊 Video Vol: <span id="nana-video-vol-display">80%</span></div>
-      <div style="display:flex;gap:12px;">
-        <button class="vol-step-btn" style="font-size:1.45rem;padding:10px 22px;" onclick="adjustNanaVideoVolume(-15)">🔉 Quieter</button>
-        <button class="vol-step-btn" style="font-size:1.45rem;padding:10px 22px;background:#0284c7;" onclick="adjustNanaVideoVolume(15)">🔊 Louder</button>
+      <div>
+        <button class="vol-step-btn" onclick="adjustNanaVideoVolume(-15)">🔉 Quieter</button>
+        <button class="vol-step-btn" style="background:#0284c7;" onclick="adjustNanaVideoVolume(15)">🔊 Louder</button>
       </div>
-      <div style="display:flex;gap:10px;">
-        <button id="btn-bottom-video-toggle" class="cancel-btn" style="font-size:1.35rem;padding:10px 22px;background:#059669;border-color:#4ade80;color:#fff;" onclick="toggleNanaVideoPlayback()">▶️ Play Video</button>
-        <button class="cancel-btn" style="font-size:1.2rem;padding:10px 16px;background:#334155;border-color:#94a3b8;color:#fff;" onclick="restartNanaVideoFromBeginning()">⏮️ Restart</button>
+      <div>
+        <button id="btn-bottom-video-toggle" class="cancel-btn" style="background:#059669;border-color:#4ade80;color:#fff;" onclick="toggleNanaVideoPlayback()">▶️ Play Video</button>
+        <button class="cancel-btn" style="background:#334155;border-color:#94a3b8;color:#fff;" onclick="restartNanaVideoFromBeginning()">⏮️ Restart</button>
       </div>
     </div>
   </div>
@@ -243,7 +259,7 @@
     <img id="outbound-photo" src="" style="width:180px;height:180px;border-radius:50%;border:7px solid #fff;margin-bottom:14px;object-fit:cover;">
     <h1 id="outbound-title" style="font-size:3.4rem;margin:0 0 8px 0;color:#fef08a;">Calling...</h1>
     <p id="outbound-sub" style="font-size:1.8rem;color:#cbd5e1;margin:0 0 20px 0;">Ringing their mobile now (1/6)...</p>
-    <button class="cancel-btn" onclick="endCall()">✖ Cancel Call</button>
+    <button class="cancel-btn" onclick="endCall(true)">✖ Cancel Call</button>
   </div>
 
   <!-- 3. Incoming Ring Screen -->
@@ -254,20 +270,31 @@
   </div>
 
   <!-- 4. Active Video Call Screen -->
-  <div id="call-screen" class="screen" onclick="resetIdleTimer()">
+  <div id="call-screen" class="screen" onpointerdown="wakeInCallControls(event)" ontouchstart="wakeInCallControls(event)">
     <div id="call-status-pill">🟢 Connected — Speak Normally</div>
     <div id="call-connecting-banner">📹 Connecting video...</div>
-    <div id="in-call-volume-bar">
-      <span>🔊 Call Vol: <strong id="in-call-vol-label" style="color:#fef08a;">85%</strong></span>
-      <button class="vol-step-btn" onclick="stepNanaCallVolume(-15)">−</button>
-      <button class="vol-step-btn" onclick="stepNanaCallVolume(15)">+</button>
-      <button class="vol-step-btn" style="background:#0f766e;" onclick="switchFamilyCamera()">🔄 Flip Cam</button>
-      <button id="in-call-settings-btn" class="vol-step-btn" style="background:#334155;display:none;" onclick="openSettingsModal()">⚙️</button>
+
+    <!-- Top-Right Gear Cog & Hidden Dropdown Menu (Family Only) -->
+    <div id="in-call-menu-wrap" onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
+      <button id="in-call-cog-btn" class="in-call-cog-btn" onclick="toggleInCallMenu(event)" title="Call Options">⚙️</button>
+      <div id="in-call-options-drawer" class="in-call-options-drawer">
+        <div class="in-call-drawer-row">
+          <span>🔊 Nana Vol: <strong id="in-call-vol-label" style="color:#fef08a;">85%</strong></span>
+          <div style="display:flex;gap:6px;">
+            <button class="vol-step-btn" onclick="stepNanaCallVolume(-15)">−</button>
+            <button class="vol-step-btn" onclick="stepNanaCallVolume(15)">+</button>
+          </div>
+        </div>
+        <button id="btn-family-voice-boost" class="vol-step-btn" style="width:100%;background:#7c3aed;border-color:#fef08a;" onclick="cycleFamilyVoiceBoost()">📢 Boost Nana: 180%</button>
+        <button class="vol-step-btn" style="width:100%;background:#0f766e;" onclick="switchFamilyCamera()">🔄 Flip Camera</button>
+        <button id="in-call-settings-btn" class="vol-step-btn" style="width:100%;background:#334155;display:none;" onclick="openSettingsModal()">⚙️ All Tablet Controls</button>
+      </div>
     </div>
+
     <video id="remote-video" autoplay playsinline muted poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
     <audio id="remote-audio" autoplay playsinline></audio>
     <video id="local-video" autoplay playsinline muted poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
-    <button id="hangup-btn" class="hangup-btn" onclick="endCall()">End Call</button>
+    <button id="hangup-btn" class="hangup-btn" onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()" onclick="promptEndCallConfirmation()">End Call</button>
   </div>
 
   <!-- 5. Family Member Screen (Organized into 3 Clean Tabs) -->
@@ -331,7 +358,7 @@
       </div>
     </div>
 
-    <!-- Tab 2: Ask Nana a Yes/No Question -->
+    <!-- Tab 2: Ask Nana a Yes/No Question + Last 5 Questions History -->
     <div id="fam-pane-ask" class="fam-tab-pane">
       <div class="settings-card" style="width:100%;margin-bottom:0;padding:12px;">
         <div class="settings-label" style="font-size:1.02rem;">
@@ -347,6 +374,10 @@
         <div class="opt-row">
           <button class="opt-btn" style="background:#059669;border-color:#4ade80;color:#fff;" onclick="sendQuestionToNana()">📤 Send Pop-Up</button>
           <button class="opt-btn" style="background:#7f1d1d;border-color:#f87171;color:#fff;flex:0.45;" onclick="clearQuestionOnNana()">✖ Clear</button>
+        </div>
+        <div style="margin-top:12px;border-top:2px solid #334155;padding-top:10px;width:100%;">
+          <div class="settings-sub" style="margin-bottom:4px;font-weight:800;color:#fef08a;">🕘 Last 5 Questions Asked by Family:</div>
+          <div id="fam-q-history-box" class="fam-q-history-list"></div>
         </div>
       </div>
     </div>
@@ -402,7 +433,7 @@
     <h1 style="font-size:2.6rem;color:#fef08a;margin:0;">🚨 Nana is Calling You!</h1>
     <p style="font-size:1.25rem;color:#e2e8f0;margin:0;">Tap the green button below to connect your camera and microphone:</p>
     <button class="giant-btn" style="height:36vh;font-size:2.4rem;" onclick="confirmFamilyPickupFromTelegram()">📞 TAP TO CONNECT<br>WITH NANA</button>
-    <button class="cancel-btn" style="font-size:1.4rem;padding:12px 32px;" onclick="endCall()">✖ Decline</button>
+    <button class="cancel-btn" style="font-size:1.4rem;padding:12px 32px;" onclick="endCall(true)">✖ Decline</button>
   </div>
 
   <!-- Remote Family Settings Modal -->
@@ -426,10 +457,12 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2.9.3"></script>
   <script type="module" src="nana-core.js?v=2.9.3"></script>
+  <script type="module" src="nana-settings.js?v=2.9.3"></script>
+  <script type="module" src="nana-chat.js?v=2.9.3"></script>
   <script type="module" src="nana-video.js?v=2.9.3"></script>
   <script type="module" src="nana-popups.js?v=2.9.3"></script>
   <script type="module" src="nana-telemetry.js?v=2.9.3"></script>
+  <script type="module" src="app.js?v=2.9.3"></script>
 </body>
 </html>
