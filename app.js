@@ -614,6 +614,13 @@ async function joinDailyRoom() {
     return;
   }
 
+  // Ensure any lingering camera tracks from a previous call are fully released first
+  const lvPrev = $('local-video');
+  if (lvPrev?.srcObject) {
+    lvPrev.srcObject.getTracks().forEach(t => t.stop());
+    lvPrev.srcObject = null;
+  }
+
   const customAudioSource = role === 'nana' ? await buildNanaProcessedMicTrack() : true;
 
   const co = window.DailyIframe.createCallObject({
@@ -622,11 +629,17 @@ async function joinDailyRoom() {
     dailyConfig: {
       avoidEval: true,
       userMediaAudioConstraints: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      userMediaVideoConstraints: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }
+      userMediaVideoConstraints: {
+        facingMode: 'user',
+        width: { ideal: 640, max: 1280 },
+        height: { ideal: 480, max: 720 },
+        frameRate: { ideal: 24, max: 30 }
+      }
     }
   });
   callObject = co;
   let hadRemote = false, emptyTimer = null, soundBlocked = false;
+  let boundVideoTrack = null;
   const targetVol = () => role === 'nana' ? Math.min(1.0, Math.max(0.2, (Number(settings.callVolume) || 85) / 100)) : 1.0;
   const showProblem = (t) => { banner.style.display = 'block'; banner.innerText = t; };
   const promptTapToUnmute = () => {
@@ -647,6 +660,24 @@ async function joinDailyRoom() {
     }, { once: true });
   };
 
+  // Pick the most recent participant that actually has an active/playable video or audio track (ignores stale ghost participants)
+  const pickBestRemoteParticipant = (remotes) => {
+    if (!remotes.length) return null;
+    const scoreParticipant = (p) => {
+      let score = 0;
+      const vState = p.tracks?.video?.state;
+      const aState = p.tracks?.audio?.state;
+      if (vState === 'playable') score += 100;
+      else if (vState === 'loading' || vState === 'sendable') score += 40;
+      if (aState === 'playable') score += 50;
+      if (role === 'family' && (p.user_name || '').startsWith('Nana')) score += 25;
+      if (role === 'nana' && (p.user_name || '').startsWith('Family_')) score += 25;
+      if (p.joined_at) score += (new Date(p.joined_at).getTime() / 1e13);
+      return score;
+    };
+    return [...remotes].sort((a, b) => scoreParticipant(b) - scoreParticipant(a))[0];
+  };
+
   const attachTracks = () => {
     if (callObject !== co) return;
     const parts = co.participants();
@@ -658,9 +689,7 @@ async function joinDailyRoom() {
     }
 
     const remotes = Object.values(parts).filter(p => !p.local);
-    const target = role === 'family'
-      ? (remotes.find(p => p.user_name === 'Nana_Tablet') || remotes.find(p => (p.user_name || '').startsWith('Nana')) || remotes[0])
-      : (remotes.find(p => (p.user_name || '').startsWith('Family_')) || remotes[0]);
+    const target = pickBestRemoteParticipant(remotes);
     if (!target) return;
     hadRemote = true;
     hadRemoteMediaInCurrentCall = true;
@@ -670,16 +699,33 @@ async function joinDailyRoom() {
     const aTrack = target.tracks?.audio?.persistentTrack || target.tracks?.audio?.track;
     const rv = $('remote-video'), ra = $('remote-audio');
 
+    // Re-trigger video element playback if WebRTC track unmutes after initial attachment on mobile
+    if (vTrack && vTrack !== boundVideoTrack) {
+      boundVideoTrack = vTrack;
+      vTrack.onunmute = () => {
+        if (rv) {
+          rv.srcObject = new MediaStream(role === 'nana' && aTrack ? [vTrack, aTrack] : [vTrack]);
+          rv.play().catch(() => {});
+          if (!soundBlocked) banner.style.display = 'none';
+        }
+      };
+    }
+
     if (role === 'family') {
-      if (vTrack && rv) {
+      if (vTrack && rv && vTrack.readyState === 'live') {
         if (!soundBlocked) banner.style.display = 'none';
         if (rv.srcObject?.getVideoTracks()[0] !== vTrack) {
           rv.srcObject = new MediaStream([vTrack]);
           rv.muted = true;
           rv.play().catch(() => {});
+        } else if (rv.paused) {
+          rv.play().catch(() => {});
         }
+      } else if (!vTrack || target.tracks?.video?.state === 'loading' || target.tracks?.video?.state === 'interrupted') {
+        showProblem('📹 Waiting for Nana\'s camera video...');
       }
-      if (aTrack) {
+
+      if (aTrack && aTrack.readyState === 'live') {
         const boostedOk = attachFamilyVoiceAmplifier(aTrack);
         if (ra) {
           ra.removeAttribute('src');
@@ -696,16 +742,18 @@ async function joinDailyRoom() {
         }
       }
     } else {
-      if (vTrack && rv) {
+      if (vTrack && rv && vTrack.readyState === 'live') {
         if (!soundBlocked) banner.style.display = 'none';
         if (rv.srcObject?.getVideoTracks()[0] !== vTrack || (aTrack && rv.srcObject?.getAudioTracks()[0] !== aTrack)) {
           rv.srcObject = new MediaStream(aTrack ? [vTrack, aTrack] : [vTrack]);
           rv.volume = targetVol();
           rv.muted = false;
           rv.play().catch(() => { rv.muted = true; rv.play().catch(() => {}); promptTapToUnmute(); });
+        } else if (rv.paused) {
+          rv.play().catch(() => {});
         }
       }
-      if (aTrack && ra && ra.srcObject?.getAudioTracks()[0] !== aTrack) {
+      if (aTrack && ra && aTrack.readyState === 'live' && ra.srcObject?.getAudioTracks()[0] !== aTrack) {
         ra.removeAttribute('src');
         ra.srcObject = new MediaStream([aTrack]);
         ra.muted = !!(rv && !rv.muted);
@@ -716,8 +764,22 @@ async function joinDailyRoom() {
   };
 
   ['joined-meeting', 'participant-joined', 'participant-updated', 'track-started', 'track-stopped'].forEach(ev => co.on(ev, attachTracks));
+
+  // Periodically verify on Nana's tablet that local video is still actively publishing during a call
+  const camWatchdog = setInterval(() => {
+    if (callObject !== co) { clearInterval(camWatchdog); return; }
+    if (role === 'nana') {
+      const localV = co.participants()?.local?.tracks?.video;
+      if (localV && (localV.state === 'off' || localV.state === 'blocked')) {
+        co.setLocalVideo(true);
+      }
+    }
+    attachTracks();
+  }, 3500);
+
   co.on('participant-left', () => {
     if (callObject !== co) return;
+    attachTracks();
     clearTimeout(emptyTimer);
     emptyTimer = setTimeout(() => {
       if (callObject === co && hadRemote && !Object.values(co.participants()).some(p => !p.local)) window.endCall();
@@ -732,7 +794,9 @@ async function joinDailyRoom() {
   try {
     await co.join({
       url: CONFIG.dailyRoomUrl,
-      userName: role === 'nana' ? (isRealAndroidTablet ? 'Nana_Tablet' : 'Nana_Browser') : `Family_${activeFamilyMember.id}`
+      userName: role === 'nana' ? (isRealAndroidTablet ? 'Nana_Tablet' : 'Nana_Browser') : `Family_${activeFamilyMember.id}`,
+      startVideoOff: false,
+      startAudioOff: false
     });
     co.setLocalVideo(true);
     co.setLocalAudio(true);
@@ -741,8 +805,10 @@ async function joinDailyRoom() {
       co.updateInputSettings({ audio: { processor: { type: 'krisp' } } }).catch(() => {});
     }
 
-    try { co.setBandwidth({ kbs: 1800, trackConstraints: { width: 1280, height: 720, frameRate: 30 } }); } catch (_) {}
+    // Gentle bandwidth cap without overriding hardware camera resolution mid-stream
+    try { co.setBandwidth({ kbs: 1000 }); } catch (_) {}
   } catch (_) {
+    clearInterval(camWatchdog);
     showProblem('⚠️ Could not join video room');
     isJoiningOrInRoom = false;
     setTimeout(() => { if (callObject === co) window.endCall(); }, 8000);
@@ -757,22 +823,24 @@ async function destroyDailyRoom() {
   if (callObject) {
     const co = callObject;
     callObject = null;
-    try { await co.leave(); await co.destroy(); } catch (_) {}
+    try {
+      co.setLocalVideo(false);
+      co.setLocalAudio(false);
+      await co.leave();
+      await co.destroy();
+    } catch (_) {}
   }
-  ['remote-video', 'remote-audio', 'local-video'].forEach(id => { if ($(id)) $(id).srcObject = null; });
+  // Explicitly stop any lingering MediaStreamTracks on video/audio elements so Android releases the camera hardware
+  ['remote-video', 'remote-audio', 'local-video'].forEach(id => {
+    const el = $(id);
+    if (el) {
+      if (el.srcObject && typeof el.srcObject.getTracks === 'function') {
+        el.srcObject.getTracks().forEach(t => { try { t.stop(); } catch (_) {} });
+      }
+      el.srcObject = null;
+    }
+  });
 }
-
-function stopRingingUI() {
-  clearInterval(ringInterval);
-  ringInterval = null;
-  window.speechSynthesis?.cancel();
-  if (activeMp3Ringtone) {
-    activeMp3Ringtone.pause();
-    activeMp3Ringtone.currentTime = 0;
-    activeMp3Ringtone = null;
-  }
-}
-
 // --- 7. CALL SIGNALING, ACCIDENTAL END-CALL MODAL & SIGNAL-DIP JITTER GUARD ---
 async function startCallFromNana(member) {
   if (!settings.callingEnabled || isHiddenFromNana(member.id)) return;
