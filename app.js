@@ -11,6 +11,9 @@ const {
   showScreen, speakMsg
 } = NanaCore;
 
+// Unique per-tab ID so only the exact tab that pressed Call/Answer joins the video room
+const CLIENT_TAB_ID = `tab_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
 let callObject = null;
 let isJoiningOrInRoom = false;
 let didManuallyInitiateOrAnswerOnThisTab = false;
@@ -841,6 +844,18 @@ async function destroyDailyRoom() {
     }
   });
 }
+
+function stopRingingUI() {
+  clearInterval(ringInterval);
+  ringInterval = null;
+  window.speechSynthesis?.cancel();
+  if (activeMp3Ringtone) {
+    activeMp3Ringtone.pause();
+    activeMp3Ringtone.currentTime = 0;
+    activeMp3Ringtone = null;
+  }
+}
+
 // --- 7. CALL SIGNALING, ACCIDENTAL END-CALL MODAL & SIGNAL-DIP JITTER GUARD ---
 async function startCallFromNana(member) {
   if (!settings.callingEnabled || isHiddenFromNana(member.id)) return;
@@ -861,7 +876,13 @@ async function startCallFromNana(member) {
 
   try {
     await clearMissedCallsForMember(member.id);
-    await set(refs.callState, { status: 'calling_family', callerId: 'nana', targetId: member.id, timestamp: Date.now() });
+    await set(refs.callState, {
+      status: 'calling_family',
+      callerId: 'nana',
+      targetId: member.id,
+      nanaTabId: CLIENT_TAB_ID,
+      timestamp: Date.now()
+    });
   } catch (_) {
     state.currentState = 'idle';
     showScreen('grid-screen');
@@ -884,7 +905,13 @@ window.confirmFamilyPickupFromTelegram = async () => {
   showScreen('call-screen');
   joinDailyRoom();
   await clearMissedCallsForMember(activeFamilyMember.id);
-  await set(refs.callState, { status: 'connected', callerId: 'nana', targetId: activeFamilyMember.id, timestamp: Date.now() });
+  await set(refs.callState, {
+    status: 'connected',
+    callerId: 'nana',
+    targetId: activeFamilyMember.id,
+    familyTabId: CLIENT_TAB_ID,
+    timestamp: Date.now()
+  });
 };
 
 window.startCallFromFamily = async () => {
@@ -897,9 +924,16 @@ window.startCallFromFamily = async () => {
   try {
     const res = await runTransaction(refs.callState, cur => {
       if (cur && cur.status !== 'idle' && !(cur.timestamp && Date.now() - cur.timestamp > 90000)) return;
-      return { status: 'ringing_nana', callerId: activeFamilyMember.id, targetId: 'nana', timestamp: Date.now() };
+      return {
+        status: 'ringing_nana',
+        callerId: activeFamilyMember.id,
+        targetId: 'nana',
+        familyTabId: CLIENT_TAB_ID,
+        timestamp: Date.now()
+      };
     });
     if (!res.committed) {
+      didManuallyInitiateOrAnswerOnThisTab = false;
       alert("Nana's tablet is currently busy on another call.");
       if (btn) btn.disabled = false;
       return;
@@ -908,6 +942,7 @@ window.startCallFromFamily = async () => {
     const b = $('call-connecting-banner');
     if (b) { b.style.display = 'block'; b.innerText = '🔔 Ringing Nana... Waiting for her to answer...'; }
   } catch (_) {
+    didManuallyInitiateOrAnswerOnThisTab = false;
     if (btn) btn.disabled = !settings.callingEnabled;
   }
 };
@@ -921,7 +956,14 @@ window.answerCallAsNana = async () => {
   joinDailyRoom();
   const cId = state.callSnap?.callerId;
   if (cId && cId !== 'nana') await clearMissedCallsForMember(cId);
-  await set(refs.callState, { status: 'connected', callerId: cId || 'family', targetId: 'nana', timestamp: Date.now() });
+  await set(refs.callState, {
+    status: 'connected',
+    callerId: cId || 'family',
+    targetId: 'nana',
+    familyTabId: state.callSnap?.familyTabId || null,
+    nanaTabId: CLIENT_TAB_ID,
+    timestamp: Date.now()
+  });
 };
 
 async function executeEndCallCleanup() {
@@ -1030,10 +1072,14 @@ onValue(refs.callState, snap => {
 
   if (role === 'family') hooks.refreshFamilyPresence?.();
 
+  // Check if this specific tab is an active participant in the call
+  const isActiveNanaTab = role === 'nana' && (isRealAndroidTablet || TEST_MODE || didManuallyInitiateOrAnswerOnThisTab);
+  const isActiveFamilyTab = role === 'family' && didManuallyInitiateOrAnswerOnThisTab && (!data.familyTabId || data.familyTabId === CLIENT_TAB_ID);
+
   if (data.status === 'idle') {
     clearTimeout(jitterHoldTimer);
     if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
-  } else {
+  } else if (isActiveNanaTab || isActiveFamilyTab) {
     $('bulletin-modal').style.display = 'none';
     if ($('nana-question-modal')) $('nana-question-modal').style.display = 'none';
     window.closeSeniorKeyboard?.(false);
@@ -1075,7 +1121,7 @@ onValue(refs.callState, snap => {
       }
     }
 
-    const act = isRealAndroidTablet || TEST_MODE || didManuallyInitiateOrAnswerOnThisTab;
+    const act = isActiveNanaTab;
     if (data.status === 'ringing_nana') {
       const caller = CONFIG.familyMembers.find(m => m.id === data.callerId) || CONFIG.familyMembers[0];
       if (isRealAndroidTablet && isCurrentlyInNightWindow() && settings.nightBlockCalls) {
@@ -1083,6 +1129,7 @@ onValue(refs.callState, snap => {
         executeEndCallCleanup();
         return;
       }
+      if (!act) return;
       if ($('night-dimmer')) $('night-dimmer').style.display = 'none';
       window.wakeScreenAndResetDimTimer?.();
       const img = $('caller-photo');
@@ -1091,27 +1138,25 @@ onValue(refs.callState, snap => {
       $('caller-title').innerText = `${caller.name} is calling!`;
       showScreen('ringing-screen');
       stopRingingUI();
-      if (act) {
-        playSelectedRingtoneAudio(settings.ringtone, settings.ringVolume || 85);
-        if (settings.autoAnswer) {
-          speakMsg(`${caller.spokenName} is calling you. Connecting automatically.`);
-          clearTimeout(autoAnswerTimeout);
-          autoAnswerTimeout = setTimeout(() => { if (state.currentState === 'ringing_nana') window.answerCallAsNana(); }, 10000);
-        } else {
-          speakMsg(`${caller.spokenName} is calling you. Touch anywhere on the screen to answer.`);
-        }
-        ringInterval = setInterval(() => {
-          playSelectedRingtoneAudio(settings.ringtone, settings.ringVolume || 85);
-          speakMsg(`${caller.spokenName} is calling you.`);
-        }, 6000);
-        clearTimeout(incomingRingTimeout);
-        incomingRingTimeout = setTimeout(async () => {
-          if (state.currentState === 'ringing_nana') {
-            await incrementMissedCallForMember(caller.id);
-            await executeEndCallCleanup();
-          }
-        }, (Number(settings.ringDurationSec) || 60) * 1000);
+      playSelectedRingtoneAudio(settings.ringtone, settings.ringVolume || 85);
+      if (settings.autoAnswer) {
+        speakMsg(`${caller.spokenName} is calling you. Connecting automatically.`);
+        clearTimeout(autoAnswerTimeout);
+        autoAnswerTimeout = setTimeout(() => { if (state.currentState === 'ringing_nana') window.answerCallAsNana(); }, 10000);
+      } else {
+        speakMsg(`${caller.spokenName} is calling you. Touch anywhere on the screen to answer.`);
       }
+      ringInterval = setInterval(() => {
+        playSelectedRingtoneAudio(settings.ringtone, settings.ringVolume || 85);
+        speakMsg(`${caller.spokenName} is calling you.`);
+      }, 6000);
+      clearTimeout(incomingRingTimeout);
+      incomingRingTimeout = setTimeout(async () => {
+        if (state.currentState === 'ringing_nana') {
+          await incrementMissedCallForMember(caller.id);
+          await executeEndCallCleanup();
+        }
+      }, (Number(settings.ringDurationSec) || 60) * 1000);
     } else if (data.status === 'connected') {
       if ($('night-dimmer')) $('night-dimmer').style.display = 'none';
       window.wakeScreenAndResetDimTimer?.();
@@ -1142,10 +1187,20 @@ onValue(refs.callState, snap => {
       updateClock();
     }
   } else {
+    // FAMILY SIDE: Only the specific tab that initiated or answered the call joins Daily.co
     const isMyCall = (data.callerId === activeFamilyMember.id || data.targetId === activeFamilyMember.id);
-    if (data.status === 'calling_family' && data.targetId === activeFamilyMember.id) showScreen('family-pickup-screen');
-    else if (data.status === 'connected' && isMyCall) { showScreen('call-screen'); joinDailyRoom(); }
-    else if (data.status === 'idle' || !isMyCall) { destroyDailyRoom(); showScreen('family-screen'); }
+    if (data.status === 'calling_family' && data.targetId === activeFamilyMember.id) {
+      showScreen('family-pickup-screen');
+    } else if (data.status === 'connected' && isMyCall && isActiveFamilyTab) {
+      showScreen('call-screen');
+      joinDailyRoom();
+    } else if (data.status === 'ringing_nana' && isMyCall && isActiveFamilyTab) {
+      showScreen('call-screen');
+    } else {
+      // Any other open tab for this user (or when call ends) stays out of the room on family-screen
+      if (callObject || isJoiningOrInRoom) destroyDailyRoom();
+      showScreen('family-screen');
+    }
   }
 });
 
