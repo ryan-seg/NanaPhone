@@ -1176,22 +1176,71 @@ window.endCall = async (forceImmediate = false) => {
   await executeEndCallCleanup();
 };
 
-// Remote Reload Command Listener (Nana's Tablet)
-if (role === 'nana') {
+
+// --- REMOTE RELOAD & UPDATE PROMPT LISTENER (NANA TABLET + FAMILY DEVICES) ---
+window.forceCacheBustReload = () => {
+  if (window.AndroidBridge?.clearCacheAndReload) {
+    window.AndroidBridge.clearCacheAndReload();
+    return;
+  }
+  const u = new URL(window.location.href);
+  u.searchParams.set('u', String(Date.now()));
+  window.location.replace(u.toString());
+};
+
+function showFamilyUpdatePromptModal() {
+  if ($('family-update-banner-modal')) {
+    $('family-update-banner-modal').style.display = 'flex';
+    return;
+  }
+  const modal = document.createElement('div');
+  modal.id = 'family-update-banner-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(9,13,22,0.95);z-index:10050;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;';
+  modal.innerHTML = `
+    <div style="background:#1e293b;border:4px solid #38bdf8;border-radius:28px;padding:28px 24px;max-width:460px;width:92vw;box-shadow:0 16px 40px rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;gap:16px;">
+      <div style="font-size:3.2rem;line-height:1;">🔄</div>
+      <div style="font-size:1.5rem;font-weight:900;color:#fef08a;">New Update Available</div>
+      <div style="font-size:1.05rem;font-weight:700;color:#e2e8f0;line-height:1.4;">
+        NanaPhone has been updated with the latest call and camera fixes. Tap below to refresh your page so you're on the newest version.
+      </div>
+      <button onclick="forceCacheBustReload()" style="width:100%;background:#22c55e;color:#000;border:3px solid #fff;border-radius:18px;padding:14px 20px;font-size:1.25rem;font-weight:900;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,0.5);">
+        🔄 Refresh & Update Now
+      </button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+{
   let reloadPending = false;
   const tryReload = () => {
-    if (reloadPending && state.currentState !== 'connected') {
-      window.AndroidBridge?.clearCacheAndReload ? window.AndroidBridge.clearCacheAndReload() : window.location.reload(true);
+    if (!reloadPending || state.currentState === 'connected') return;
+    if (role === 'nana') {
+      window.forceCacheBustReload();
+    } else {
+      // Pop up the high-contrast prompt on family phones/tabs (Wait until call ends if they are mid-call)
+      showFamilyUpdatePromptModal();
     }
   };
+
   onValue(refs.reloadCmd, snap => {
     const val = Number(snap.val() || 0);
     if (!val) return;
-    const last = localStorage.getItem('nana_last_reload_cmd');
-    localStorage.setItem('nana_last_reload_cmd', String(val));
+    const storageKey = `nana_last_reload_cmd_${role}`;
+    const last = localStorage.getItem(storageKey);
+    localStorage.setItem(storageKey, String(val));
+
+    // Trigger if a new reload command was pushed since this tab's last seen timestamp
     if (last !== null && val > Number(last)) {
       reloadPending = true;
       tryReload();
+    } else if (last === null && (Date.now() - val < 3600 * 1000)) {
+      // Also catch tabs that had old cached JS from before this reload was pushed (within last hour)
+      const lastBust = Number(new URLSearchParams(window.location.search).get('u') || 0);
+      if (val > lastBust + 10000) {
+        reloadPending = true;
+        tryReload();
+      }
     }
   });
   setInterval(tryReload, 5000);
