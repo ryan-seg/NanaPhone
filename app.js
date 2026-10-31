@@ -1,6 +1,6 @@
 import {
   $, NanaCore, ref, set, update, push, onValue, remove, runTransaction
-} from "./nana-core.js?v=2.9.3";
+} from "./nana-core.js?v=2.9.4";
 import { updateClock, isCurrentlyInNightWindow, isHiddenFromNana } from "./nana-settings.js?v=2.9.3";
 
 const {
