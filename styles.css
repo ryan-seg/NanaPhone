@@ -442,7 +442,37 @@ body.calling-off #calling-off-card { display: flex !important; }
 
 #call-connecting-banner { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20; font-size: clamp(1.3rem, 4vw, 2.1rem); font-weight: 900; color: #fef08a; background: rgba(15,23,42,0.9); padding: 14px 24px; border-radius: 20px; border: 3px solid #facc15; pointer-events: none; width: max-content; max-width: 90vw; text-align: center; }
 
-/* Compact Top-Right In-Call Settings Cog & Drawer (Houses Volume, Boost, Flip Camera, Controls) */
+/* Live Subtitles Overlay on Nana's Video Call Screen */
+.nana-live-captions {
+  display: none;
+  position: fixed;
+  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  left: 165px;
+  right: 24px;
+  z-index: 9999;
+  background: rgba(9, 13, 22, 0.88);
+  border: 4px solid #facc15;
+  border-radius: 22px;
+  padding: 12px 22px;
+  color: #fef08a;
+  font-size: clamp(1.8rem, 3vw, 2.55rem);
+  font-weight: 900;
+  line-height: 1.3;
+  text-align: left;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.85);
+  pointer-events: none;
+  max-height: 7.4em;
+  overflow: hidden;
+}
+body.role-nana .nana-live-captions.has-text {
+  display: block;
+}
+.caption-speaker-tag {
+  color: #38bdf8;
+  margin-right: 10px;
+}
+
+/* Compact Top-Right In-Call Settings Cog & Drawer (Houses Volume, Boost, Subtitles, Flip Camera, Controls) */
 #in-call-menu-wrap {
   display: none;
   position: fixed;
