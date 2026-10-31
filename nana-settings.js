@@ -412,6 +412,8 @@ window.copyTestLink = async (kind) => {
 window.requestTabletReload = async () => {
   const b = $('remote-refresh-btn');
   try {
+    // Also clear any stuck ringing/call state so the tablet is never blocked from reloading
+    await set(refs.callState, { status: 'idle', timestamp: Date.now() });
     await set(refs.reloadCmd, Date.now());
     if (b) { b.innerText = '✅ Sent!'; setTimeout(() => { b.innerText = '🔄 Refresh Now'; }, 3000); }
   } catch (_) {}
