@@ -1,6 +1,6 @@
 import {
   $, NanaCore, ref, update, push, onValue, query, limitToLast
-} from "./nana-core.js?v=2.9.3";
+} from "./nana-core.js?v=2.9.4";
 
 const {
   CONFIG, SERVICE_TOKEN, PORTAL_NODE_ID, role, activeFamilyMember,
