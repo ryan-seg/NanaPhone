@@ -1,7 +1,7 @@
 import {
   $, NanaCore, ref, set, update, push, onValue, remove, runTransaction
 } from "./nana-core.js?v=2.9.4";
-import { updateClock, isCurrentlyInNightWindow, isHiddenFromNana } from "./nana-settings.js?v=2.9.3";
+import { updateClock, isCurrentlyInNightWindow, isHiddenFromNana } from "./nana-settings.js?v=2.9.4";
 
 const {
   CONFIG, SERVICE_TOKEN, TEST_MODE, PORTAL_NODE_ID,
@@ -36,15 +36,12 @@ let hadRemoteMediaInCurrentCall = false;
 let endCallConfirmedByUser = false;
 let endCallModalTimer = null;
 let jitterHoldTimer = null;
-let callSpeechRecognition = null;
-let captionHideTimer = null;
 
 // Web Audio DSP Nodes (Outbound Nana Mic & Inbound Family Voice Boost)
 let nanaRawMicStream = null;
 let nanaMicNodes = null;
 let familyBoostNodes = null;
 let attachedRemoteAudioTrack = null;
-let directWebAudioFallbackNodes = null;
 
 const radioPlayer = $('nana-radio-stream');
 
@@ -78,7 +75,7 @@ function getNanaVideoConstraintObject(camSetting = settings.nanaCameraMode) {
   if (mode === 'user' || mode === 'environment') {
     return { ...baseRes, facingMode: mode };
   }
-  return { ...baseRes, deviceId: { exact: mode } };
+  return { ...baseRes, deviceId: { ideal: mode } };
 }
 
 // Synchronous Audio Pre-Unlock (Run during physical Answer/Call tap so browsers never block call sound)
@@ -102,53 +99,6 @@ function unlockCallAudioImmediate() {
       rv.play().catch(() => {});
     }
   } catch (_) {}
-}
-
-// --- LIVE CALL CAPTIONS ENGINE ---
-function startLiveCallCaptioning() {
-  if (role !== 'family') return;
-  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRec) return;
-  try {
-    if (callSpeechRecognition) { callSpeechRecognition.abort(); }
-    const rec = new SpeechRec();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = 'en-GB';
-
-    rec.onresult = (ev) => {
-      let phrase = '';
-      for (let i = ev.resultIndex; i < ev.results.length; ++i) {
-        phrase += ev.results[i][0].transcript;
-      }
-      phrase = phrase.trim();
-      if (phrase && state.currentState === 'connected') {
-        update(refs.callState, {
-          captionText: phrase,
-          captionTime: Date.now()
-        }).catch(() => {});
-      }
-    };
-
-    rec.onerror = () => {};
-    rec.onend = () => {
-      if (state.currentState === 'connected' && callObject) {
-        try { rec.start(); } catch (_) {}
-      }
-    };
-
-    rec.start();
-    callSpeechRecognition = rec;
-  } catch (_) {}
-}
-
-function stopLiveCallCaptioning() {
-  if (callSpeechRecognition) {
-    try { callSpeechRecognition.abort(); } catch (_) {}
-    callSpeechRecognition = null;
-  }
-  const el = $('call-live-captions');
-  if (el) el.style.display = 'none';
 }
 
 (function initVideoCallStageAdapters() {
@@ -206,7 +156,7 @@ function stopLiveCallCaptioning() {
         window.wakeInCallControls(ev);
         if (audioCtx?.state === 'suspended') audioCtx.resume();
         const ra = $('remote-audio');
-        if (ra?.srcObject && !(role === 'family' && familyBoostNodes)) {
+        if (ra?.srcObject) {
           ra.muted = false;
           ra.play().catch(() => {});
         }
@@ -350,8 +300,10 @@ async function applyLiveNanaCameraAndMicChanges() {
 
 function applyFamilyVoiceBoostGain() {
   if (!familyBoostNodes) return;
-  const boostMult = Math.max(1.0, Math.min(3.5, (Number(settings.familyVoiceBoostPct) || 180) / 100));
-  familyBoostNodes.gainNode.gain.setTargetAtTime(boostMult, audioCtx.currentTime, 0.03);
+  // Base 100% is already played by #remote-audio; add the extra boost on top
+  const boostPct = Number(settings.familyVoiceBoostPct) || 180;
+  const extraGain = Math.max(0.0, Math.min(2.5, (boostPct - 100) / 100));
+  familyBoostNodes.gainNode.gain.setTargetAtTime(extraGain, audioCtx.currentTime, 0.03);
 }
 
 function attachFamilyVoiceAmplifier(aTrack) {
@@ -407,20 +359,12 @@ function cleanupFamilyVoiceAmplifier() {
     try { familyBoostNodes.source.disconnect(); familyBoostNodes.limiter.disconnect(); } catch (_) {}
     familyBoostNodes = null;
   }
-  if (directWebAudioFallbackNodes) {
-    try { directWebAudioFallbackNodes.source.disconnect(); directWebAudioFallbackNodes.gainNode.disconnect(); } catch (_) {}
-    directWebAudioFallbackNodes = null;
-  }
 }
 
 hooks.onSettingsChanged.push((s) => {
   applyNanaMicDspParameters();
   applyFamilyVoiceBoostGain();
   applyLiveNanaCameraAndMicChanges();
-  if (directWebAudioFallbackNodes && role === 'nana') {
-    const vol = Math.min(1.0, Math.max(0.2, (Number(s.callVolume) || 85) / 100));
-    directWebAudioFallbackNodes.gainNode.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.03);
-  }
   if (role === 'nana' && state.settingsLoaded && !s.callingEnabled && state.callSnap?.status !== 'idle') {
     stopRingingUI();
     set(refs.callState, { status: 'idle', timestamp: Date.now() });
@@ -860,22 +804,18 @@ async function joinDailyRoom() {
       showProblem('📹 Waiting for Nana\'s camera video...');
     }
 
-    // Route all call audio strictly through #remote-audio (already unlocked on tap) or Web Audio API
+    // Route all call audio through #remote-audio (keeps Android Chrome decoding WebRTC packets!)
+    // and layer the Web Audio amplifier on top for family members
     if (aTrack && aTrack.readyState === 'live') {
       if (role === 'family') {
-        const boostedOk = attachFamilyVoiceAmplifier(aTrack);
-        if (ra) {
+        attachFamilyVoiceAmplifier(aTrack);
+        if (ra && ra.srcObject?.getAudioTracks()[0] !== aTrack) {
           ra.loop = false;
           ra.removeAttribute('src');
-          if (boostedOk) {
-            ra.srcObject = null;
-            ra.muted = true;
-          } else if (ra.srcObject?.getAudioTracks()[0] !== aTrack) {
-            ra.srcObject = new MediaStream([aTrack]);
-            ra.muted = false;
-            ra.volume = 1.0;
-            ra.play().catch(() => {});
-          }
+          ra.srcObject = new MediaStream([aTrack]);
+          ra.muted = false;
+          ra.volume = 1.0;
+          ra.play().catch(() => {});
         }
       } else if (ra && ra.srcObject?.getAudioTracks()[0] !== aTrack) {
         ra.loop = false;
@@ -883,21 +823,7 @@ async function joinDailyRoom() {
         ra.srcObject = new MediaStream([aTrack]);
         ra.muted = false;
         ra.volume = targetVol();
-        ra.play().catch(() => {
-          // Automatic Web Audio fallback if HTMLAudioElement is ever restricted
-          try {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            if (directWebAudioFallbackNodes) {
-              try { directWebAudioFallbackNodes.source.disconnect(); } catch (_) {}
-            }
-            const source = audioCtx.createMediaStreamSource(new MediaStream([aTrack]));
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.value = targetVol();
-            source.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            directWebAudioFallbackNodes = { source, gainNode };
-          } catch (_) {}
-        });
+        ra.play().catch(() => {});
       }
     }
   };
@@ -940,7 +866,6 @@ async function joinDailyRoom() {
     co.setLocalAudio(true);
 
     if (role === 'nana') publishNanaHardwareDevices();
-    if (role === 'family') startLiveCallCaptioning();
 
     if (typeof co.updateInputSettings === 'function') {
       co.updateInputSettings({ audio: { processor: { type: 'krisp' } } }).catch(() => {});
@@ -960,7 +885,6 @@ async function destroyDailyRoom() {
   didManuallyInitiateOrAnswerOnThisTab = false;
   appliedNanaCameraMode = null;
   appliedNanaMicDeviceId = null;
-  stopLiveCallCaptioning();
   cleanupNanaMicDsp();
   cleanupFamilyVoiceAmplifier();
   if (callObject) {
@@ -1111,7 +1035,6 @@ async function executeEndCallCleanup() {
   clearTimeout(incomingRingTimeout);
   clearTimeout(autoAnswerTimeout);
   clearTimeout(jitterHoldTimer);
-  stopLiveCallCaptioning();
   if ($('end-call-confirm-modal')) $('end-call-confirm-modal').style.display = 'none';
   stopTelegramRingBurst();
   stopRingingUI();
@@ -1176,7 +1099,6 @@ window.endCall = async (forceImmediate = false) => {
   await executeEndCallCleanup();
 };
 
-
 // --- REMOTE RELOAD & UPDATE PROMPT LISTENER (NANA TABLET + FAMILY DEVICES) ---
 window.forceCacheBustReload = () => {
   if (window.AndroidBridge?.clearCacheAndReload) {
@@ -1201,7 +1123,7 @@ function showFamilyUpdatePromptModal() {
       <div style="font-size:3.2rem;line-height:1;">🔄</div>
       <div style="font-size:1.5rem;font-weight:900;color:#fef08a;">New Update Available</div>
       <div style="font-size:1.05rem;font-weight:700;color:#e2e8f0;line-height:1.4;">
-        NanaPhone has been updated with the latest call and camera fixes. Tap below to refresh your page so you're on the newest version.
+        NanaPhone has been updated with the latest call and audio fixes. Tap below to refresh your page so you're on the newest version.
       </div>
       <button onclick="forceCacheBustReload()" style="width:100%;background:#22c55e;color:#000;border:3px solid #fff;border-radius:18px;padding:14px 20px;font-size:1.25rem;font-weight:900;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,0.5);">
         🔄 Refresh & Update Now
@@ -1218,7 +1140,6 @@ function showFamilyUpdatePromptModal() {
     if (role === 'nana') {
       window.forceCacheBustReload();
     } else {
-      // Pop up the high-contrast prompt on family phones/tabs (Wait until call ends if they are mid-call)
       showFamilyUpdatePromptModal();
     }
   };
@@ -1230,12 +1151,10 @@ function showFamilyUpdatePromptModal() {
     const last = localStorage.getItem(storageKey);
     localStorage.setItem(storageKey, String(val));
 
-    // Trigger if a new reload command was pushed since this tab's last seen timestamp
     if (last !== null && val > Number(last)) {
       reloadPending = true;
       tryReload();
     } else if (last === null && (Date.now() - val < 3600 * 1000)) {
-      // Also catch tabs that had old cached JS from before this reload was pushed (within last hour)
       const lastBust = Number(new URLSearchParams(window.location.search).get('u') || 0);
       if (val > lastBust + 10000) {
         reloadPending = true;
@@ -1244,23 +1163,6 @@ function showFamilyUpdatePromptModal() {
     }
   });
   setInterval(tryReload, 5000);
-}
-
-// Live Call Subtitles Listener (Renders live captions on Nana's tablet during call)
-if (role === 'nana') {
-  onValue(refs.callState, snap => {
-    const data = snap.val();
-    const captionEl = $('call-live-captions');
-    if (!captionEl) return;
-    if (data?.status === 'connected' && data?.captionText && data?.captionTime && (Date.now() - data.captionTime < 9000)) {
-      captionEl.innerText = data.captionText;
-      captionEl.style.display = 'block';
-      clearTimeout(captionHideTimer);
-      captionHideTimer = setTimeout(() => { captionEl.style.display = 'none'; }, 7000);
-    } else if (data?.status !== 'connected') {
-      captionEl.style.display = 'none';
-    }
-  });
 }
 
 // Unified Call State Listener
