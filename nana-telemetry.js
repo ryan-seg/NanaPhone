@@ -1,6 +1,6 @@
 import {
   $, NanaCore, update, onValue, onDisconnect, query, limitToLast
-} from "./nana-core.js?v=2.9.3";
+} from "./nana-core.js?v=2.9.4";
 
 const {
   role, activeFamilyMember, FAMILY_NAMES, refs, settings, state, hooks, isBatteryVoiceCurrentlyMuted
