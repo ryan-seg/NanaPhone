@@ -1,8 +1,9 @@
 import { getApps, getApp, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, update, push, onValue, remove, runTransaction, onDisconnect, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-export const APP_VERSION = "2.9.3";
+export const APP_VERSION = "2.9.4";
 export const $ = (id) => document.getElementById(id);
+export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export { ref, set, update, push, onValue, remove, runTransaction, onDisconnect, query, limitToLast };
 
 // --- 1. VERSION GUARD & CACHE BUSTER ---
@@ -139,6 +140,7 @@ export const refs = {
   videoStream:      ref(db, `${basePath}/videoStream`),
   quickQuestion:    ref(db, `${basePath}/quickQuestion`),
   questionHistory:  ref(db, `${basePath}/questionHistory`),
+  callBeat:         ref(db, `${basePath}/callBeat`),
   reloadCmd:        ref(db, `${basePath}/commands/reloadAt`),
   connectedInfo:    ref(db, `.info/connected`)
 };
@@ -161,6 +163,15 @@ export const settings = {
   showTodaysCallsBanner: true, periodicPopupsEnabled: true, unreadChatPopupMin: 30,
   radioPromptHours: [10, 15], videoPromptHours: [14, 19], speakQuestions: true
 };
+
+// Put a Yes/No pop-up on Nana's screen. `extra` can override any field (e.g. silent, historyKey, nextIndex).
+export function askNana(type, question, askedBy, extra = {}) {
+  const now = Date.now();
+  return set(refs.quickQuestion, {
+    id: `q_${type}_${now}`, type, question, askedBy,
+    silent: !settings.speakQuestions, status: 'pending', answer: null, askedAt: now, ...extra
+  });
+}
 
 export const state = {
   settingsLoaded: false,
@@ -228,7 +239,7 @@ export const NanaCore = {
   activeFamilyMember, isAdminFamilyMember, isAdminFamily: isAdminFamilyMember,
   FAMILY_NAMES, senderName: activeFamilyMember.name,
   basePath, db, refs, settings, state, hooks, audioCtx,
-  showScreen, speakMsg, isBatteryVoiceCurrentlyMuted,
+  showScreen, speakMsg, isBatteryVoiceCurrentlyMuted, askNana,
   isNanaVideoActivelyPlaying: () => false,
   getCurrentQueueItem: () => null
 };
@@ -278,17 +289,7 @@ window.switchNanaMainTab = async (tab, forceLeaveVideo = false) => {
       radio: 'Classic FM Radio'
     };
     const destName = tabLabels[tab] || 'another screen';
-    await set(refs.quickQuestion, {
-      id: `q_leavevid_${Date.now()}`,
-      type: 'leave_video_prompt',
-      targetTab: tab,
-      question: `Your video is paused. Are you sure you want to leave the video to open ${destName}?`,
-      askedBy: 'Video Player',
-      silent: !settings.speakQuestions,
-      status: 'pending',
-      answer: null,
-      askedAt: Date.now()
-    });
+    await askNana('leave_video_prompt', `Your video is paused. Are you sure you want to leave the video to open ${destName}?`, 'Video Player', { targetTab: tab });
     return;
   }
 

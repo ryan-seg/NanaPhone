@@ -7,9 +7,10 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="nanaphone-page-version" content="2.9.3">
+  <meta name="nanaphone-page-version" content="2.9.4">
+  <link rel="icon" href="data:,">
   <script>
-    window.__NANA_PAGE_VERSION = "2.9.3";
+    window.__NANA_PAGE_VERSION = "2.9.4";
     (function () {
       function ok() {
         var sv = (getComputedStyle(document.documentElement).getPropertyValue('--nana-styles-version') || '').replace(/["'\s]/g, '');
@@ -19,7 +20,7 @@
         if (ok() || !document.body) return;
         var d = document.createElement('div');
         d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7c2d12;color:#fff;font:700 20px sans-serif;padding:14px;text-align:center;';
-        d.innerText = 'Loading NanaPhone... (page v2.9.3) - retrying';
+        d.innerText = 'Loading NanaPhone... (page v' + window.__NANA_PAGE_VERSION + ') - retrying';
         document.body.appendChild(d);
       }, 15000);
       setInterval(function () { if (!ok()) window.location.reload(); }, 60000);
@@ -274,6 +275,9 @@
     <div id="call-status-pill">🟢 Connected — Speak Normally</div>
     <div id="call-connecting-banner">📹 Connecting video...</div>
 
+    <!-- Live Subtitles Banner on Nana's Call Screen -->
+    <div id="nana-live-captions" class="nana-live-captions"></div>
+
     <!-- Top-Right Gear Cog & Hidden Dropdown Menu (Family Only) -->
     <div id="in-call-menu-wrap" onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
       <button id="in-call-cog-btn" class="in-call-cog-btn" onclick="toggleInCallMenu(event)" title="Call Options">⚙️</button>
@@ -457,12 +461,12 @@
     </div>
   </div>
 
-  <script type="module" src="nana-core.js?v=2.9.3"></script>
-  <script type="module" src="nana-settings.js?v=2.9.3"></script>
-  <script type="module" src="nana-chat.js?v=2.9.3"></script>
-  <script type="module" src="nana-video.js?v=2.9.3"></script>
-  <script type="module" src="nana-popups.js?v=2.9.3"></script>
-  <script type="module" src="nana-telemetry.js?v=2.9.3"></script>
-  <script type="module" src="app.js?v=2.9.3"></script>
+  <script type="module" src="nana-core.js?v=2.9.4"></script>
+  <script type="module" src="nana-settings.js?v=2.9.4"></script>
+  <script type="module" src="nana-chat.js?v=2.9.4"></script>
+  <script type="module" src="nana-video.js?v=2.9.4"></script>
+  <script type="module" src="nana-popups.js?v=2.9.4"></script>
+  <script type="module" src="nana-telemetry.js?v=2.9.4"></script>
+  <script type="module" src="app.js?v=2.9.4"></script>
 </body>
 </html>

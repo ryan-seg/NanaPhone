@@ -1,4 +1,4 @@
-import { $, NanaCore, set, update, onValue } from "./nana-core.js?v=2.9.3";
+import { $, NanaCore, esc, askNana, update, onValue } from "./nana-core.js?v=2.9.4";
 
 const { role, isAdminFamilyMember, senderName, refs, settings, state, hooks, showScreen } = NanaCore;
 // Strictly limit queue editing/adding/deleting/sorting to Admin (Ryan); other family members can only Play, Pause & Select
@@ -54,7 +54,9 @@ function startNormalDimCountdownOnPause() {
 }
 hooks.startNormalDimCountdownOnPause = startNormalDimCountdownOnPause;
 
-setInterval(() => { if (isNanaVideoActivelyPlaying()) keepScreenAwakeIfPlayingVideo(); }, 5000);
+setInterval(() => {
+  if (isNanaVideoActivelyPlaying()) { keepScreenAwakeIfPlayingVideo(); requestVideoWakeLock(); }
+}, 5000);
 
 // --- 2. STREAM DATA NORMALIZATION & VOLUME ---
 function normalizeStreamData(raw) {
@@ -183,7 +185,7 @@ function saveCurrentVideoTime(force = false) {
   const cur = Math.floor(videoEl.currentTime || 0);
   // Don't overwrite 0 reset when video is at the very end
   if (dur > 0 && dur - cur <= 2) return;
-  if (cur >= 1 && (force || Math.abs(cur - lastSavedTimeSec) >= 4)) {
+  if (cur >= 1 && (force || Math.abs(cur - lastSavedTimeSec) >= 10)) {
     lastSavedTimeSec = cur;
     localStorage.setItem(`nana_vid_pos_${curItem.item.url}`, String(cur));
     if (!state.streamData.savedTimes) state.streamData.savedTimes = {};
@@ -355,16 +357,7 @@ window.restartNanaVideoFromBeginning = async () => {
   const curItem = getCurrentQueueItem();
   if (!videoEl || !curItem) return;
   pauseVideoAndSavePosition('restart_confirm_prompt');
-  await set(refs.quickQuestion, {
-    id: `q_restart_${Date.now()}`,
-    type: 'restart_video_prompt',
-    question: 'Are you sure you want to return to the start of the episode?',
-    askedBy: 'Video Player',
-    silent: !settings.speakQuestions,
-    status: 'pending',
-    answer: null,
-    askedAt: Date.now()
-  });
+  await askNana('restart_video_prompt', 'Are you sure you want to return to the start of the episode?', 'Video Player');
 };
 
 // Executed only when Nana taps "✅ YES" on the restart confirmation modal
@@ -432,17 +425,7 @@ async function handleVideoEndedOnNana() {
     ? `That video has finished. Would you like to watch the next video: "${nextTitle}"?`
     : `That video has finished. Would you like to watch "${nextTitle}" again?`;
 
-  await set(refs.quickQuestion, {
-    id: `q_nextvid_${Date.now()}`,
-    type: 'next_video_prompt',
-    nextIndex,
-    question: promptText,
-    askedBy: 'Video Player',
-    silent: !settings.speakQuestions,
-    status: 'pending',
-    answer: null,
-    askedAt: Date.now()
-  });
+  await askNana('next_video_prompt', promptText, 'Video Player', { nextIndex });
 }
 
 if (videoEl) {
@@ -538,11 +521,18 @@ window.saveEditedQueueItem = async () => {
   await update(refs.videoStream, { queue: q, savedTimes: nextSavedTimes, updatedBy: senderName, updatedAt: Date.now() });
 };
 
+let lastQueueRenderSig = '';
 function renderFamilyQueueUI() {
   const box = $('fam-queue-container');
   if (!box) return;
-  box.innerHTML = '';
   const q = state.streamData.queue || [];
+  const sig = JSON.stringify([
+    q.map(item => [item.id, item.title, item.subtitleUrl ? 1 : 0, getViewCountForItem(item), Math.floor(getSavedTimeForItem(item) / 15)]),
+    state.streamData.currentIndex, state.presenceSnap?.currentScreen === 'video_playing', editingQueueIndex, canEditQueue
+  ]);
+  if (sig === lastQueueRenderSig) return;
+  lastQueueRenderSig = sig;
+  box.innerHTML = '';
   if (!q.length) {
     box.innerHTML = `<div style="color:#94a3b8;font-size:0.85rem;padding:6px;">No videos in queue yet.</div>`;
     return;
@@ -573,7 +563,7 @@ function renderFamilyQueueUI() {
     row.innerHTML = `
       <div class="fam-q-title" onclick="selectQueueIndex(${idx}, false)">
         ${isCur ? `<span class="fam-q-badge">${isPlayingNow ? 'PLAYING' : 'SELECTED'}</span>` : `<strong>${idx + 1}.</strong> `}
-        ${item.title || 'Video'}${item.subtitleUrl ? ' 💬' : ''}${timeTag}
+        ${esc(item.title || 'Video')}${item.subtitleUrl ? ' 💬' : ''}${timeTag}
         <span class="fam-view-pill" title="Number of times Nana has watched this video">👁️ ${views}</span>
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0;">${actionBtns}</div>
@@ -595,12 +585,10 @@ window.addVideoToQueue = async (playImmediately = false) => {
   q.push({ id, title, url, subtitleUrl: subUrl, views: 0 });
 
   const newIndex = playImmediately ? (q.length - 1) : (state.streamData.currentIndex || 0);
-  await set(refs.videoStream, {
+  await update(refs.videoStream, {
     queue: q,
     currentIndex: newIndex,
     state: playImmediately ? 'playing' : (state.streamData.state || 'paused'),
-    savedTimes: state.streamData.savedTimes || {},
-    viewCounts: state.streamData.viewCounts || {},
     updatedBy: senderName,
     updatedAt: Date.now()
   });
@@ -639,19 +627,15 @@ window.removeQueueIndex = async (idx) => {
   if (idx < nextIdx) nextIdx = Math.max(0, nextIdx - 1);
   if (nextIdx >= q.length) nextIdx = 0;
 
-  const nextSavedTimes = { ...(state.streamData.savedTimes || {}) };
-  const nextViewCounts = { ...(state.streamData.viewCounts || {}) };
-  if (removed?.id) { delete nextSavedTimes[removed.id]; delete nextViewCounts[removed.id]; }
-
-  await set(refs.videoStream, {
-    queue: q,
+  const payload = {
+    queue: q.length ? q : null,
     currentIndex: nextIdx,
     state: q.length ? state.streamData.state : 'paused',
-    savedTimes: nextSavedTimes,
-    viewCounts: nextViewCounts,
     updatedBy: senderName,
     updatedAt: Date.now()
-  });
+  };
+  if (removed?.id) { payload[`savedTimes/${removed.id}`] = null; payload[`viewCounts/${removed.id}`] = null; }
+  await update(refs.videoStream, payload);
 };
 
 window.remoteCommandVideo = async (cmd) => {
@@ -708,7 +692,11 @@ onValue(refs.videoStream, snap => {
     } else if (curItem && subChanged && videoEl) {
       attachSubtitleTrack(curItem.item.subtitleUrl || '', true);
     }
-    if (state.streamData.state === 'playing' && curItem) {
+    const callBusy = !!state.currentState && state.currentState !== 'idle';
+    if (state.streamData.state === 'playing' && curItem && callBusy) {
+      // Nana is on (or ringing for) a call: hold the video instead of taking over her screen
+      update(refs.videoStream, { state: 'paused', pauseReason: 'call_in_progress', updatedAt: Date.now() }).catch(() => {});
+    } else if (state.streamData.state === 'playing' && curItem) {
       if (!$('video-screen')?.classList.contains('active')) window.openVideoScreen();
       if (videoEl?.paused || urlChanged || idChanged) startOrResumeVideo();
     } else if (state.streamData.state === 'paused') {

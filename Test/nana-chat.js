@@ -1,6 +1,6 @@
 import {
   $, NanaCore, ref, update, push, onValue, query, limitToLast
-} from "./nana-core.js?v=2.9.3";
+} from "./nana-core.js?v=2.9.4";
 
 const {
   CONFIG, SERVICE_TOKEN, PORTAL_NODE_ID, role, activeFamilyMember,
@@ -29,7 +29,7 @@ NanaCore.isMessageUnreadByNana = isMessageUnreadByNana;
 
 function resolveChatPhotoUrl(item) {
   if (!item) return null;
-  const raw = (item.imageUrl || item.photoUrl || item.image || item.photo || item.mediaUrl || '').trim();
+  const raw = String(item.imageUrl || item.photoUrl || item.image || item.photo || item.mediaUrl || '').trim();
   if (raw) {
     if (/^(data:image\/|https?:\/\/|blob:)/i.test(raw)) return raw;
     if (/^[A-Za-z0-9+/=]{100,}$/.test(raw)) return `data:image/jpeg;base64,${raw}`;
@@ -299,6 +299,11 @@ window.kbHideTapped = () => { if (Date.now() - lastKeyTapMs >= 350) window.close
 window.submitTypedNanaMessage = async () => {
   const input = $('nana-chat-input');
   if (!input || (Date.now() - lastKeyTapMs < 350) || !input.value.trim()) return;
+  if (Date.now() - lastChatSendMs < 4000) {
+    const st = $('tg-send-status');
+    if (st) { st.style.color = "#ffff00"; st.innerText = "⏳ One moment, then tap Send again"; }
+    return; // keep her words in the box
+  }
   const text = input.value.trim();
   input.value = "";
   savedChatScrollTop = null;
@@ -455,8 +460,30 @@ hooks.onSettingsChanged.push((s) => {
   if (lastRenderedReadAloud !== !!s.showReadAloud) renderBulletinFeed(false);
 });
 
+let lastBulletinContentSig = null;
+const bulletinContentSig = (snapObj) => Object.entries(snapObj)
+  .map(([k, v]) => `${k}|${v?.author || ''}|${v?.text || ''}|${v?.timestamp || ''}|${v?.fileId || v?.imageUrl || v?.photoUrl || v?.image || v?.photo || v?.mediaUrl || ''}`)
+  .join('\n');
+
+// Update NEW tags / counters in place (no DOM rebuild, so scrolling is never interrupted)
+function syncUnreadMarkersInPlace() {
+  document.querySelectorAll('#bulletin-posts-container .tg-bubble[data-msg-key]').forEach(b => {
+    if (!isMessageUnreadByNana(state.bulletinSnap[b.dataset.msgKey])) {
+      b.classList.remove('unread-msg');
+      b.querySelector('.tg-new-tag')?.remove();
+    }
+  });
+  if (!Object.values(state.bulletinSnap).some(p => isMessageUnreadByNana(p))) $('first-unread-divider')?.remove();
+  updateBulletinTickerVisibility();
+}
+
 onValue(query(refs.bulletin, limitToLast(25)), snap => {
   state.bulletinSnap = snap.val() || {};
+  if (role === 'nana') {
+    const sig = bulletinContentSig(state.bulletinSnap);
+    if (sig === lastBulletinContentSig) { syncUnreadMarkersInPlace(); return; }
+    lastBulletinContentSig = sig;
+  }
   renderBulletinFeed(false);
 });
 
