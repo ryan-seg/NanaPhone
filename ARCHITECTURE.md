@@ -50,6 +50,5 @@ Safeguards: family pick-up is a transaction (must still be `calling_family`); ca
 - Cache-busting: bump `APP_VERSION` (core), `__NANA_PAGE_VERSION` + `?v=` in index.html, and the `--nana-styles-version` var in styles.css **together**; the footer shows a warning if they differ.
 
 ## Known open items
-- Key is embedded in the APK launch URL and the DB/room IDs derive from the published key hash (see review notes) – rotate key, separate ID salt, lock Firebase rules, private Daily room.
 - daily-js is loaded unpinned from unpkg – pin a tested version.
 - Presence times use the tablet clock (drift can show false "offline").
