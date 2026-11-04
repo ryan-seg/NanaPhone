@@ -33,6 +33,25 @@ const fmtDelay = (sec) => {
   return s === 0 ? "Never" : (s < 60 ? `${s}s` : `${Math.round(s / 60)}m`);
 };
 
+export function getNanaCameraShortLabel(mode = settings.nanaCameraMode) {
+  const m = mode || 'user';
+  if (m === 'user') return 'Front';
+  if (m === 'environment') return 'Rear';
+  const cams = state.nanaDevicesSnap?.cameras || [];
+  const idx = cams.findIndex(c => c.deviceId === m);
+  if (idx >= 0) return cams[idx].label || `Cam ${idx + 1}`;
+  return 'Custom';
+}
+
+export function getNanaMicShortLabel(micId = settings.nanaMicDeviceId) {
+  const id = micId || 'default';
+  if (id === 'default') return 'Default';
+  const mics = state.nanaDevicesSnap?.mics || [];
+  const idx = mics.findIndex(m => m.deviceId === id);
+  if (idx >= 0) return mics[idx].label || `Mic ${idx + 1}`;
+  return 'Custom';
+}
+
 // --- 1. SINGLE-PASS DYNAMIC CONTROLS & SETTINGS BUILDER ---
 (function buildAllSettingsControls() {
   const kp = $('pin-keypad-grid');
@@ -81,6 +100,16 @@ const fmtDelay = (sec) => {
         <button class="opt-btn calling-on-btn" onclick="setCallingEnabled(true)">✅ Turn ON</button>
       </div>
     </div>
+    <div class="settings-card">
+      <div class="settings-label">
+        <span>📷🎙️ Nana's Camera & Microphone Hardware</span>
+        <span class="lbl-hw-summary" style="color:#38bdf8;font-size:0.88rem;">Front • Default Mic</span>
+      </div>
+      <div class="settings-sub" style="margin-bottom:4px;">📷 Nana's Active Camera (Switch if a camera lens is black or facing away):</div>
+      <div id="nana-cam-options-row" class="opt-row" style="margin-bottom:8px;"></div>
+      <div class="settings-sub" style="margin-bottom:4px;">🎙️ Nana's Active Microphone:</div>
+      <div id="nana-mic-options-row" class="opt-row"></div>
+    </div>
     <div class="settings-card" id="test-links-card">
       <div class="settings-label"><span>🧪 Test Calls Without Nana</span></div>
       <div class="settings-sub">Practice calls in a private sandbox without ringing Nana's tablet.</div>
@@ -90,8 +119,8 @@ const fmtDelay = (sec) => {
       </div>
     </div>
     <div class="settings-card">
-      <div class="settings-label"><span>🔄 Refresh Nana's Tablet</span></div>
-      <div class="opt-row"><button class="opt-btn" id="remote-refresh-btn" onclick="requestTabletReload()">🔄 Refresh Now</button></div>
+      <div class="settings-label"><span>🔄 Refresh Nana's Tablet & Prompt Family Devices</span></div>
+      <div class="opt-row"><button class="opt-btn" id="remote-refresh-btn" onclick="requestTabletReload()">🔄 Refresh Nana & Prompt Family Now</button></div>
     </div>
     <div class="settings-card">
       <div class="settings-label"><span>🎨 High-Contrast Visibility Theme</span></div>
@@ -203,6 +232,77 @@ const fmtDelay = (sec) => {
     </div>
   `;
 })();
+
+function renderNanaHardwareDeviceOptions() {
+  const camRow = $('nana-cam-options-row');
+  const micRow = $('nana-mic-options-row');
+  const curCam = settings.nanaCameraMode || 'user';
+  const curMic = settings.nanaMicDeviceId || 'default';
+  const cams = state.nanaDevicesSnap?.cameras || [];
+  const mics = state.nanaDevicesSnap?.mics || [];
+
+  if (camRow) {
+    const camChoices = [
+      ['user', '📷 Front Camera'],
+      ['environment', '📷 Rear Camera'],
+      ...cams.map((c, i) => [c.deviceId, `🎥 ${c.label || `Camera ${i + 1}`}`])
+    ];
+    camRow.innerHTML = '';
+    camChoices.forEach(([val, lbl]) => {
+      const b = document.createElement('button');
+      b.className = 'opt-btn' + (curCam === val ? ' selected' : '');
+      b.textContent = lbl;
+      b.onclick = () => window.updateSetting('nanaCameraMode', val);
+      camRow.appendChild(b);
+    });
+  }
+
+  if (micRow) {
+    const micChoices = [
+      ['default', '🎙️ Default Mic'],
+      ...mics.filter(m => m.deviceId !== 'default').map((m, i) => [m.deviceId, `🎤 ${m.label || `Mic ${i + 1}`}`])
+    ];
+    micRow.innerHTML = '';
+    micChoices.forEach(([val, lbl]) => {
+      const b = document.createElement('button');
+      b.className = 'opt-btn' + (curMic === val ? ' selected' : '');
+      b.textContent = lbl;
+      b.onclick = () => window.updateSetting('nanaMicDeviceId', val);
+      micRow.appendChild(b);
+    });
+  }
+
+  const camShort = getNanaCameraShortLabel(curCam);
+  const micShort = getNanaMicShortLabel(curMic);
+  document.querySelectorAll('.lbl-hw-summary').forEach(el => {
+    el.innerText = `${camShort} • ${micShort}`;
+  });
+  if ($('btn-nana-cam-cycle')) $('btn-nana-cam-cycle').innerText = `📷 Nana Cam: ${camShort}`;
+  if ($('btn-nana-mic-cycle')) $('btn-nana-mic-cycle').innerText = `🎙️ Nana Mic: ${micShort}`;
+}
+
+window.cycleNanaCamera = () => {
+  const cams = state.nanaDevicesSnap?.cameras || [];
+  const options = ['user', 'environment', ...cams.map(c => c.deviceId)];
+  const uniqueOpts = [...new Set(options)];
+  const cur = settings.nanaCameraMode || 'user';
+  const next = uniqueOpts[(uniqueOpts.indexOf(cur) + 1) % uniqueOpts.length] || 'user';
+  window.updateSetting('nanaCameraMode', next);
+};
+
+window.cycleNanaMicrophone = () => {
+  const mics = (state.nanaDevicesSnap?.mics || []).filter(m => m.deviceId && m.deviceId !== 'default');
+  const options = ['default', ...mics.map(m => m.deviceId)];
+  const uniqueOpts = [...new Set(options)];
+  const cur = settings.nanaMicDeviceId || 'default';
+  const next = uniqueOpts[(uniqueOpts.indexOf(cur) + 1) % uniqueOpts.length] || 'default';
+  window.updateSetting('nanaMicDeviceId', next);
+};
+
+onValue(refs.nanaDevices, snap => {
+  state.nanaDevicesSnap = snap.val() || { cameras: [], mics: [] };
+  renderNanaHardwareDeviceOptions();
+});
 
 // --- 2. BRIGHTNESS, NIGHT MODE & CLOCK ---
 export function applyScreenBrightness(targetPercent) {
@@ -412,10 +512,9 @@ window.copyTestLink = async (kind) => {
 window.requestTabletReload = async () => {
   const b = $('remote-refresh-btn');
   try {
-    // Also clear any stuck ringing/call state so the tablet is never blocked from reloading
     await set(refs.callState, { status: 'idle', timestamp: Date.now() });
     await set(refs.reloadCmd, Date.now());
-    if (b) { b.innerText = '✅ Sent!'; setTimeout(() => { b.innerText = '🔄 Refresh Now'; }, 3000); }
+    if (b) { b.innerText = '✅ Sent to Nana & Family!'; setTimeout(() => { b.innerText = '🔄 Refresh Nana & Prompt Family Now'; }, 3000); }
   } catch (_) {}
 };
 
@@ -457,6 +556,8 @@ export function refreshSettingsUI() {
     boostBtn.style.background = boostPct > 100 ? '#7c3aed' : '#334155';
     boostBtn.style.borderColor = boostPct >= 250 ? '#fef08a' : '#fff';
   }
+
+  renderNanaHardwareDeviceOptions();
 
   document.querySelectorAll('.lbl-bright-summary').forEach(e => { e.innerText = `${awakeB}% ➔ ${dimB}% (${fmtDelay(dimSec)})`; });
   document.querySelectorAll('.lbl-kb-summary').forEach(e => { e.innerText = `${kbLayout.toUpperCase()} • ${fmtDelay(kbHideSec)}`; });

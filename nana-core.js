@@ -3,6 +3,7 @@ import { getDatabase, ref, set, update, push, onValue, remove, runTransaction, o
 
 export const APP_VERSION = "2.9.4";
 export const $ = (id) => document.getElementById(id);
+export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export { ref, set, update, push, onValue, remove, runTransaction, onDisconnect, query, limitToLast };
 
 // --- 1. VERSION GUARD & CACHE BUSTER ---
@@ -67,7 +68,6 @@ if (computedKeyHash !== EXPECTED_KEY_HASH) {
   showScreen('auth-error-screen');
   throw new Error("Unauthorized: Valid access key required.");
 } else {
-  // Immediately show the appropriate home screen as soon as auth succeeds
   showScreen(role === 'family' ? 'family-screen' : 'grid-screen');
 }
 
@@ -129,6 +129,7 @@ export const refs = {
   callState:        ref(db, `${basePath}/callState`),
   callHistory:      ref(db, `${basePath}/callHistory`),
   presence:         ref(db, `${basePath}/presence`),
+  nanaDevices:      ref(db, `${basePath}/nanaDevices`),
   bulletin:         ref(db, `${basePath}/bulletin`),
   settings:         ref(db, `${basePath}/settings`),
   missedCalls:      ref(db, `${basePath}/missedCalls`),
@@ -139,6 +140,7 @@ export const refs = {
   videoStream:      ref(db, `${basePath}/videoStream`),
   quickQuestion:    ref(db, `${basePath}/quickQuestion`),
   questionHistory:  ref(db, `${basePath}/questionHistory`),
+  callBeat:         ref(db, `${basePath}/callBeat`),
   reloadCmd:        ref(db, `${basePath}/commands/reloadAt`),
   connectedInfo:    ref(db, `.info/connected`)
 };
@@ -151,6 +153,7 @@ export const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
 export const settings = {
   callVolume: 85, radioVolume: 75, ringVolume: 85, videoVolume: 80,
   nanaMicDspMode: 'vocal-boost', familyVoiceBoostPct: 180,
+  nanaCameraMode: 'user', nanaMicDeviceId: 'default',
   ringDurationSec: 60, ringtone: 'uk-phone', voicePrompts: true, autoAnswer: false,
   speechRate: 0.9, awakeBrightness: 85, dimBrightness: 15, dimDelaySec: 120,
   nightModeEnabled: true, nightStartHour: 21, nightEndHour: 8, nightBlockCalls: false,
@@ -162,6 +165,14 @@ export const settings = {
   radioPromptHours: [10, 15], videoPromptHours: [14, 19], speakQuestions: true
 };
 
+export function askNana(type, question, askedBy, extra = {}) {
+  const now = Date.now();
+  return set(refs.quickQuestion, {
+    id: `q_${type}_${now}`, type, question, askedBy,
+    silent: !settings.speakQuestions, status: 'pending', answer: null, askedAt: now, ...extra
+  });
+}
+
 export const state = {
   settingsLoaded: false,
   currentState: 'idle',
@@ -169,6 +180,7 @@ export const state = {
   returnToVideoAfterCall: false,
   callSnap: { status: 'idle' },
   presenceSnap: {},
+  nanaDevicesSnap: { cameras: [], mics: [] },
   bulletinSnap: {},
   entSnap: { activeKey: 'off', title: 'Off' },
   missedCallsByMember: {},
@@ -228,7 +240,7 @@ export const NanaCore = {
   activeFamilyMember, isAdminFamilyMember, isAdminFamily: isAdminFamilyMember,
   FAMILY_NAMES, senderName: activeFamilyMember.name,
   basePath, db, refs, settings, state, hooks, audioCtx,
-  showScreen, speakMsg, isBatteryVoiceCurrentlyMuted,
+  showScreen, speakMsg, isBatteryVoiceCurrentlyMuted, askNana,
   isNanaVideoActivelyPlaying: () => false,
   getCurrentQueueItem: () => null
 };
@@ -250,7 +262,6 @@ window.switchFamilyPortalTab = (tab) => {
   });
 };
 
-// Direct fallback handlers so top buttons work even if a secondary module is still loading
 window.openFamilyBulletin = window.openFamilyBulletin || (() => {
   const m = $('bulletin-modal');
   if (m) { m.classList.remove('kb-fullscreen'); m.style.display = 'flex'; }
@@ -269,7 +280,6 @@ window.openVideoScreen = window.openVideoScreen || (() => {
 });
 
 window.switchNanaMainTab = async (tab, forceLeaveVideo = false) => {
-  // If Nana is actively watching a video and taps another tab, pause & ask for confirmation first
   if (role === 'nana' && tab !== 'video' && !forceLeaveVideo && NanaCore.isNanaVideoActivelyPlaying?.()) {
     hooks.pauseVideo?.('confirm_leave_video');
     const tabLabels = {
@@ -278,21 +288,10 @@ window.switchNanaMainTab = async (tab, forceLeaveVideo = false) => {
       radio: 'Classic FM Radio'
     };
     const destName = tabLabels[tab] || 'another screen';
-    await set(refs.quickQuestion, {
-      id: `q_leavevid_${Date.now()}`,
-      type: 'leave_video_prompt',
-      targetTab: tab,
-      question: `Your video is paused. Are you sure you want to leave the video to open ${destName}?`,
-      askedBy: 'Video Player',
-      silent: !settings.speakQuestions,
-      status: 'pending',
-      answer: null,
-      askedAt: Date.now()
-    });
+    await askNana('leave_video_prompt', `Your video is paused. Are you sure you want to leave the video to open ${destName}?`, 'Video Player', { targetTab: tab });
     return;
   }
 
-  // Always pause and save exact video position when leaving the video screen
   if (tab !== 'video') {
     state.returnToVideoAfterCall = false;
     hooks.pauseVideo?.('switched_tab');

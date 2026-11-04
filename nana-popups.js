@@ -1,4 +1,4 @@
-import { $, NanaCore, ref, set, update, push, onValue, query, limitToLast } from "./nana-core.js?v=2.9.4";
+import { $, NanaCore, esc, askNana, ref, set, update, push, onValue, query, limitToLast } from "./nana-core.js?v=2.9.4";
 
 const {
   SERVICE_TOKEN, PORTAL_NODE_ID, GOOGLE_SCRIPT_URL,
@@ -52,8 +52,8 @@ function renderFamilyQuestionHistory() {
     row.className = 'fam-q-hist-item';
     row.innerHTML = `
       <div class="fam-q-hist-info">
-        <div class="fam-q-hist-text">"${item.question}"</div>
-        <div class="fam-q-hist-meta">👤 ${item.askedBy || 'Family'} • ${askedStr} • ${ansBadge}</div>
+        <div class="fam-q-hist-text">"${esc(item.question)}"</div>
+        <div class="fam-q-hist-meta">👤 ${esc(item.askedBy || 'Family')} • ${askedStr} • ${ansBadge}</div>
       </div>
       <button class="fam-q-mini-btn" style="background:#059669;border-color:#4ade80;padding:6px 10px;white-space:nowrap;" title="Send this question to Nana's screen again">🔄 Ask Again</button>
     `;
@@ -89,16 +89,7 @@ async function evaluateScheduledPopupsOnNana() {
     if (now - lastUnreadChatPromptMs >= unreadMin * 60000) {
       lastUnreadChatPromptMs = now;
       lastAnyPeriodicPromptMs = now;
-      await set(refs.quickQuestion, {
-        id: `q_unread_${now}`,
-        type: 'unread_chat_prompt',
-        question: 'You have unread messages, would you like to read them?',
-        askedBy: 'Family Chat',
-        silent: !settings.speakQuestions,
-        status: 'pending',
-        answer: null,
-        askedAt: now
-      });
+      await askNana('unread_chat_prompt', 'You have unread messages, would you like to read them?', 'Family Chat');
       return;
     }
   }
@@ -124,16 +115,7 @@ async function evaluateScheduledPopupsOnNana() {
       if (!localStorage.getItem(storageKey)) {
         localStorage.setItem(storageKey, '1');
         lastAnyPeriodicPromptMs = now;
-        await set(refs.quickQuestion, {
-          id: `q_schedradio_${now}`,
-          type: 'idle_radio_prompt',
-          question: 'Would you like to listen to Classic FM?',
-          askedBy: 'Classic FM Radio',
-          silent: !settings.speakQuestions,
-          status: 'pending',
-          answer: null,
-          askedAt: now
-        });
+        await askNana('idle_radio_prompt', 'Would you like to listen to Classic FM?', 'Classic FM Radio');
         return;
       }
     }
@@ -143,16 +125,7 @@ async function evaluateScheduledPopupsOnNana() {
       if (!localStorage.getItem(storageKey)) {
         localStorage.setItem(storageKey, '1');
         lastAnyPeriodicPromptMs = now;
-        await set(refs.quickQuestion, {
-          id: `q_schedvideo_${now}`,
-          type: 'idle_video_prompt',
-          question: 'Would you like to watch Judge John Deed?',
-          askedBy: 'Video Player',
-          silent: !settings.speakQuestions,
-          status: 'pending',
-          answer: null,
-          askedAt: now
-        });
+        await askNana('idle_video_prompt', 'Would you like to watch Judge John Deed?', 'Video Player');
       }
     }
   }
@@ -173,17 +146,7 @@ async function dispatchFamilyQuestionPopup(questionText) {
     answer: null,
     askedAt: now
   });
-  await set(refs.quickQuestion, {
-    id: `q_${now}`,
-    historyKey: histNode.key,
-    type: 'family_question',
-    question: text,
-    askedBy: senderName,
-    silent: state.familyComposerSilent,
-    status: 'pending',
-    answer: null,
-    askedAt: now
-  });
+  await askNana('family_question', text, senderName, { historyKey: histNode.key, silent: state.familyComposerSilent });
 }
 
 window.sendQuestionToNana = async () => {
@@ -295,6 +258,41 @@ window.submitNanaQuestionAnswer = async (choice) => {
   if (!isSilent) window.speakNote?.(`Sent ${choice} to ${askedBy}`);
 };
 
+function showNanaQuestionPopup() {
+  if (role !== 'nana') return;
+  const modal = $('nana-question-modal');
+  if (!modal) return;
+  const q = activeQuestionData;
+  const inCall = !!state.currentState && state.currentState !== 'idle';
+  if (q && q.status === 'pending' && q.question && !inCall) {
+    hooks.pauseVideo?.('question_popup');
+    const isSilent = !!(q.silent || !settings.speakQuestions);
+    const badgeMap = {
+      leave_video_prompt: '🎬 Leave Video Player?',
+      restart_video_prompt: '⏮️ Restart Video?',
+      next_video_prompt: '🎬 Up Next in Video Queue',
+      unread_chat_prompt: '✈️ Unread Family Chat Messages',
+      idle_radio_prompt: '🎻 Classic FM Radio',
+      idle_video_prompt: '🎬 Family Video Suggestion'
+    };
+    $('q-popup-sender').innerText = badgeMap[q.type] || `❓ Question from ${q.askedBy || 'Family'}`;
+    $('q-popup-text').innerText = q.question;
+    modal.style.display = 'flex';
+    if (q.id !== lastHandledQuestionId) {
+      lastHandledQuestionId = q.id;
+      window.wakeFromNightMode?.();
+      hooks.startNormalDimCountdownOnPause?.();
+      if (!isSilent) {
+        const isSystemPrompt = !!badgeMap[q.type];
+        window.speakNote?.(isSystemPrompt ? `${q.question} Touch Yes or No.` : `${q.askedBy || 'Family'} asks: ${q.question}. Touch Yes or No.`);
+      }
+    }
+  } else {
+    modal.style.display = 'none';
+  }
+}
+window.refreshNanaQuestionPopup = showNanaQuestionPopup;
+
 onValue(refs.quickQuestion, snap => {
   const q = snap.val();
   activeQuestionData = q;
@@ -314,33 +312,6 @@ onValue(refs.quickQuestion, snap => {
       st.style.color = q.answer === 'YES' ? '#4ade80' : '#f87171';
     }
   } else if (role === 'nana') {
-    const modal = $('nana-question-modal');
-    if (!modal) return;
-    if (q && q.status === 'pending' && q.question) {
-      hooks.pauseVideo?.('question_popup');
-      const isSilent = !!(q.silent || !settings.speakQuestions);
-      const badgeMap = {
-        leave_video_prompt: '🎬 Leave Video Player?',
-        restart_video_prompt: '⏮️ Restart Video?',
-        next_video_prompt: '🎬 Up Next in Video Queue',
-        unread_chat_prompt: '✈️ Unread Family Chat Messages',
-        idle_radio_prompt: '🎻 Classic FM Radio',
-        idle_video_prompt: '🎬 Family Video Suggestion'
-      };
-      $('q-popup-sender').innerText = badgeMap[q.type] || `❓ Question from ${q.askedBy || 'Family'}`;
-      $('q-popup-text').innerText = q.question;
-      modal.style.display = 'flex';
-      if (q.id !== lastHandledQuestionId) {
-        lastHandledQuestionId = q.id;
-        window.wakeFromNightMode?.();
-        hooks.startNormalDimCountdownOnPause?.();
-        if (!isSilent) {
-          const isSystemPrompt = !!badgeMap[q.type];
-          window.speakNote?.(isSystemPrompt ? `${q.question} Touch Yes or No.` : `${q.askedBy || 'Family'} asks: ${q.question}. Touch Yes or No.`);
-        }
-      }
-    } else {
-      modal.style.display = 'none';
-    }
+    showNanaQuestionPopup();
   }
 });

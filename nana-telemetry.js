@@ -1,5 +1,5 @@
 import {
-  $, NanaCore, update, onValue, onDisconnect, query, limitToLast
+  $, NanaCore, esc, update, onValue, onDisconnect, query, limitToLast
 } from "./nana-core.js?v=2.9.4";
 
 const {
@@ -285,7 +285,7 @@ function getSimpleNanaStatusSummary() {
   if (scr === 'video_playing') {
     return {
       border: '#a855f7',
-      text: `🎬 Video is playing${curItem?.item?.title ? ` (${curItem.item.title})` : ''}`
+      text: `🎬 Video is playing${curItem?.item?.title ? ` (${esc(curItem.item.title)})` : ''}`
     };
   }
 
@@ -318,7 +318,7 @@ export function updateFamilyPresenceBanner() {
   let todayLineHtml = '';
   if (callsToday.length) {
     const summaryItems = callsToday.map(c => {
-      const name = FAMILY_NAMES[c.partnerId] || c.partnerName || 'Family';
+      const name = esc(FAMILY_NAMES[c.partnerId] || c.partnerName || 'Family');
       const t = c.startedAt ? new Date(c.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
       const m = Math.max(1, Math.round((Number(c.durationSec) || 60) / 60));
       return `${name} (${t}, ${m}m)`;
