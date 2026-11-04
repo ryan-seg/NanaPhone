@@ -265,9 +265,14 @@ function cleanupNanaMicDsp() {
   }
 }
 
-// Daily's setInputDevicesAsync takes a device ID or a track, never a facingMode, so turn Front/Rear into a real device ID
+// Resolve Front/Rear into a real device ID using the cached device list first (avoids opening a 2nd camera stream on Android)
 async function resolveNanaCameraDeviceId(mode) {
   if (mode !== 'user' && mode !== 'environment') return mode;
+  const cams = state.nanaDevicesSnap?.cameras || [];
+  const pattern = mode === 'environment' ? /back|rear|environment|0/i : /front|user|selfie|1/i;
+  const matched = cams.find(c => pattern.test(c.label)) || (mode === 'environment' ? cams[1] : cams[0]);
+  if (matched?.deviceId) return matched.deviceId;
+
   const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
   const id = s.getVideoTracks()[0]?.getSettings?.().deviceId || null;
   s.getTracks().forEach(t => t.stop());
@@ -278,7 +283,6 @@ async function applyLiveNanaCameraAndMicChanges() {
   if (role !== 'nana' || !callObject) return;
 
   const targetCam = settings.nanaCameraMode || 'user';
-  if (failedNanaCameraMode && targetCam !== failedNanaCameraMode) failedNanaCameraMode = null; // a different pick earns a fresh try
   if (failedNanaCameraMode && targetCam !== failedNanaCameraMode) failedNanaCameraMode = null; // a different pick earns a fresh try
   if (targetCam !== appliedNanaCameraMode && targetCam !== failedNanaCameraMode) {
     try {
@@ -1318,7 +1322,10 @@ window.endCall = async (forceImmediate = false) => {
   await executeEndCallCleanup();
 };
 
-// --- REMOTE RELOAD & UPDATE PROMPT LISTENER (NANA TABLET + FAMILY DEVICES) ---
+// --- REMOTE RELOAD, 4AM QUIET MAINTENANCE RELOAD & FAMILY UPDATE PROMPT ---
+const PAGE_BOOT_MS = Date.now();
+const MIN_UPTIME_FOR_NIGHTLY_RELOAD_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 window.forceCacheBustReload = () => {
   if (window.AndroidBridge?.clearCacheAndReload) {
     window.AndroidBridge.clearCacheAndReload();
@@ -1382,6 +1389,26 @@ function showFamilyUpdatePromptModal() {
     }
   });
   setInterval(tryReload, 5000);
+
+  // Quiet nightly maintenance reload around 4:00 AM on Nana's tablet
+  // Runs only when idle and up for >24 hours to clear memory build-up and pick up new code
+  if (role === 'nana') {
+    setInterval(() => {
+      const now = Date.now();
+      if (now - PAGE_BOOT_MS < MIN_UPTIME_FOR_NIGHTLY_RELOAD_MS) return;
+      if (new Date(now).getHours() !== 4) return;
+      const isIdle = state.currentState === 'idle'
+        && !callObject
+        && !isJoiningOrInRoom
+        && !state.isRadioPlaying
+        && !NanaCore.isNanaVideoActivelyPlaying?.()
+        && !$('bulletin-modal')?.classList.contains('kb-fullscreen')
+        && (now - state.lastActivityOrCallMs > 30 * 60 * 1000);
+      if (isIdle) {
+        window.forceCacheBustReload();
+      }
+    }, 5 * 60 * 1000);
+  }
 }
 
 // Unified Call State Listener
