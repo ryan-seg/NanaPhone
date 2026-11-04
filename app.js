@@ -20,6 +20,7 @@ let didManuallyInitiateOrAnswerOnThisTab = false;
 let currentFacingMode = 'user';
 let appliedNanaCameraMode = null;
 let appliedNanaMicDeviceId = null;
+let failedNanaCameraMode = null;
 let pendingCallContact = null;
 let confirmTimer = null;
 let ringInterval = null;
@@ -264,25 +265,34 @@ function cleanupNanaMicDsp() {
   }
 }
 
+// Daily's setInputDevicesAsync takes a device ID or a track, never a facingMode, so turn Front/Rear into a real device ID
+async function resolveNanaCameraDeviceId(mode) {
+  if (mode !== 'user' && mode !== 'environment') return mode;
+  const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
+  const id = s.getVideoTracks()[0]?.getSettings?.().deviceId || null;
+  s.getTracks().forEach(t => t.stop());
+  return id;
+}
+
 async function applyLiveNanaCameraAndMicChanges() {
   if (role !== 'nana' || !callObject) return;
 
   const targetCam = settings.nanaCameraMode || 'user';
-  if (targetCam !== appliedNanaCameraMode) {
-    appliedNanaCameraMode = targetCam;
+  if (failedNanaCameraMode && targetCam !== failedNanaCameraMode) failedNanaCameraMode = null; // a different pick earns a fresh try
+  if (failedNanaCameraMode && targetCam !== failedNanaCameraMode) failedNanaCameraMode = null; // a different pick earns a fresh try
+  if (targetCam !== appliedNanaCameraMode && targetCam !== failedNanaCameraMode) {
     try {
-      if (targetCam === 'user' || targetCam === 'environment') {
-        await callObject.setInputDevicesAsync({ videoSource: { facingMode: targetCam } });
-      } else {
-        await callObject.setInputDevicesAsync({ videoDeviceId: targetCam });
-      }
-      callObject.setLocalVideo(true);
+      const camId = await resolveNanaCameraDeviceId(targetCam);
+      if (!camId) throw new Error('camera not found');
+      await callObject.setInputDevicesAsync({ videoDeviceId: camId });
+      appliedNanaCameraMode = targetCam; // only marked as applied once it really worked
       if ($('local-video')) {
         $('local-video').style.transform = targetCam === 'environment' ? 'scaleX(1)' : 'scaleX(-1)';
       }
       logCall('cam-switch', targetCam);
     } catch (e) {
-      console.warn("Could not switch Nana camera:", e);
+      failedNanaCameraMode = targetCam; // don't retry on every unrelated settings change
+      logCall('cam-switch-fail', e?.message || e);
     }
   }
 
@@ -1070,6 +1080,7 @@ async function destroyDailyRoom() {
   didManuallyInitiateOrAnswerOnThisTab = false;
   appliedNanaCameraMode = null;
   appliedNanaMicDeviceId = null;
+  failedNanaCameraMode = null;
   rejoinAttempts = 0;
   clearInterval(callBeatTimer);
   callBeatTimer = null;
