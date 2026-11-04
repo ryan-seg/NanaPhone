@@ -47,9 +47,9 @@ const radioPlayer = $('nana-radio-stream');
 // Nana's tablet always uses the front camera at modest resolution (keeps the call light and simple)
 const NANA_VIDEO_CONSTRAINTS = {
   facingMode: 'user',
-  width: { ideal: 640, max: 1280 },
-  height: { ideal: 480, max: 720 },
-  frameRate: { ideal: 24, max: 30 }
+  width: { ideal: 640, max: 640 },
+  height: { ideal: 480, max: 480 },
+  frameRate: { ideal: 20, max: 24 }
 };
 
 // Synchronous Audio Pre-Unlock (Run during physical Answer/Call tap so browsers never block call sound)
@@ -233,16 +233,24 @@ function cleanupNanaMicDsp() {
   }
 }
 
+const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+// The Web Audio amplifier is the ONLY audible path while it is running (the muted #remote-audio element just keeps
+// Chrome decoding the stream). Playing both used to give family a delayed second copy of Nana's voice.
+const familyAmpIsExclusive = () => !!familyBoostNodes && audioCtx.state === 'running';
+
 function applyFamilyVoiceBoostGain() {
   if (!familyBoostNodes) return;
-  // Base 100% is already played by #remote-audio; add the extra boost on top
   const boostPct = Number(settings.familyVoiceBoostPct) || 180;
-  const extraGain = Math.max(0.0, Math.min(2.5, (boostPct - 100) / 100));
-  familyBoostNodes.gainNode.gain.setTargetAtTime(extraGain, audioCtx.currentTime, 0.03);
+  if (boostPct <= 100) { cleanupFamilyVoiceAmplifier(); return; } // no boost wanted: plain element playback
+  const gain = familyAmpIsExclusive() ? boostPct / 100 : (boostPct - 100) / 100;
+  familyBoostNodes.gainNode.gain.setTargetAtTime(Math.max(0, Math.min(3.5, gain)), audioCtx.currentTime, 0.03);
 }
 
 function attachFamilyVoiceAmplifier(aTrack) {
   if (role !== 'family' || !aTrack) return false;
+  // iPhones/iPads: Web Audio on remote streams is unreliable, so they use plain element playback
+  if (isIOSDevice || (Number(settings.familyVoiceBoostPct) || 180) <= 100) return false;
   if (attachedRemoteAudioTrack === aTrack && familyBoostNodes) {
     applyFamilyVoiceBoostGain();
     return true;
@@ -644,7 +652,7 @@ const diagEvents = [];
 let diagTimer = null;
 function logCall(evt, detail = '') {
   diagEvents.push(`${new Date().toISOString().slice(11, 19)} ${evt}${detail ? ' ' + String(detail).slice(0, 140) : ''}`);
-  if (diagEvents.length > 30) diagEvents.shift();
+  if (diagEvents.length > 60) diagEvents.shift();
   clearTimeout(diagTimer);
   diagTimer = setTimeout(() => {
     set(ref(db, `${basePath}/callDiag/${diagKey}`), {
@@ -746,6 +754,7 @@ async function joinDailyRoom() {
   const targetVol = () => role === 'nana' ? Math.min(1.0, Math.max(0.2, (Number(settings.callVolume) || 85) / 100)) : 1.0;
   const showProblem = (t) => { banner.style.display = 'block'; banner.innerText = t; };
   let audioBlocked = false;
+  let videoPausedForNetwork = false; // Nana's camera is switched off while her connection is bad, so her voice still gets through
   let joinedOk = false; // 'error' events during the initial join are handled by the retry loop, not by recovery
   const hideBannerIfOk = () => { if (!audioBlocked) banner.style.display = 'none'; };
   const playEl = (el) => el.play().then(() => { if (el.id === 'remote-audio') audioBlocked = false; }).catch(() => {
@@ -841,6 +850,7 @@ async function joinDailyRoom() {
     // and layer the Web Audio amplifier on top for family members
     if (aTrack && aTrack.readyState === 'live') {
       if (role === 'family') {
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
         attachFamilyVoiceAmplifier(aTrack);
         if (ra && ra.srcObject?.getAudioTracks()[0] !== aTrack) {
           ra.loop = false;
@@ -850,6 +860,9 @@ async function joinDailyRoom() {
           ra.volume = 1.0;
           playEl(ra);
         }
+        // exactly one audible path, re-checked every few seconds
+        if (ra) ra.muted = familyAmpIsExclusive();
+        applyFamilyVoiceBoostGain();
       } else if (ra && ra.srcObject?.getAudioTracks()[0] !== aTrack) {
         ra.loop = false;
         ra.removeAttribute('src');
@@ -859,7 +872,7 @@ async function joinDailyRoom() {
         playEl(ra);
       }
       // Audio element paused for any reason (autoplay block, interruption): keep nudging it
-      if (ra && ra.srcObject && ra.paused) { ra.muted = false; playEl(ra); }
+      if (ra && ra.srcObject && ra.paused) { ra.muted = role === 'family' ? familyAmpIsExclusive() : false; playEl(ra); }
     }
   };
 
@@ -869,7 +882,7 @@ async function joinDailyRoom() {
     if (callObject !== co) { clearInterval(camWatchdog); return; }
     if (role === 'nana') {
       const localV = co.participants()?.local?.tracks?.video;
-      if (localV && (localV.state === 'off' || localV.state === 'blocked')) {
+      if (localV && !videoPausedForNetwork && (localV.state === 'off' || localV.state === 'blocked')) {
         co.setLocalVideo(true);
       }
     }
@@ -894,6 +907,28 @@ async function joinDailyRoom() {
     if (callObject === co && e?.event === 'interrupted') showProblem('📡 Connection wobble - please hold on...');
   });
   co.on('error', e => tryRecover('error ' + (e?.errorMsg || '')));
+
+  // Network quality: Nana's video steps aside (voice keeps flowing) when her connection is bad, and returns when it recovers
+  co.on('network-quality-change', e => {
+    if (callObject !== co) return;
+    const s = e?.networkState || (e?.threshold === 'very-low' ? 'bad' : e?.threshold === 'low' ? 'warning' : 'good');
+    logCall('quality', `${s} ${(e?.networkStateReasons || []).join(',')}`);
+    if (role !== 'nana') return;
+    if (s === 'bad' && !videoPausedForNetwork) {
+      videoPausedForNetwork = true;
+      try { co.setLocalVideo(false); } catch (_) {}
+      logCall('video-off-network');
+    } else if (s === 'good' && videoPausedForNetwork) {
+      videoPausedForNetwork = false;
+      try { co.setLocalVideo(true); } catch (_) {}
+      logCall('video-on-network');
+    }
+  });
+  co.on('cpu-load-change', e => {
+    if (callObject !== co) return;
+    logCall('cpu', e?.cpuLoadState || '');
+    if (role === 'nana') co.updateSendSettings({ video: e?.cpuLoadState === 'high' ? { maxQuality: 'low' } : 'bandwidth-optimized' }).catch(() => {});
+  });
 
   try {
     // Up to 3 attempts: a single network blip at connect time should not cost the whole call
@@ -938,6 +973,20 @@ async function joinDailyRoom() {
     }
 
     try { co.setBandwidth({ kbs: 1000 }); } catch (_) {}
+    // Nana's tablet: modest outgoing video so her voice never has to compete with it for Wi-Fi or CPU
+    if (role === 'nana') co.updateSendSettings({ video: 'bandwidth-optimized' }).catch(() => {});
+
+    // Diagnostics for "delayed audio" reports: route, audio-engine latency, and network numbers every 30 s
+    logCall('audio', `ctx=${audioCtx.state} base=${Math.round((audioCtx.baseLatency || 0) * 1000)}ms out=${Math.round((audioCtx.outputLatency || 0) * 1000)}ms`);
+    try { co.getNetworkTopology?.().then(t => logCall('topology', t?.topology)).catch(() => {}); } catch (_) {}
+    const statsTimer = setInterval(async () => {
+      if (callObject !== co) { clearInterval(statsTimer); return; }
+      try {
+        const n = await co.getNetworkStats();
+        const l = n?.stats?.latest || {};
+        logCall('stats', `${n?.networkState || n?.threshold} rtt=${Math.round((n?.stats?.averageNetworkRoundTripTime || 0) * 1000)}ms in=${Math.round((l.recvBitsPerSecond || 0) / 1000)}k out=${Math.round((l.sendBitsPerSecond || 0) / 1000)}k ctxOut=${Math.round((audioCtx.outputLatency || 0) * 1000)}ms`);
+      } catch (_) {}
+    }, 30000);
   } catch (_) {
     clearInterval(camWatchdog);
     if (callObject !== co) return; // call already ended

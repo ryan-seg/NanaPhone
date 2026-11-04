@@ -37,6 +37,8 @@ Safeguards: family pick-up is a transaction (must still be `calling_family`); ca
 - A `connected` call is never overwritten by a new ring; it counts as dead only if `callBeat`/timestamp is >2 min old.
 - Audio: Nana's mic DSP falls back to the plain mic if the AudioContext can't run; blocked autoplay shows "Touch the screen to hear" and retries on touch.
 - `online` event rejoins a call; `pagehide` leaves the room (no ghost participants).
+- Audio path (family phones): the Web Audio booster is the only audible path while running (element muted); iPhones and boost <= 100% use plain element playback. Set `familyVoiceBoostPct` to 100 to switch the booster off.
+- Nana's tablet sends modest video (640x480, ~20 fps, 'bandwidth-optimized'); her camera is switched off while Daily reports a 'bad' network and back on at 'good', so her voice keeps priority.
 - To debug a bad call: open Firebase `callDiag/` and read both devices' event lists.
 
 ## Pop-up types (`quickQuestion.type`) and who handles the answer
