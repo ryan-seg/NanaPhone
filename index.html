@@ -164,31 +164,35 @@
     <button class="cancel-btn" style="background:#22c55e;color:#000;padding:12px 40px;font-size:1.35rem;" onclick="closePhoneGuideModal()">✔ Got It</button>
   </div>
 
-  <!-- 1. Nana's Main Grid Screen -->
+ <!-- 1. Nana's Main Grid Screen -->
   <div id="grid-screen" class="screen active">
     <div class="header-bar">
-      <div class="header-title" id="grid-header-title">Tap a photo to call family</div>
-      <div class="header-pills">
-        <button class="nav-pill-btn calls-pill active-tab" onclick="switchNanaMainTab('calls')">📞 Family Calls</button>
-        <button class="nav-pill-btn chat-pill-x" onclick="switchNanaMainTab('chat')">✈️ Family Chat <span id="chat-unread-badge" class="chat-unread-badge">NEW</span></button>
-        <button class="nav-pill-btn radio-pill-x" onclick="switchNanaMainTab('radio')">🎻 Classic FM</button>
-        <button class="nav-pill-btn video-pill-x" onclick="switchNanaMainTab('video')">🎬 Video</button>
-        <div id="clock" class="clock-pill">12:00</div>
-        <div class="gear-pill" onclick="openAdminPinModal()">⚙️ v2.9.4</div>
+      <div class="header-pills" style="width:100%;justify-content:space-between;">
+        <button class="nav-pill-btn calls-pill active-tab" style="flex:1;" onclick="switchNanaMainTab('calls')">📞 Family Calls</button>
+        <button class="nav-pill-btn chat-pill-x" style="flex:1;" onclick="switchNanaMainTab('chat')">✈️ Family Chat <span id="chat-unread-badge" class="chat-unread-badge">NEW</span></button>
+        <button class="nav-pill-btn radio-pill-x" style="flex:1;" onclick="switchNanaMainTab('radio')">🎻 Classic FM</button>
+        <button class="nav-pill-btn video-pill-x" style="flex:1;" onclick="switchNanaMainTab('video')">🎬 Video</button>
+        <div class="gear-pill" onclick="openAdminPinModal()" title="Supervisor Controls">⚙️</div>
       </div>
     </div>
-    <div id="message-ticker-bar" class="message-ticker-bar" onclick="openFamilyBulletin()">
-      <span id="ticker-preview-text">💬 New family message! Tap to open chat</span>
-      <span style="font-weight:900;color:#fef08a;white-space:nowrap;">Open Chat ➔</span>
+
+    <!-- Single-Row Combined Status Strip (New Chat Preview + Spoken to Today side-by-side) -->
+    <div id="nana-status-strip-row" class="nana-status-strip-row">
+      <div id="message-ticker-bar" class="message-ticker-bar" onclick="openFamilyBulletin()">
+        <span id="ticker-preview-text">💬 New family message!</span>
+        <span style="font-weight:900;color:#fef08a;white-space:nowrap;">Open Chat ➔</span>
+      </div>
+      <div id="todays-calls-reassurance-banner">
+        <span style="white-space:nowrap;color:#4ade80;">💚 Spoken to Today:</span>
+        <div id="todays-calls-chips-container" class="todays-calls-chips"></div>
+      </div>
     </div>
-    <div id="missed-call-banner">
-      <div class="missed-label">📞 Missed Calls:</div>
-      <div id="missed-chips-container" class="missed-chips-row"></div>
+
+    <!-- Hidden for legacy JS compatibility; missed calls show directly on each person's photo card -->
+    <div id="missed-call-banner" style="display:none !important;">
+      <div id="missed-chips-container"></div>
     </div>
-    <div id="todays-calls-reassurance-banner">
-      <span style="white-space:nowrap;color:#4ade80;">💚 Spoken to Today:</span>
-      <div id="todays-calls-chips-container" class="todays-calls-chips"></div>
-    </div>
+
     <div id="calling-off-card" style="flex:1;width:100%;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:18px;">
       <div style="font-size:4rem;">💬</div>
       <div style="font-size:2.2rem;font-weight:900;color:var(--text-accent);">Video calling is switched off for now</div>
