@@ -11,11 +11,240 @@ let savedChatScrollTop = null;
 let chatIntersectionObserver = null;
 let keyboardHideTimer = null;
 let lastKeyTapMs = 0;
+let lastLetterTapMs = 0;
 let lastKeyChar = null;
+let activePointerId = null;
 let lastChatSendMs = 0;
 let lastRenderedKbLayout = null;
 let lastRenderedReadAloud = null;
 const pendingReadMarks = new Set();
+
+// --- NANA'S PERSONALIZED TYPO & RUN-TOGETHER WORD AUTO-FIXER ---
+// Drawn directly from Nana's real messages & common QWERTY neighbor slips
+const NANA_TYPO_MAP = {
+  "l": "I", "i": "I", "im": "I'm", "iam": "I am", "lam": "I am",
+  "ido": "I do", "ldo": "I do", "lhope": "I hope", "ihope": "I hope", "dohope": "do hope",
+  "lhave": "I have", "ihave": "I have", "lwill": "I will", "iwill": "I will",
+  "ljust": "I just", "ijust": "I just", "lfeel": "I feel", "ifeel": "I feel",
+  "lwishyou": "I wish you", "hopeyou": "hope you", "allhave": "all have",
+  "withyou": "with you", "inthed": "in the", "inthe": "in the", "onthe": "on the",
+  "tothe": "to the", "fothe": "for the", "forthe": "for the",
+  "lotsof": "lots of", "loys": "lots", "loyts": "lots", "lotts": "lots", "lotttss": "lots",
+  "goog": "good", "goood": "good", "goodnews": "good news",
+  "jusr": "just", "sust": "just", "thar": "that", "tht": "that", "tat": "that", "tha": "that", "tthat": "that",
+  "fot": "for", "forr": "for", "yiu": "you", "yout": "your", "yoiur": "your", "yoryoiur": "your", "wou": "you", "tu": "to",
+  "sill": "will", "wiiii": "will", "wiill": "will", "wil": "will",
+  "meer": "meet", "dib": "did", "mun": "Mum", "anum": "Mum", "nan": "Nana",
+  "amso": "am so", "aso": "am so", "quie": "quite", "abit": "a bit",
+  "cerai": "certain", "certa": "certain", "eveng": "evening", "eeniipgz": "evening",
+  "enjo": "enjoy", "ennjoy": "enjoy", "enejoyed": "enjoyed", "ebjoy": "enjoy", "dnjoy": "enjoy",
+  "aftenoon": "afternoon", "ahternoon": "afternoon", "ahternoonsleep": "afternoon sleep",
+  "mimutes": "minutes", "minuit": "minute", "miiinute": "minute",
+  "togther": "together", "tigetherv": "together", "togeth": "together",
+  "happpy": "happy", "veryhapppy": "very happy", "loveily": "lovely",
+  "dellbght": "delightful", "trilled": "thrilled", "thrlled": "thrilled",
+  "frisfrared": "frustrated", "relaxsd": "relaxed", "arrve": "arrive",
+  "recieved": "received", "appreciats": "appreciates", "strorms": "storms",
+  "eyses": "eyes", "eysewere": "eyes were", "glssses": "glasses", "glassssout": "glasses out",
+  "hearin": "hearing", "scivens": "Scrivens", "rolatori": "rollator",
+  "neiighboutrs": "neighbours", "eighours": "neighbours", "fiiend": "friends", "friiends": "friends",
+  "somone": "someone", "cansomr": "can some", "asssist": "assist",
+  "goddess": "God", "godbess": "God bless", "godhelllp": "God help", "nightnight": "night night",
+  "dunt": "don't", "dont": "don't", "doesnt": "doesn't", "cant": "can't", "wont": "won't"
+};
+
+// Next-word predictions keyed by the previous word Nana just finished
+const NANA_NEXT_WORD_MAP = {
+  "": ["Hi my love", "I do hope", "Lots of love"],
+  "hi": ["my love", "my loves", "everyone"],
+  "my": ["love", "loves", "garden"],
+  "i": ["do hope", "am", "have"],
+  "do": ["hope", "enjoy", "feel"],
+  "hope": ["you", "all is well", "to see"],
+  "am": ["sure", "certain", "so pleased"],
+  "so": ["pleased", "good", "lovely"],
+  "you": ["all", "are", "enjoy"],
+  "enjoy": ["your", "the", "it all"],
+  "your": ["evening", "day", "visit"],
+  "have": ["a good day", "had", "been"],
+  "good": ["night", "day", "to see"],
+  "lots": ["of love", "of", "love"],
+  "of": ["love", "the", "you"],
+  "love": ["to you all", "Mum", "Nana"],
+  "god": ["bless you", "bless", "willing"],
+  "bless": ["you all", "you", "Mum"],
+  "night": ["night", "God bless", "Mum"],
+  "in": ["the garden", "the", "my room"],
+  "the": ["garden", "weather", "children"],
+  "for": ["your", "the", "supper"],
+  "looking": ["forward", "to", "good"],
+  "all": ["is well", "my love", "the best"]
+};
+
+// Core vocabulary sorted by frequency in Nana's messages for instant prefix & fuzzy matching
+const NANA_VOCAB = [
+  "love", "loves", "hope", "enjoy", "enjoyed", "good", "night", "day", "today", "evening",
+  "morning", "afternoon", "lovely", "pleased", "certain", "sure", "always", "family",
+  "garden", "supper", "lunch", "weather", "sunshine", "shade", "peace", "serenity",
+  "sleep", "awake", "tired", "dozy", "better", "well", "happy", "wonderful", "delighted",
+  "thrilled", "bless", "Mum", "Nana", "Denise", "Nicky", "Phil", "Gill", "Ryan", "Zara",
+  "Megan", "Nicola", "Jo", "Louis", "Marcus", "Yolanda", "Helen", "Lynda", "friends",
+  "neighbours", "visitors", "visit", "visited", "glasses", "hearing", "eyes", "ears",
+  "nurse", "doctor", "stockings", "shoes", "rollator", "wheelchair", "bedroom", "room",
+  "shopping", "beach", "journey", "flight", "holiday", "photos", "children", "together",
+  "minutes", "hours", "week", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+  "Saturday", "Sunday", "thank", "thanks", "welcome", "sorry", "please", "helping",
+  "helpful", "understand", "remember", "thinking", "longing", "seeing", "speaking",
+  "chat", "message", "call", "calling", "phone", "tablet", "xxxxxxx"
+];
+
+// Compute Levenshtein edit distance for fuzzy matching (handles 1–2 letter slips)
+function editDistance(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 99;
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+function getCurrentTypingContext(rawText) {
+  const val = rawText || "";
+  const endsWithSpace = val.endsWith(" ");
+  const parts = val.trim().split(/\s+/).filter(Boolean);
+  if (!val.length) return { currentWord: "", prevWord: "" };
+  if (endsWithSpace) {
+    return { currentWord: "", prevWord: (parts[parts.length - 1] || "").toLowerCase().replace(/[^a-z]/g, "") };
+  }
+  return {
+    currentWord: parts[parts.length - 1] || "",
+    prevWord: (parts[parts.length - 2] || "").toLowerCase().replace(/[^a-z]/g, "")
+  };
+}
+
+function computeSmartSuggestions(rawText) {
+  const { currentWord, prevWord } = getCurrentTypingContext(rawText);
+  const cleanCur = currentWord.toLowerCase().replace(/[^a-z]/g, "");
+
+  // Case 1: Not currently mid-word -> show next-word / phrase predictions
+  if (!cleanCur) {
+    return (NANA_NEXT_WORD_MAP[prevWord] || NANA_NEXT_WORD_MAP[""]).map(w => ({
+      text: w,
+      replaceCurrent: false,
+      isAutoFix: false
+    }));
+  }
+
+  const results = [];
+  const seen = new Set();
+  const addCandidate = (word, isAutoFix = false) => {
+    const key = word.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      results.push({ text: word, replaceCurrent: true, isAutoFix });
+    }
+  };
+
+  // 1. Direct match in Nana's personal typo map
+  if (NANA_TYPO_MAP[cleanCur]) {
+    addCandidate(NANA_TYPO_MAP[cleanCur], true);
+  }
+
+  // 2. Prefix match in Nana's vocabulary
+  for (const w of NANA_VOCAB) {
+    if (w.toLowerCase().startsWith(cleanCur) && w.toLowerCase() !== cleanCur) {
+      addCandidate(w, false);
+      if (results.length >= 3) break;
+    }
+  }
+
+  // 3. Fuzzy typo match (edit distance <= 2) for words >= 3 chars
+  if (results.length < 3 && cleanCur.length >= 3) {
+    const fuzzyMatches = [];
+    for (const w of NANA_VOCAB) {
+      const lw = w.toLowerCase();
+      if (seen.has(lw)) continue;
+      // Check prefix of vocab word or full word edit distance
+      const distFull = editDistance(cleanCur, lw);
+      const distPref = lw.length > cleanCur.length ? editDistance(cleanCur, lw.slice(0, cleanCur.length)) : 99;
+      const bestDist = Math.min(distFull, distPref);
+      if (bestDist <= (cleanCur.length >= 5 ? 2 : 1)) {
+        fuzzyMatches.push({ w, d: bestDist });
+      }
+    }
+    fuzzyMatches.sort((a, b) => a.d - b.d).forEach(m => {
+      if (results.length < 3) addCandidate(m.w, true);
+    });
+  }
+
+  // Fill any remaining slots with helpful defaults
+  const fallbacks = ["love", "hope", "enjoy", "good", "Mum"];
+  for (const f of fallbacks) {
+    if (results.length >= 3) break;
+    addCandidate(f, false);
+  }
+
+  return results.slice(0, 3);
+}
+
+function renderWordSuggestionsBar() {
+  const bar = $('nana-word-suggestions');
+  if (!bar) return;
+  const input = $('nana-chat-input');
+  const suggestions = computeSmartSuggestions(input?.value || "");
+  bar.innerHTML = '';
+
+  suggestions.forEach(sug => {
+    const btn = document.createElement('button');
+    btn.className = 'nana-predict-btn' + (sug.isAutoFix ? ' autocorrect-match' : '');
+    btn.textContent = sug.isAutoFix ? `✨ ${sug.text}` : sug.text;
+    btn.onpointerdown = (ev) => {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      applySuggestedWord(sug);
+    };
+    bar.appendChild(btn);
+  });
+}
+
+function applySuggestedWord(sug) {
+  const input = $('nana-chat-input');
+  if (!input) return;
+  let cur = input.value || "";
+
+  if (sug.replaceCurrent) {
+    // Replace the last partial/misspelled word with the chosen word + trailing space
+    cur = cur.replace(/\S+$/, '') + sug.text + ' ';
+  } else {
+    if (cur.length && !cur.endsWith(' ')) cur += ' ';
+    cur += sug.text + ' ';
+  }
+
+  // Capitalize first letter of message automatically
+  cur = cur.charAt(0).toUpperCase() + cur.slice(1);
+  input.value = cur;
+  lastKeyTapMs = Date.now();
+  resetKeyboardAutoHideTimer();
+  window.wakeScreenAndResetDimTimer?.();
+  syncChatInputDisplay();
+}
+
+window.deleteLastSeniorWord = (ev) => {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  const now = Date.now();
+  if (now - lastKeyTapMs < 220) return;
+  lastKeyTapMs = now;
+  const input = $('nana-chat-input');
+  if (!input) return;
+  input.value = (input.value || '').trimEnd().replace(/\S+$/, '');
+  resetKeyboardAutoHideTimer();
+  window.wakeScreenAndResetDimTimer?.();
+  syncChatInputDisplay();
+};
 
 // --- 1. UNREAD CHECK & PHOTO URL RESOLUTION ---
 export function isMessageUnreadByNana(item) {
@@ -128,6 +357,7 @@ function syncChatInputDisplay() {
   ph.style.display = (!val.length && !kbOpen) ? 'inline' : 'none';
   typed.textContent = val.replace(/ /g, '\u00A0');
   if (box) box.scrollLeft = box.scrollWidth;
+  renderWordSuggestionsBar();
 }
 
 export function renderSeniorKeyboardLayout() {
@@ -164,6 +394,7 @@ export function renderSeniorKeyboardLayout() {
   del.onpointerdown = (ev) => window.typeSeniorKey('BACKSPACE', ev);
   r3.appendChild(del);
   container.appendChild(r3);
+  renderWordSuggestionsBar();
 }
 
 function resetKeyboardAutoHideTimer() {
@@ -265,20 +496,72 @@ window.handleChatScroll = (el) => {
   }
 };
 
+// Auto-correct the last completed word when Nana presses Space or Send
+function autoCorrectLastWordInString(str) {
+  const match = str.match(/^(.*?)([A-Za-z]+)$/);
+  if (!match) return str;
+  const prefix = match[1];
+  const word = match[2];
+  const lower = word.toLowerCase();
+  if (NANA_TYPO_MAP[lower]) {
+    return prefix + NANA_TYPO_MAP[lower];
+  }
+  return str;
+}
+
 window.typeSeniorKey = (char, ev) => {
-  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
-  const now = Date.now(), guardMs = Number(settings.keyGuardMs ?? 350), sameKey = (char === lastKeyChar);
-  const minGap = char === 'BACKSPACE' ? (sameKey ? Math.min(guardMs, 250) : 60) : (sameKey && guardMs > 0 ? guardMs : 80);
+  if (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    // Ignore secondary fingers/palms resting on screen (multi-touch guard)
+    if (ev.isPrimary === false) return;
+  }
+
+  const now = Date.now();
+  const isEmoji = ['💋','❤️','☘️','👍','😘'].includes(char);
+  const guardMs = Math.max(350, Number(settings.keyGuardMs ?? 350));
+  const sameKey = (char === lastKeyChar);
+
+  // 1. Emoji Knuckle Guard: Ignore accidental emoji brushes within 550ms of typing a letter
+  if (isEmoji && (now - lastLetterTapMs < 550)) return;
+
+  // 2. Global Anti-Rocking Cooldown: 280ms between ANY two keys (stops r-q-r-q-s-z palm bursts)
+  const minGap = char === 'BACKSPACE'
+    ? (sameKey ? 220 : 100)
+    : (sameKey ? Math.max(guardMs, 500) : 280);
   if (now - lastKeyTapMs < minGap) return;
 
   const input = $('nana-chat-input');
   if (!input) return;
-  const cur = input.value;
-  if (char === ' ' && (!cur.length || cur.endsWith(' '))) return;
-  if (guardMs > 0 && char.length === 1 && /[A-Za-z]/.test(char)) {
-    const c = char.toLowerCase();
-    if (cur.length >= 2 && cur.slice(-1).toLowerCase() === c && cur.slice(-2, -1).toLowerCase() === c) return;
+  let cur = input.value || "";
+
+  if (char === ' ') {
+    if (!cur.length || cur.endsWith(' ')) return;
+    // Automatically fix known typos/run-togethers on the word she just finished
+    cur = autoCorrectLastWordInString(cur) + ' ';
+    lastKeyTapMs = now;
+    lastKeyChar = char;
+    input.value = cur;
+    resetKeyboardAutoHideTimer();
+    window.wakeScreenAndResetDimTimer?.();
+    syncChatInputDisplay();
+    return;
   }
+
+  if (char !== 'BACKSPACE' && !isEmoji && char.length === 1 && /[A-Za-z]/.test(char)) {
+    const c = char.toLowerCase();
+    // Never allow 3 identical letters in a row (except 'x' for kisses)
+    if (c !== 'x' && cur.length >= 2 && cur.slice(-1).toLowerCase() === c && cur.slice(-2, -1).toLowerCase() === c) {
+      return;
+    }
+    // Consonant-mash guard: if the current word already has 4 consonants in a row (not 'x'), ignore further consonant mashing
+    const lastWord = (cur.split(/\s+/).pop() || "").toLowerCase();
+    if (c !== 'x' && !/[aeiouy]/.test(c) && /[bcdfghjklmnpqrstvwz]{4}$/.test(lastWord)) {
+      return;
+    }
+    lastLetterTapMs = now;
+  }
+
   lastKeyTapMs = now;
   lastKeyChar = char;
   if (ev?.currentTarget) {
@@ -288,9 +571,17 @@ window.typeSeniorKey = (char, ev) => {
   }
   resetKeyboardAutoHideTimer();
   window.wakeScreenAndResetDimTimer?.();
-  input.value = char === 'BACKSPACE'
-    ? Array.from(cur).slice(0, -1).join('')
-    : cur + (['💋','❤️','☘️','👍','😘'].includes(char) || !cur.length ? char : char.toLowerCase());
+
+  if (char === 'BACKSPACE') {
+    input.value = Array.from(cur).slice(0, -1).join('');
+  } else if (isEmoji) {
+    // If she taps an emoji right after a letter, insert a space first so it doesn't glue inside a word
+    const needsSpace = cur.length > 0 && !cur.endsWith(' ') && /[A-Za-z0-9]$/.test(cur);
+    input.value = cur + (needsSpace ? ' ' : '') + char + ' ';
+  } else {
+    const shouldCap = !cur.length || /[.!?]\s+$/.test(cur);
+    input.value = cur + (shouldCap ? char.toUpperCase() : char.toLowerCase());
+  }
   syncChatInputDisplay();
 };
 
@@ -302,9 +593,9 @@ window.submitTypedNanaMessage = async () => {
   if (Date.now() - lastChatSendMs < 4000) {
     const st = $('tg-send-status');
     if (st) { st.style.color = "#ffff00"; st.innerText = "⏳ One moment, then tap Send again"; }
-    return; // keep her words in the box
+    return;
   }
-  const text = input.value.trim();
+  const text = autoCorrectLastWordInString(input.value.trim());
   input.value = "";
   savedChatScrollTop = null;
   syncChatInputDisplay();
@@ -465,7 +756,6 @@ const bulletinContentSig = (snapObj) => Object.entries(snapObj)
   .map(([k, v]) => `${k}|${v?.author || ''}|${v?.text || ''}|${v?.timestamp || ''}|${v?.fileId || v?.imageUrl || v?.photoUrl || v?.image || v?.photo || v?.mediaUrl || ''}`)
   .join('\n');
 
-// Update NEW tags / counters in place (no DOM rebuild, so scrolling is never interrupted)
 function syncUnreadMarkersInPlace() {
   document.querySelectorAll('#bulletin-posts-container .tg-bubble[data-msg-key]').forEach(b => {
     if (!isMessageUnreadByNana(state.bulletinSnap[b.dataset.msgKey])) {
