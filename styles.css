@@ -642,3 +642,41 @@ body.role-nana #nana-top-orientation-bar {
   gap: 14px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85);
 }
+
+/* Nana Predictive Word Bar Above Keyboard */
+.nana-word-suggestions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+  flex-shrink: 0;
+  min-height: 60px;
+}
+.nana-predict-btn {
+  height: 60px;
+  background: #0f172a;
+  color: #fef08a;
+  border: 3px solid #38bdf8;
+  border-radius: 16px;
+  font-size: clamp(1.35rem, 2.3vw, 1.85rem);
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+}
+.nana-predict-btn.autocorrect-match {
+  background: #064e3b;
+  border-color: #4ade80;
+  color: #ffffff;
+}
+.nana-predict-btn:active {
+  background: #22c55e !important;
+  color: #000 !important;
+  transform: scale(0.96);
+}
