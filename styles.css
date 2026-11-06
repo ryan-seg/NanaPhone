@@ -680,3 +680,86 @@ body.role-nana #nana-top-orientation-bar {
   color: #000 !important;
   transform: scale(0.96);
 }
+
+/* --- TIDY HOME GRID UPGRADE FOR NANA (LARGER PHOTOS, ZERO DUPLICATION) --- */
+#grid-screen {
+  padding: 66px 14px 12px 14px;
+  gap: 6px;
+}
+
+#grid-screen .header-pills {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+}
+
+#grid-screen .nav-pill-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  font-size: clamp(1.25rem, 2.05vw, 1.65rem);
+}
+
+/* Keep the unread badge inline inside the Family Chat button so it never covers the word "Chat" */
+.chat-unread-badge {
+  position: static !important;
+  display: none;
+  background: #dc2626;
+  color: #ffff00;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 0.95rem;
+  font-weight: 900;
+  margin-left: 4px;
+  vertical-align: middle;
+  animation: pulseMissed 1.4s infinite;
+}
+
+/* Single slim row that holds New Message Ticker and Spoken-to-Today side-by-side */
+.nana-status-strip-row {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+.nana-status-strip-row:empty {
+  display: none;
+}
+
+#message-ticker-bar,
+#todays-calls-reassurance-banner {
+  flex: 1 1 50%;
+  min-width: 0;
+  padding: 6px 14px !important;
+  border-radius: 14px !important;
+  font-size: clamp(1.05rem, 1.7vw, 1.3rem) !important;
+}
+
+#todays-calls-chips-container {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+/* Always hide the duplicate full-width missed call bar (each contact card already pulses red with a big badge) */
+#missed-call-banner {
+  display: none !important;
+}
+
+/* Make the badge on the contact card extra clear & high-contrast */
+.missed-card-badge {
+  top: 8px;
+  right: 8px;
+  padding: 4px 12px;
+  font-size: clamp(1.05rem, 1.6vw, 1.3rem);
+  border-width: 3px;
+}
+
+/* Allow family photos to grow larger with the reclaimed vertical space */
+.family-card img {
+  max-height: 145px;
+}
