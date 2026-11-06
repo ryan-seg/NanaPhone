@@ -116,7 +116,7 @@
     <div class="tg-composer-area">
       <div class="tg-input-row">
         <input id="nana-chat-input" type="hidden" value="" />
-        <div id="nana-chat-display" class="tg-text-display" onclick="openSeniorKeyboard()">
+        <div id="nana-chat-display" class="tg-text-display" onclick="openSeniorKeyboard()" title="Tap while typing to hear your message read aloud">
           <span id="nana-chat-placeholder" class="tg-placeholder">Tap here to open big keyboard...</span>
           <span id="nana-chat-typed"></span><span id="nana-chat-cursor" class="tg-flashing-cursor"></span>
         </div>
@@ -125,19 +125,19 @@
     </div>
     <div id="senior-onscreen-keyboard" oncontextmenu="return false;">
       <div class="emoji-fav-row">
-        <button class="emoji-key-btn" onpointerdown="typeSeniorKey('💋', event)">💋</button>
-        <button class="emoji-key-btn" onpointerdown="typeSeniorKey('❤️', event)">❤️</button>
-        <button class="emoji-key-btn" onpointerdown="typeSeniorKey('☘️', event)">☘️</button>
-        <button class="emoji-key-btn" onpointerdown="typeSeniorKey('👍', event)">👍</button>
-        <button class="emoji-key-btn" onpointerdown="typeSeniorKey('😘', event)">😘</button>
+        <button class="emoji-key-btn" onpointerup="typeSeniorKey('💋', event)">💋</button>
+        <button class="emoji-key-btn" onpointerup="typeSeniorKey('❤️', event)">❤️</button>
+        <button class="emoji-key-btn" onpointerup="typeSeniorKey('☘️', event)">☘️</button>
+        <button class="emoji-key-btn" onpointerup="typeSeniorKey('👍', event)">👍</button>
+        <button class="emoji-key-btn" onpointerup="typeSeniorKey('😘', event)">😘</button>
       </div>
       <!-- Giant 3-Slot Predictive Text & Auto-Correct Bar -->
       <div id="nana-word-suggestions" class="nana-word-suggestions"></div>
       <div id="senior-kb-letters-container" class="kb-rows-wrapper"></div>
       <div class="kb-bottom-bar" style="grid-template-columns: 2.1fr 1.8fr 3.5fr 2.2fr;">
         <button class="kb-letter-btn kb-view-msgs-btn" style="background:#334155;color:#fff;" onclick="kbHideTapped()">🔽 Messages</button>
-        <button class="kb-letter-btn" style="background:#991b1b;color:#fef08a;border-color:#f87171;font-size:clamp(1.1rem,1.9vw,1.45rem);" onpointerdown="deleteLastSeniorWord(event)">⌫ Word</button>
-        <button class="kb-letter-btn" style="background:var(--key-bg);" onpointerdown="typeSeniorKey(' ', event)">SPACE BAR</button>
+        <button class="kb-letter-btn" style="background:#991b1b;color:#fef08a;border-color:#f87171;font-size:clamp(1.1rem,1.9vw,1.45rem);" onpointerup="deleteLastSeniorWord(event)">⌫ Word</button>
+        <button class="kb-letter-btn" style="background:var(--key-bg);" onpointerup="typeSeniorKey(' ', event)">SPACE BAR</button>
         <button class="kb-letter-btn" style="background:#22c55e;color:#000;font-size:1.6rem;" onclick="submitTypedNanaMessage()">Send ➤</button>
       </div>
     </div>
@@ -164,7 +164,7 @@
     <button class="cancel-btn" style="background:#22c55e;color:#000;padding:12px 40px;font-size:1.35rem;" onclick="closePhoneGuideModal()">✔ Got It</button>
   </div>
 
- <!-- 1. Nana's Main Grid Screen -->
+  <!-- 1. Nana's Main Grid Screen (Tidied: 4 Full-Width Tabs, Single-Row Status Strip, Larger Photo Cards) -->
   <div id="grid-screen" class="screen active">
     <div class="header-bar">
       <div class="header-pills" style="width:100%;justify-content:space-between;">
@@ -172,7 +172,7 @@
         <button class="nav-pill-btn chat-pill-x" style="flex:1;" onclick="switchNanaMainTab('chat')">✈️ Family Chat <span id="chat-unread-badge" class="chat-unread-badge">NEW</span></button>
         <button class="nav-pill-btn radio-pill-x" style="flex:1;" onclick="switchNanaMainTab('radio')">🎻 Classic FM</button>
         <button class="nav-pill-btn video-pill-x" style="flex:1;" onclick="switchNanaMainTab('video')">🎬 Video</button>
-        <div class="gear-pill" onclick="openAdminPinModal()" title="Supervisor Controls">⚙️</div>
+        <div class="gear-pill" onclick="openAdminPinModal()" title="Supervisor Controls">⚙️ v2.9.4</div>
       </div>
     </div>
 
