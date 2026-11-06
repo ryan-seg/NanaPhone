@@ -131,9 +131,12 @@
         <button class="emoji-key-btn" onpointerdown="typeSeniorKey('👍', event)">👍</button>
         <button class="emoji-key-btn" onpointerdown="typeSeniorKey('😘', event)">😘</button>
       </div>
+      <!-- Giant 3-Slot Predictive Text & Auto-Correct Bar -->
+      <div id="nana-word-suggestions" class="nana-word-suggestions"></div>
       <div id="senior-kb-letters-container" class="kb-rows-wrapper"></div>
-      <div class="kb-bottom-bar">
-        <button class="kb-letter-btn kb-view-msgs-btn" style="background:#334155;color:#fff;" onclick="kbHideTapped()">🔽 View Messages</button>
+      <div class="kb-bottom-bar" style="grid-template-columns: 2.1fr 1.8fr 3.5fr 2.2fr;">
+        <button class="kb-letter-btn kb-view-msgs-btn" style="background:#334155;color:#fff;" onclick="kbHideTapped()">🔽 Messages</button>
+        <button class="kb-letter-btn" style="background:#991b1b;color:#fef08a;border-color:#f87171;font-size:clamp(1.1rem,1.9vw,1.45rem);" onpointerdown="deleteLastSeniorWord(event)">⌫ Word</button>
         <button class="kb-letter-btn" style="background:var(--key-bg);" onpointerdown="typeSeniorKey(' ', event)">SPACE BAR</button>
         <button class="kb-letter-btn" style="background:#22c55e;color:#000;font-size:1.6rem;" onclick="submitTypedNanaMessage()">Send ➤</button>
       </div>
