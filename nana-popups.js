@@ -75,6 +75,7 @@ function hasUnreadFamilyChatMessages() {
 async function evaluateScheduledPopupsOnNana() {
   if (role !== 'nana' || !settings.periodicPopupsEnabled || NanaCore.isCurrentlyInNightWindow?.()) return;
   if (state.callSnap?.status && state.callSnap.status !== 'idle') return;
+  if (activeQuestionData?.status === 'pending') return;
   if ($('nana-question-modal')?.style.display === 'flex' || $('confirm-modal')?.style.display === 'flex') return;
 
   const now = Date.now();
@@ -100,7 +101,6 @@ async function evaluateScheduledPopupsOnNana() {
   const d = new Date();
   const curHour = d.getHours(), curMin = d.getMinutes();
 
-  // Match either :00 window (mins 0..20) or :30 window (mins 30..50)
   let activeSlot = null;
   if (curMin >= 0 && curMin <= 20) activeSlot = curHour;
   else if (curMin >= 30 && curMin <= 50) activeSlot = curHour + 0.5;
@@ -194,7 +194,6 @@ window.submitNanaQuestionAnswer = async (choice) => {
     if (choice === 'YES') {
       window.switchNanaMainTab?.(qData.targetTab || 'calls', true);
     } else {
-      // Stay on video screen and resume playing from saved position
       hooks.resumeVideo?.();
     }
     return;
@@ -208,13 +207,20 @@ window.submitNanaQuestionAnswer = async (choice) => {
     return;
   }
 
+  // Advance to next video in queue after Nana's confirmation at the end of an episode
   if (qData.type === 'next_video_prompt') {
     const targetIdx = Number(qData.nextIndex) || 0;
     const nextItem = state.streamData.queue?.[targetIdx];
-    if (nextItem) localStorage.setItem(`nana_vid_pos_${nextItem.url}`, '0');
-    const updatePayload = { currentIndex: targetIdx, state: choice === 'YES' ? 'playing' : 'paused', updatedAt: now };
-    if (nextItem?.id) updatePayload[`savedTimes/${nextItem.id}`] = 0;
-    await update(refs.videoStream, updatePayload);
+    if (choice === 'YES') {
+      if (nextItem) localStorage.setItem(`nana_vid_pos_${nextItem.url}`, '0');
+      const updatePayload = {
+        currentIndex: targetIdx,
+        state: 'playing',
+        updatedAt: now
+      };
+      if (nextItem?.id) updatePayload[`savedTimes/${nextItem.id}`] = 0;
+      await update(refs.videoStream, updatePayload);
+    }
     return;
   }
 
@@ -232,14 +238,12 @@ window.submitNanaQuestionAnswer = async (choice) => {
     return;
   }
 
+  // Resume Nana's CURRENT active episode without ever changing currentIndex!
   if (qData.type === 'idle_video_prompt') {
     if (choice === 'YES') {
       window.openVideoScreen?.();
-      const q = state.streamData.queue || [];
-      if (q.length) {
-        const jjdIdx = q.findIndex(item => /judge\s*john\s*deed/i.test(item.title || ''));
-        const targetIdx = jjdIdx >= 0 ? jjdIdx : (state.streamData.currentIndex || 0);
-        await update(refs.videoStream, { currentIndex: targetIdx, state: 'playing', updatedAt: now }).catch(() => {});
+      if ((state.streamData.queue || []).length) {
+        await update(refs.videoStream, { state: 'playing', updatedAt: now }).catch(() => {});
       }
     }
     return;
@@ -265,7 +269,10 @@ function showNanaQuestionPopup() {
   const q = activeQuestionData;
   const inCall = !!state.currentState && state.currentState !== 'idle';
   if (q && q.status === 'pending' && q.question && !inCall) {
-    hooks.pauseVideo?.('question_popup');
+    // Do not call pauseVideo when the video has already ended and is showing next_video_prompt
+    if (q.type !== 'next_video_prompt') {
+      hooks.pauseVideo?.('question_popup');
+    }
     const isSilent = !!(q.silent || !settings.speakQuestions);
     const badgeMap = {
       leave_video_prompt: '🎬 Leave Video Player?',
