@@ -307,11 +307,13 @@ onValue(refs.nanaDevices, snap => {
 // --- 2. BRIGHTNESS, NIGHT MODE & CLOCK ---
 export function applyScreenBrightness(targetPercent) {
   if (role !== 'nana') return;
-  const pct = Math.max(5, Math.min(100, Number(targetPercent) || 85));
+  // Never dim the screen while ringing or in an active call
+  const inCallOrRinging = state.currentState && state.currentState !== 'idle';
+  const pct = inCallOrRinging ? 100 : Math.max(5, Math.min(100, Number(targetPercent) || 85));
   const overlay = $('brightness-overlay');
   if (overlay) {
-    overlay.style.opacity = Math.max(0, Math.min(0.88, (100 - pct) / 105)).toFixed(2);
-    overlay.style.pointerEvents = pct < (settings.awakeBrightness ?? 85) ? 'auto' : 'none';
+    overlay.style.opacity = inCallOrRinging ? '0' : Math.max(0, Math.min(0.88, (100 - pct) / 105)).toFixed(2);
+    overlay.style.pointerEvents = (!inCallOrRinging && pct < (settings.awakeBrightness ?? 85)) ? 'auto' : 'none';
   }
   const activeVol = state.currentState === 'connected'
     ? Number(settings.callVolume ?? 85)
@@ -321,8 +323,12 @@ export function applyScreenBrightness(targetPercent) {
 
 window.wakeScreenAndResetDimTimer = function () {
   if (role !== 'nana') return;
+  // If a call is ringing when Nana touches a dimmed screen, immediately answer the call on that single tap!
   if (state.currentState === 'ringing_nana') {
     applyScreenBrightness(100);
+    if ($('ringing-screen')?.classList.contains('active')) {
+      window.answerCallAsNana?.();
+    }
     return;
   }
   applyScreenBrightness(settings.awakeBrightness ?? 85);
@@ -359,6 +365,10 @@ export function updateClock() {
 window.wakeFromNightMode = () => {
   nightDismissedUntilMs = Date.now() + 15 * 60 * 1000;
   if ($('night-dimmer')) $('night-dimmer').style.display = 'none';
+  if (state.currentState === 'ringing_nana') {
+    applyScreenBrightness(100);
+    return;
+  }
   window.wakeScreenAndResetDimTimer();
 };
 
