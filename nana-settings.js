@@ -321,6 +321,10 @@ export function applyScreenBrightness(targetPercent) {
 
 window.wakeScreenAndResetDimTimer = function () {
   if (role !== 'nana') return;
+  if (state.currentState === 'ringing_nana') {
+    applyScreenBrightness(100);
+    return;
+  }
   applyScreenBrightness(settings.awakeBrightness ?? 85);
   clearTimeout(idleDimTimer);
   const delaySec = Number(settings.dimDelaySec ?? 120);
