@@ -1592,8 +1592,16 @@ onValue(refs.callState, snap => {
     } else if (data.status === 'connected' && isMyCall && isActiveFamilyTab) {
       showScreen('call-screen');
       joinDailyRoom();
-    } else if (data.status === 'ringing_nana' && isMyCall && isActiveFamilyTab) {
+} else if (data.status === 'ringing_nana' && isMyCall && isActiveFamilyTab) {
       showScreen('call-screen');
+      const b = $('call-connecting-banner');
+      if (b) {
+        b.style.display = 'block';
+        b.innerText = data.nanaRingingConfirmedAt
+          ? '🔊 Ringing out loud on Nana\'s tablet! Waiting for her to answer...'
+          : '🔔 Calling Nana\'s tablet...';
+      }
+    }
     } else {
       if (callObject || isJoiningOrInRoom) destroyDailyRoom();
       showScreen('family-screen');
