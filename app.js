@@ -1501,7 +1501,7 @@ onValue(refs.callState, snap => {
     }
 
     const act = isActiveNanaTab;
-    if (data.status === 'ringing_nana') {
+   if (data.status === 'ringing_nana') {
       const caller = CONFIG.familyMembers.find(m => m.id === data.callerId) || CONFIG.familyMembers[0];
       if (isRealAndroidTablet && isCurrentlyInNightWindow() && settings.nightBlockCalls) {
         incrementMissedCallForMember(caller.id);
@@ -1509,25 +1509,44 @@ onValue(refs.callState, snap => {
         return;
       }
       if (!act) return;
+
+      // 1. Force Night Dimmer & Brightness Overlay completely out of the way so 1st tap ALWAYS answers
       if ($('night-dimmer')) $('night-dimmer').style.display = 'none';
+      if ($('brightness-overlay')) {
+        $('brightness-overlay').style.opacity = '0';
+        $('brightness-overlay').style.pointerEvents = 'none';
+      }
+      window.wakeFromNightMode?.();
       window.wakeScreenAndResetDimTimer?.();
+
+      // 2. Force Lenovo hardware speaker volume to ringVolume & screen brightness to 100%
+      const rVol = Number(settings.ringVolume) || 85;
+      window.AndroidBridge?.updateTabletHardwareSettings?.(rVol, 100, Number(settings.dimDelaySec ?? 120), Number(settings.speechRate) || 0.9);
+
       const img = $('caller-photo');
       img.onerror = () => { img.src = caller.fallback; };
       img.src = caller.photo;
       $('caller-title').innerText = `${caller.name} is calling!`;
       showScreen('ringing-screen');
       stopRingingUI();
-      playSelectedRingtoneAudio(settings.ringtone, settings.ringVolume || 85);
+      playSelectedRingtoneAudio(settings.ringtone, rVol);
+
+      // 3. Report back to the caller's phone that Nana's tablet is awake and ringing out loud!
+      if (!data.nanaRingingConfirmedAt) {
+        update(refs.callState, { nanaRingingConfirmedAt: Date.now() }).catch(() => {});
+      }
+
       if (settings.autoAnswer) {
-        speakMsg(`${caller.spokenName} is calling you. Connecting automatically.`);
+        speakMsg(`${caller.spokenName} is calling you. Connecting automatically.`, false, rVol / 100);
         clearTimeout(autoAnswerTimeout);
         autoAnswerTimeout = setTimeout(() => { if (state.currentState === 'ringing_nana') window.answerCallAsNana(); }, 10000);
       } else {
-        speakMsg(`${caller.spokenName} is calling you. Touch anywhere on the screen to answer.`);
+        speakMsg(`${caller.spokenName} is calling you. Touch anywhere on the screen to answer.`, false, rVol / 100);
       }
+      clearInterval(ringInterval);
       ringInterval = setInterval(() => {
-        playSelectedRingtoneAudio(settings.ringtone, settings.ringVolume || 85);
-        speakMsg(`${caller.spokenName} is calling you.`);
+        playSelectedRingtoneAudio(settings.ringtone, rVol);
+        speakMsg(`${caller.spokenName} is calling you. Touch the green button to answer.`, false, rVol / 100);
       }, 6000);
       clearTimeout(incomingRingTimeout);
       incomingRingTimeout = setTimeout(async () => {
