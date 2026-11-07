@@ -283,19 +283,19 @@ async function applyLiveNanaCameraAndMicChanges() {
   if (role !== 'nana' || !callObject) return;
 
   const targetCam = settings.nanaCameraMode || 'user';
-  if (failedNanaCameraMode && targetCam !== failedNanaCameraMode) failedNanaCameraMode = null; // a different pick earns a fresh try
+  if (failedNanaCameraMode && targetCam !== failedNanaCameraMode) failedNanaCameraMode = null;
   if (targetCam !== appliedNanaCameraMode && targetCam !== failedNanaCameraMode) {
     try {
       const camId = await resolveNanaCameraDeviceId(targetCam);
       if (!camId) throw new Error('camera not found');
       await callObject.setInputDevicesAsync({ videoDeviceId: camId });
-      appliedNanaCameraMode = targetCam; // only marked as applied once it really worked
+      appliedNanaCameraMode = targetCam;
       if ($('local-video')) {
         $('local-video').style.transform = targetCam === 'environment' ? 'scaleX(1)' : 'scaleX(-1)';
       }
       logCall('cam-switch', targetCam);
     } catch (e) {
-      failedNanaCameraMode = targetCam; // don't retry on every unrelated settings change
+      failedNanaCameraMode = targetCam;
       logCall('cam-switch-fail', e?.message || e);
     }
   }
@@ -340,7 +340,6 @@ function applyFamilyVoiceBoostGain() {
 
 function attachFamilyVoiceAmplifier(aTrack) {
   if (role !== 'family' || !aTrack) return false;
-  // iPhones/iPads: Web Audio on remote streams is unreliable, so they use plain element playback
   if (isIOSDevice || (Number(settings.familyVoiceBoostPct) || 180) <= 100) return false;
   if (attachedRemoteAudioTrack === aTrack && familyBoostNodes) {
     applyFamilyVoiceBoostGain();
@@ -632,7 +631,21 @@ onValue(refs.entertainment, snap => {
   }
 });
 
-// Generate a loud UK dual-tone phone ring WAV data URI so HTML5 <audio> can ring even when AudioContext is suspended after a reload
+// --- 5. RINGTONE SYNTHESIZER (WITH HTML5 WAV FALLBACK) & 6-STAGE TELEGRAM RING BURST ---
+function playNote(freq, start, dur, type = 'sine', baseGain = 0.6, vol = 85) {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, start);
+  gain.gain.setValueAtTime(baseGain * (vol / 100), start);
+  gain.gain.exponentialRampToValueAtTime(0.008, start + dur);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(start);
+  osc.stop(start + dur);
+}
+
+// Generate a loud UK dual-tone phone ring WAV blob so HTML5 <audio> rings out loud even when AudioContext is suspended after a reload
 let cachedUkRingWavUrl = null;
 function getFallbackRingWavUrl() {
   if (cachedUkRingWavUrl) return cachedUkRingWavUrl;
@@ -647,7 +660,6 @@ function getFallbackRingWavUrl() {
   writeStr(36, 'data'); view.setUint32(40, numSamples * 2, true);
   for (let i = 0; i < numSamples; i++) {
     const t = i / sampleRate;
-    // Classic UK "brrr-brrr" cadence: 0.0-0.4s ON, 0.4-0.6s OFF, 0.6-1.0s ON, 1.0-1.6s OFF
     const isOn = (t >= 0 && t < 0.4) || (t >= 0.6 && t < 1.0);
     const sample = isOn ? 0.45 * (Math.sin(2 * Math.PI * 400 * t) + Math.sin(2 * Math.PI * 450 * t)) : 0;
     view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, sample)) * 32767, true);
@@ -668,7 +680,7 @@ export function playSelectedRingtoneAudio(tone, vol = 85, isPreview = false) {
     return;
   }
 
-  // Try resuming AudioContext; if it's still suspended (e.g. after a remote reload with no screen touch yet),
+  // Try resuming AudioContext; if still suspended (e.g. after a remote reload with no screen touch yet),
   // immediately play the HTML5 <audio> WAV ringtone so the tablet NEVER rings silently!
   if (audioCtx.state === 'suspended') {
     audioCtx.resume().catch(() => {});
@@ -1235,6 +1247,7 @@ window.startCallFromFamily = async () => {
         callerId: activeFamilyMember.id,
         targetId: 'nana',
         familyTabId: CLIENT_TAB_ID,
+        nanaRingingConfirmedAt: null,
         timestamp: Date.now()
       };
     });
@@ -1246,7 +1259,7 @@ window.startCallFromFamily = async () => {
     }
     showScreen('call-screen');
     const b = $('call-connecting-banner');
-    if (b) { b.style.display = 'block'; b.innerText = '🔔 Ringing Nana... Waiting for her to answer...'; }
+    if (b) { b.style.display = 'block'; b.innerText = '🔔 Calling Nana\'s tablet...'; }
     clearTimeout(outboundTimeout);
     outboundTimeout = setTimeout(async () => {
       if (state.currentState === 'ringing_nana' && didManuallyInitiateOrAnswerOnThisTab) {
@@ -1501,7 +1514,7 @@ onValue(refs.callState, snap => {
     }
 
     const act = isActiveNanaTab;
-   if (data.status === 'ringing_nana') {
+    if (data.status === 'ringing_nana') {
       const caller = CONFIG.familyMembers.find(m => m.id === data.callerId) || CONFIG.familyMembers[0];
       if (isRealAndroidTablet && isCurrentlyInNightWindow() && settings.nightBlockCalls) {
         incrementMissedCallForMember(caller.id);
@@ -1543,7 +1556,6 @@ onValue(refs.callState, snap => {
       } else {
         speakMsg(`${caller.spokenName} is calling you. Touch anywhere on the screen to answer.`, false, rVol / 100);
       }
-      clearInterval(ringInterval);
       ringInterval = setInterval(() => {
         playSelectedRingtoneAudio(settings.ringtone, rVol);
         speakMsg(`${caller.spokenName} is calling you. Touch the green button to answer.`, false, rVol / 100);
@@ -1557,6 +1569,10 @@ onValue(refs.callState, snap => {
       }, (Number(settings.ringDurationSec) || 60) * 1000);
     } else if (data.status === 'connected') {
       if ($('night-dimmer')) $('night-dimmer').style.display = 'none';
+      if ($('brightness-overlay')) {
+        $('brightness-overlay').style.opacity = '0';
+        $('brightness-overlay').style.pointerEvents = 'none';
+      }
       window.wakeScreenAndResetDimTimer?.();
       clearTimeout(outboundTimeout);
       clearTimeout(incomingRingTimeout);
@@ -1592,7 +1608,7 @@ onValue(refs.callState, snap => {
     } else if (data.status === 'connected' && isMyCall && isActiveFamilyTab) {
       showScreen('call-screen');
       joinDailyRoom();
-} else if (data.status === 'ringing_nana' && isMyCall && isActiveFamilyTab) {
+    } else if (data.status === 'ringing_nana' && isMyCall && isActiveFamilyTab) {
       showScreen('call-screen');
       const b = $('call-connecting-banner');
       if (b) {
@@ -1601,7 +1617,6 @@ onValue(refs.callState, snap => {
           ? '🔊 Ringing out loud on Nana\'s tablet! Waiting for her to answer...'
           : '🔔 Calling Nana\'s tablet...';
       }
-    }
     } else {
       if (callObject || isJoiningOrInRoom) destroyDailyRoom();
       showScreen('family-screen');
