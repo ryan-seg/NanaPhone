@@ -27,8 +27,11 @@ const NANA_TYPO_MAP = {
   "ljust": "I just", "ijust": "I just", "lfeel": "I feel", "ifeel": "I feel",
   "ltook": "I took", "lthink": "I think", "lcan": "I can", "lknow": "I know",
   "lwishyou": "I wish you", "hopeyou": "hope you", "allhave": "all have",
-  "withyou": "with you", "inthed": "in the", "inthe": "in the", "onthe": "on the",
+  "withyou": "with you", "withme": "with me", "inthed": "in the", "inthe": "in the", "onthe": "on the",
   "tothe": "to the", "fothe": "for the", "forthe": "for the", "inhere": "in here",
+  "toknow": "to know", "tkono": "to know", "tkoono": "to know",
+  "loveyou": "love you", "loveyouboth": "love you both", "loveyouboths": "love you both",
+  "lovemum": "love Mum", "lovenana": "love Nana", "somuch": "so much", "mumuch": "much",
   "lotsof": "lots of", "oflove": "of love", "lotsoflove": "lots of love",
   "loys": "lots", "loyts": "lots", "lotts": "lots", "lotttss": "lots",
   // Historical run-togethers from Nana's messages
@@ -46,7 +49,7 @@ const NANA_TYPO_MAP = {
   "thankks": "thanks", "tseem": "seem", "begining": "beginning", "succesful": "successful",
   "diffference": "difference", "tomorro": "tomorrow", "pocketr": "pocket", "migh": "might",
   "mighht": "might", "sill": "will", "wiiii": "will", "wiill": "will", "wil": "will",
-  "meer": "meet", "dib": "did", "mun": "Mum", "anum": "Mum", "nan": "Nana",
+  "meer": "meet", "dib": "did", "mun": "Mum", "anum": "Mum", "uum": "Mum", "nan": "Nana",
   "amso": "am so", "aso": "am so", "quie": "quite", "abit": "a bit", "alls": "all is",
   "cerai": "certain", "certa": "certain", "eveng": "evening", "eeniipgz": "evening",
   "enjo": "enjoy", "ennjoy": "enjoy", "enejoyed": "enjoyed", "ebjoy": "enjoy", "dnjoy": "enjoy", "njoy": "enjoy",
@@ -63,6 +66,7 @@ const NANA_TYPO_MAP = {
   "somone": "someone", "cansomr": "can some", "asssist": "assist",
   "goddess": "God", "godbess": "God bless", "godhelllp": "God help", "nightnight": "night night",
   "dunt": "don't", "dont": "don't", "doesnt": "doesn't", "cant": "can't", "wont": "won't",
+  "pl": "pleased", "pll": "pleased", "pleeses": "pleased", "wit": "with", "booth": "both", "booths": "both",
   "tg": "TG"
 };
 
@@ -78,13 +82,17 @@ const NANA_TRIGRAM_MAP = {
   "hope you": ["had a good day", "enjoy your evening", "are all well"],
   "hope all": ["is well", "goes well", "is fine"],
   "all is": ["well", "well with you", "good here"],
-  "i am": ["so pleased", "sure", "feeling better"],
+  "i am": ["so pleased", "pleased to know", "sure"],
+  "am pleased": ["to know", "to hear", "you are"],
+  "pleased to": ["know", "hear", "see you"],
   "am so": ["pleased", "sorry", "happy"],
-  "so pleased": ["to see", "you had", "all is well"],
+  "so pleased": ["to see", "to know", "all is well"],
   "so good": ["to see you", "to hear", "to be together"],
   "enjoy your": ["evening", "day", "holiday"],
   "have a": ["good day", "lovely evening", "good night"],
   "had a": ["good night", "lovely day", "lovely visit"],
+  "love you": ["both", "all", "so much"],
+  "you both": ["so much", "very much", "love Mum"],
   "lots of": ["love", "love as always", "love Mum and Nana"],
   "of love": ["to you all", "as always Mum", "Nana xxxxx"],
   "love to": ["you all", "both of you", "everyone"],
@@ -97,6 +105,7 @@ const NANA_TRIGRAM_MAP = {
   "thanks so": ["much", "very much", "much for"],
   "in the": ["garden", "afternoon", "morning"],
   "on the": ["way", "seafront", "phone"],
+  "with me": ["today", "love Mum", "now"],
   "looking forward": ["to seeing you", "to our chat", "to it"]
 };
 
@@ -105,12 +114,14 @@ const NANA_NEXT_WORD_MAP = {
   "hi": ["my love", "my loves", "darling"],
   "oh": ["my darling", "my love", "so pleased"],
   "my": ["love", "loves", "darling"],
-  "i": ["do hope", "am so", "have had"],
+  "i": ["do hope", "am pleased", "have had"],
   "do": ["hope", "enjoy", "know"],
   "hope": ["you", "all is well", "your journey"],
-  "am": ["so pleased", "sure", "certain"],
-  "so": ["pleased", "good to see", "lovely"],
-  "you": ["all", "both", "enjoy"],
+  "am": ["pleased", "so pleased", "sure"],
+  "pleased": ["to know", "to see", "that"],
+  "so": ["pleased", "good to see", "much"],
+  "you": ["both", "all", "enjoy"],
+  "both": ["so much", "of you", "love Mum"],
   "enjoy": ["your", "the", "it all"],
   "your": ["evening", "journey", "visit"],
   "have": ["a good day", "had a", "been"],
@@ -119,14 +130,14 @@ const NANA_NEXT_WORD_MAP = {
   "sunny": ["day", "morning", "afternoon"],
   "lots": ["of love", "of", "love"],
   "of": ["love", "yourselves", "you both"],
-  "love": ["to you all", "Mum", "Nana"],
+  "love": ["you both", "to you all", "Mum"],
   "take": ["care", "good care", "care my loves"],
   "care": ["of yourselves", "my loves", "of yourself"],
   "god": ["bless you", "bless you all", "bless my darling"],
   "bless": ["you all", "you both", "Mum"],
   "night": ["night", "God bless", "Mum"],
   "safe": ["and sound", "journey", "home"],
-  "happy": ["smiling faces", "to see", "day"],
+  "happy": ["to be", "smiling faces", "with me"],
   "smiling": ["faces", "and happy", "today"],
   "hugs": ["and kisses", "to you all", "Nana"],
   "keep": ["fit and well", "well", "warm"],
@@ -137,9 +148,12 @@ const NANA_NEXT_WORD_MAP = {
   "in": ["the garden", "good time", "my room"],
   "the": ["garden", "weather", "seafront"],
   "for": ["lunch", "supper", "all your help"],
+  "with": ["me", "you all", "her"],
+  "she": ["is with me", "is happy", "is well"],
+  "gill": ["is here", "and Louis", "is well"],
   "looking": ["forward to", "so well", "good"],
   "all": ["is well", "my love", "the difference"],
-  "mum": ["and Nana", "Nana", "xxxxxxx"],
+  "mum": ["and Nana", "xxxx", "Nana"],
   "nana": ["xxxxxxx", "and Supanana", "God bless"]
 };
 
@@ -148,28 +162,28 @@ const NANA_VOCAB = [
   "love", "loves", "darling", "darlings", "hope", "hoping", "enjoy", "enjoyed", "enjoying",
   "good", "night", "morning", "afternoon", "evening", "day", "today", "tomorrow", "weekend",
   "lovely", "pleased", "delighted", "thrilled", "certain", "sure", "always", "usually",
-  "family", "company", "visit", "visited", "visitors", "welcome", "wonderful", "super",
-  "garden", "seafront", "beach", "sunshine", "sunny", "weather", "forecast", "shade", "warm",
-  "peace", "serenity", "blossom", "tree", "outside", "walk", "walking", "sitting", "reading",
-  "lunch", "supper", "breakfast", "drink", "quiche", "cheese", "onion", "salad", "fruit",
-  "journey", "drive", "traffic", "roads", "car", "flight", "holiday", "home", "house",
-  "bedroom", "bathroom", "room", "floor", "flooring", "freezer", "lobby", "seat", "bed",
-  "sleep", "awake", "tired", "dozy", "muddled", "lazy", "busy", "occupied", "relaxed",
-  "better", "well", "healthy", "happy", "smiling", "faces", "pleasure", "joy", "lucky",
-  "bless", "thank", "thanks", "thankful", "thoughtful", "kindness", "appreciate", "helpful",
-  "repaired", "fixed", "working", "project", "gift", "present", "photos", "news", "chat",
-  "message", "call", "calling", "phone", "tablet", "glasses", "hearing", "sight", "eyes",
-  "ears", "Scrivens", "hospital", "nurse", "doctor", "stockings", "shoes", "rollator",
-  "wheelchair", "shul", "neighbours", "friends", "children", "wedding", "parents", "together",
-  "minutes", "hours", "week", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
-  "Saturday", "Sunday", "sorry", "please", "understand", "remember", "thinking", "longing",
-  "missing", "concerning", "worried", "carefree", "trouble", "difference", "annoying",
+  "both", "much", "with", "here", "know", "she", "family", "company", "visit", "visited",
+  "visitors", "welcome", "wonderful", "super", "garden", "seafront", "beach", "sunshine",
+  "sunny", "weather", "forecast", "shade", "warm", "peace", "serenity", "blossom", "tree",
+  "outside", "walk", "walking", "sitting", "reading", "lunch", "supper", "breakfast",
+  "drink", "quiche", "cheese", "onion", "salad", "fruit", "journey", "drive", "traffic",
+  "roads", "car", "flight", "holiday", "home", "house", "bedroom", "bathroom", "room",
+  "floor", "flooring", "freezer", "lobby", "seat", "bed", "sleep", "awake", "tired", "dozy",
+  "muddled", "lazy", "busy", "occupied", "relaxed", "better", "well", "healthy", "happy",
+  "smiling", "faces", "pleasure", "joy", "lucky", "bless", "thank", "thanks", "thankful",
+  "thoughtful", "kindness", "appreciate", "helpful", "repaired", "fixed", "working",
+  "project", "gift", "present", "photos", "news", "chat", "message", "call", "calling",
+  "phone", "tablet", "glasses", "hearing", "sight", "eyes", "ears", "Scrivens", "hospital",
+  "nurse", "doctor", "stockings", "shoes", "rollator", "wheelchair", "shul", "neighbours",
+  "friends", "children", "wedding", "parents", "together", "minutes", "hours", "week",
+  "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "sorry",
+  "please", "understand", "remember", "thinking", "longing", "missing", "concerning",
+  "worried", "carefree", "trouble", "difference", "annoying",
   "Mum", "Nana", "Supanana", "Ryan", "Megan", "Gill", "Louis", "Denise", "Darien",
   "Nicky", "John", "Phil", "Zara", "Marcus", "Nicola", "Jo", "Lois", "Simon",
   "Yolanda", "Helen", "Lynda", "Steve", "Mike", "Luma", "TG", "xxxxxxx"
 ];
 
-const SPLIT_PREFIXES = ["i", "l", "do", "am", "so", "in", "on", "to", "for", "all", "with", "lots", "good", "night", "very", "hope", "love", "thank", "my", "the", "had", "was", "are", "you"];
 const VALID_WORD_SET = new Set([
   ...NANA_VOCAB.map(w => w.toLowerCase()),
   "i", "a", "am", "an", "as", "at", "be", "by", "do", "go", "he", "hi", "if", "in", "is", "it",
@@ -192,15 +206,102 @@ const VALID_WORD_SET = new Set([
   "were", "what", "when", "will", "wind", "wise", "wish", "with", "woke", "work", "year", "your"
 ]);
 
-function trySplitRunTogetherWord(cleanWord) {
+// Pre-compute all valid prefixes that legitimately contain a double letter (e.g. "goo" in "good", "see", "wee", "all", "hap" -> "happ")
+const VALID_DOUBLE_LETTER_PREFIXES = new Set();
+VALID_WORD_SET.forEach(word => {
+  if (/([a-z])\1/.test(word)) {
+    for (let i = 2; i <= word.length; i++) {
+      VALID_DOUBLE_LETTER_PREFIXES.add(word.slice(0, i));
+    }
+  }
+});
+
+// Letters that NEVER double in any word Nana uses
+const NEVER_DOUBLE_LETTERS = new Set(['a', 'h', 'i', 'j', 'k', 'q', 'u', 'v', 'w', 'y', 'z']);
+
+// Determine if pressing `c` twice in a row at the end of `lastWord` is a legitimate English double letter or a tremor bounce
+function shouldAllowDoubleLetter(lastWord, c, timeSinceLastTapMs) {
+  if (c === 'x') return true; // Always allow "xxxx" kisses
+  if (NEVER_DOUBLE_LETTERS.has(c)) return false; // Never allow vv, uu, yy, ww, hh, ii, aa, kk
+  if (lastWord.length <= 1) return false; // NO English word starts with a double letter (blocks LL, mm, gg, ss, bb at word start)
+  if (timeSinceLastTapMs < 850) return false; // Require deliberate pause (>850ms) for any double letter
+  // Block if the word already has a double letter immediately preceding (stops "lloovvee")
+  if (lastWord.length >= 3 && lastWord.slice(-2, -1) === lastWord.slice(-3, -2)) return false;
+  // Only allow if `lastWord + c` is an actual prefix of a valid double-letter word in Nana's vocabulary!
+  const candidatePrefix = (lastWord + c).toLowerCase();
+  return VALID_DOUBLE_LETTER_PREFIXES.has(candidatePrefix);
+}
+
+// Strip accidental tremor double-bounces from a word (e.g. "lloovvee" -> "love", "bboothh" -> "both", "mmuumm" -> "mum")
+function deStutterWord(rawWord) {
+  const lower = (rawWord || "").toLowerCase().replace(/[^a-z]/g, "");
+  if (lower.length < 2) return lower;
+  if (/^x+$/.test(lower)) return lower;
+
+  // 1. Collapse any alternating 2-letter tremor loops like "eesseesseesess" or "eseseses" -> "es"
+  let collapsed = lower
+    .replace(/([a-z])\1+/g, (match, ch, offset) => {
+      // Keep legitimate double letters only if not at offset 0 and not in NEVER_DOUBLE_LETTERS
+      if (offset === 0 || NEVER_DOUBLE_LETTERS.has(ch)) return ch;
+      return ch + ch;
+    })
+    .replace(/([a-z]{2})\1{2,}/g, '$1');
+
+  if (NANA_TYPO_MAP[collapsed]) return NANA_TYPO_MAP[collapsed];
+  if (VALID_WORD_SET.has(collapsed)) return collapsed;
+
+  // 2. Fully single-collapse all repeated letters ("lloovvee" -> "love", "bboothh" -> "both", "mmuumm" -> "mum")
+  const single = lower.replace(/([a-z])\1+/g, '$1');
+  if (NANA_TYPO_MAP[single]) return NANA_TYPO_MAP[single];
+  if (VALID_WORD_SET.has(single)) return single;
+
+  return single;
+}
+
+const PROPER_NOUN_CAPITALIZATION = Object.fromEntries(
+  NANA_VOCAB.filter(w => /^[A-Z]/.test(w)).map(w => [w.toLowerCase(), w])
+);
+PROPER_NOUN_CAPITALIZATION["i"] = "I";
+
+function restoreProperCasing(word) {
+  return word.split(' ').map(part => {
+    const clean = part.toLowerCase();
+    return PROPER_NOUN_CAPITALIZATION[clean] || part;
+  }).join(' ');
+}
+
+// Split 2 or 3 glued words when Nana misses the spacebar (e.g. "loveyouboth" -> "love you both", "gillishere" -> "Gill is here")
+function trySplitRunTogetherWord(rawCleanWord) {
+  const cleanWord = deStutterWord(rawCleanWord);
   if (cleanWord.length < 4 || VALID_WORD_SET.has(cleanWord)) return null;
-  for (const pref of SPLIT_PREFIXES) {
-    if (cleanWord.startsWith(pref) && cleanWord.length > pref.length + 1) {
-      const rest = cleanWord.slice(pref.length);
-      const fixedRest = NANA_TYPO_MAP[rest] || (VALID_WORD_SET.has(rest) ? rest : null);
-      if (fixedRest) {
-        const fixedPref = (pref === "l" || pref === "i") ? "I" : pref;
-        return `${fixedPref} ${fixedRest}`;
+  if (NANA_TYPO_MAP[cleanWord]) return NANA_TYPO_MAP[cleanWord];
+
+  const isKnownToken = (s) => s.length >= 2 && (VALID_WORD_SET.has(s) || !!NANA_TYPO_MAP[s]);
+  const resolveToken = (s) => restoreProperCasing(NANA_TYPO_MAP[s] || s);
+
+  // Try 2-word split (e.g. "loveyou", "withme", "toknow", "somuch")
+  for (let i = 2; i <= cleanWord.length - 2; i++) {
+    const w1 = cleanWord.slice(0, i);
+    const w2 = cleanWord.slice(i);
+    if ((w1 === 'i' || w1 === 'l' || isKnownToken(w1)) && isKnownToken(w2)) {
+      const p1 = (w1 === 'i' || w1 === 'l') ? 'I' : resolveToken(w1);
+      return `${p1} ${resolveToken(w2)}`;
+    }
+  }
+
+  // Try 3-word split (e.g. "loveyouboth", "gillishere", "sheishappy")
+  if (cleanWord.length >= 7) {
+    for (let i = 2; i <= cleanWord.length - 4; i++) {
+      const w1 = cleanWord.slice(0, i);
+      if (!(w1 === 'i' || w1 === 'l' || isKnownToken(w1))) continue;
+      for (let j = i + 2; j <= cleanWord.length - 2; j++) {
+        const w2 = cleanWord.slice(i, j);
+        const w3 = cleanWord.slice(j);
+        const w3Trim = (w3.endsWith('s') && ! isKnownToken(w3) && isKnownToken(w3.slice(0, -1))) ? w3.slice(0, -1) : w3;
+        if (isKnownToken(w2) && isKnownToken(w3Trim)) {
+          const p1 = (w1 === 'i' || w1 === 'l') ? 'I' : resolveToken(w1);
+          return `${p1} ${resolveToken(w2)} ${resolveToken(w3Trim)}`;
+        }
       }
     }
   }
@@ -219,11 +320,11 @@ function getEmptyBoxContextStarters() {
       const hasPhoto = !!(lastMsg.fileId || lastMsg.photoFileId || lastMsg.imageUrl || lastMsg.photoUrl || lastMsg.photo);
       if (hasPhoto) return ["Lovely photo", "Thanks for the photos", timeGreeting];
       if (/^[❤️💋😘☘️👍\s]+$/.test(lastMsg.text || '')) {
-        return ["Lots of love", "Love you too", timeGreeting];
+        return ["Lots of love", "Love you both", timeGreeting];
       }
     }
   }
-  return [timeGreeting, "I do hope", "Lots of love"];
+  return [timeGreeting, "I do hope", "Love you both"];
 }
 
 // Compute Levenshtein edit distance for fuzzy matching (handles 1–2 letter slips)
@@ -263,7 +364,8 @@ function getCurrentTypingContext(rawText) {
 
 function computeSmartSuggestions(rawText) {
   const { currentWord, prevWord, prevTwoWords } = getCurrentTypingContext(rawText);
-  const cleanCur = currentWord.toLowerCase().replace(/[^a-z]/g, "");
+  const rawCleanCur = currentWord.toLowerCase().replace(/[^a-z]/g, "");
+  const cleanCur = deStutterWord(rawCleanCur);
 
   // Case 1: Empty box or just finished a word -> check 2-word Trigram map, then 1-word Bigram map, then context starters
   if (!cleanCur) {
@@ -280,33 +382,38 @@ function computeSmartSuggestions(rawText) {
   const results = [];
   const seen = new Set();
   const addCandidate = (word, isAutoFix = false) => {
-    const key = word.toLowerCase();
+    const formatted = restoreProperCasing(word);
+    const key = formatted.toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
-      results.push({ text: word, replaceCurrent: true, isAutoFix });
+      results.push({ text: formatted, replaceCurrent: true, isAutoFix });
     }
   };
 
-  // 1. Direct match in Nana's personal typo map
-  if (NANA_TYPO_MAP[cleanCur]) {
-    addCandidate(NANA_TYPO_MAP[cleanCur], true);
-  }
+  // 1. Direct match in Nana's personal typo map (using both raw & de-stuttered forms)
+  if (NANA_TYPO_MAP[rawCleanCur]) addCandidate(NANA_TYPO_MAP[rawCleanCur], true);
+  if (NANA_TYPO_MAP[cleanCur]) addCandidate(NANA_TYPO_MAP[cleanCur], true);
 
-  // 2. Check if she missed the spacebar between two valid words (e.g. "verygood" -> "very good")
-  const splitAttempt = trySplitRunTogetherWord(cleanCur);
+  // 2. Check if she missed the spacebar between 2 or 3 valid words (e.g. "loveyouboth" -> "love you both")
+  const splitAttempt = trySplitRunTogetherWord(rawCleanCur);
   if (splitAttempt) {
     addCandidate(splitAttempt, true);
   }
 
-  // 3. Prefix match in Nana's vocabulary
+  // 3. If de-stuttering produced a clean valid word (e.g. "lloovvee" -> "love"), offer it as #1 auto-fix
+  if (cleanCur !== rawCleanCur && VALID_WORD_SET.has(cleanCur)) {
+    addCandidate(cleanCur, true);
+  }
+
+  // 4. Prefix match in Nana's vocabulary
   for (const w of NANA_VOCAB) {
-    if (w.toLowerCase().startsWith(cleanCur) && w.toLowerCase() !== cleanCur) {
+    if (w.toLowerCase().startsWith(cleanCur) && w.toLowerCase() !== rawCleanCur) {
       addCandidate(w, false);
       if (results.length >= 3) break;
     }
   }
 
-  // 4. Fuzzy typo match (edit distance <= 2) for words >= 3 chars
+  // 5. Fuzzy typo match (edit distance <= 2) for words >= 3 chars
   if (results.length < 3 && cleanCur.length >= 3) {
     const fuzzyMatches = [];
     for (const w of NANA_VOCAB) {
@@ -325,7 +432,7 @@ function computeSmartSuggestions(rawText) {
   }
 
   // Fill any remaining slots with helpful defaults
-  const fallbacks = ["love", "hope", "enjoy", "good", "Nana"];
+  const fallbacks = ["love", "hope", "pleased", "good", "Mum"];
   for (const f of fallbacks) {
     if (results.length >= 3) break;
     addCandidate(f, false);
@@ -334,17 +441,16 @@ function computeSmartSuggestions(rawText) {
   return results.slice(0, 3);
 }
 
-// If Nana mistyped a word fragment ("cerai") and then re-typed the word ("certain"), collapse the fragment
+// If Nana mistyped a word fragment ("cerai" or "mmuu") and then re-typed the word ("certain" or "Mum"), collapse the fragment
 function collapseRestartedWordFragment(text) {
   const parts = text.trimEnd().split(/\s+/);
   if (parts.length < 2) return text;
   const last = parts[parts.length - 1];
   const prev = parts[parts.length - 2];
-  const cleanLast = last.toLowerCase().replace(/[^a-z]/g, "");
-  const cleanPrev = prev.toLowerCase().replace(/[^a-z]/g, "");
-  if (cleanLast.length >= 4 && cleanPrev.length >= 2 && cleanPrev.length <= cleanLast.length) {
-    // If previous token is not a normal valid word (or is an unfinished prefix of the new word) and shares the same first 2 letters
-    if (cleanLast.slice(0, 2) === cleanPrev.slice(0, 2) && (!VALID_WORD_SET.has(cleanPrev) || cleanLast.startsWith(cleanPrev))) {
+  const cleanLast = deStutterWord(last);
+  const cleanPrev = deStutterWord(prev);
+  if (cleanLast.length >= 3 && cleanPrev.length >= 2 && cleanPrev.length <= cleanLast.length) {
+    if (cleanLast === cleanPrev || (cleanLast.slice(0, 2) === cleanPrev.slice(0, 2) && (!VALID_WORD_SET.has(cleanPrev) || cleanLast.startsWith(cleanPrev)))) {
       parts.splice(parts.length - 2, 1);
       return parts.join(' ') + (text.endsWith(' ') ? ' ' : '');
     }
@@ -537,7 +643,6 @@ export function renderSeniorKeyboardLayout() {
       const b = document.createElement('button');
       b.className = 'kb-letter-btn';
       b.textContent = l;
-      // Trigger on pointer release (onpointerup) so resting/sliding fingers don't machine-gun adjacent keys
       b.onpointerup = (ev) => window.typeSeniorKey(l, ev);
       r.appendChild(b);
     });
@@ -610,7 +715,6 @@ window.closeFamilyBulletin = () => {
 window.openSeniorKeyboard = () => {
   const modal = $('bulletin-modal');
   const input = $('nana-chat-input');
-  // If keyboard is ALREADY open and Nana taps the yellow text display, read her typed message aloud!
   if (modal?.classList.contains('kb-fullscreen') && input?.value?.trim()) {
     window.speakNote?.(input.value.trim());
     return;
@@ -663,44 +767,53 @@ window.handleChatScroll = (el) => {
   }
 };
 
-// Auto-correct the last completed word (and split run-togethers / collapse restarted fragments) when Nana presses Space or Send
+// Auto-correct the last completed word (de-stuttering tremor doubles & splitting run-togethers) when Nana presses Space or Send
 function autoCorrectLastWordInString(str) {
   const match = str.match(/^(.*?)([A-Za-z]+)$/);
   if (!match) return str;
   const prefix = match[1];
   const word = match[2];
   const lower = word.toLowerCase();
+  const destuttered = deStutterWord(lower);
   let fixed = str;
+
   if (NANA_TYPO_MAP[lower]) {
     fixed = prefix + NANA_TYPO_MAP[lower];
+  } else if (NANA_TYPO_MAP[destuttered]) {
+    fixed = prefix + NANA_TYPO_MAP[destuttered];
   } else {
     const split = trySplitRunTogetherWord(lower);
-    if (split) fixed = prefix + split;
+    if (split) {
+      fixed = prefix + split;
+    } else if (VALID_WORD_SET.has(destuttered)) {
+      fixed = prefix + restoreProperCasing(destuttered);
+    }
   }
-  return collapseRestartedWordFragment(fixed);
+  const collapsed = collapseRestartedWordFragment(fixed);
+  return collapsed.charAt(0).toUpperCase() + collapsed.slice(1);
 }
 
 window.typeSeniorKey = (char, ev) => {
   if (ev) {
     ev.preventDefault();
     ev.stopPropagation();
-    // Ignore secondary fingers/palms resting on screen (multi-touch guard)
     if (ev.isPrimary === false) return;
   }
 
   const now = Date.now();
   const isEmoji = ['💋','❤️','☘️','👍','😘'].includes(char);
-  const guardMs = Math.max(350, Number(settings.keyGuardMs ?? 350));
+  const guardMs = Math.max(450, Number(settings.keyGuardMs ?? 450));
   const sameKey = (char === lastKeyChar);
+  const timeSinceLastTap = now - lastKeyTapMs;
 
   // 1. Emoji Knuckle Guard: Ignore accidental emoji brushes within 550ms of typing a letter
   if (isEmoji && (now - lastLetterTapMs < 550)) return;
 
-  // 2. Global Anti-Rocking Cooldown: 280ms between ANY two keys (stops r-q-r-q-s-z palm bursts)
+  // 2. Global Cooldown: 280ms between different keys; 550ms minimum on same key
   const minGap = char === 'BACKSPACE'
     ? (sameKey ? 220 : 100)
-    : (sameKey ? Math.max(guardMs, 500) : 280);
-  if (now - lastKeyTapMs < minGap) return;
+    : (sameKey ? Math.max(guardMs, 550) : 280);
+  if (timeSinceLastTap < minGap) return;
 
   const input = $('nana-chat-input');
   if (!input) return;
@@ -720,15 +833,33 @@ window.typeSeniorKey = (char, ev) => {
 
   if (char !== 'BACKSPACE' && !isEmoji && char.length === 1 && /[A-Za-z]/.test(char)) {
     const c = char.toLowerCase();
-    // Never allow 3 identical letters in a row (except 'x' for kisses)
-    if (c !== 'x' && cur.length >= 2 && cur.slice(-1).toLowerCase() === c && cur.slice(-2, -1).toLowerCase() === c) {
+    const lastWord = (cur.split(/\s+/).pop() || "").toLowerCase();
+
+    // 3. Smart Double-Letter Tremor Filter (Stops "Llooveeyooubboothhs" & "mm uumm")
+    if (lastWord.length >= 1 && lastWord.slice(-1) === c) {
+      if (!shouldAllowDoubleLetter(lastWord, c, timeSinceLastTap)) {
+        return;
+      }
+    }
+
+    // 4. Never allow 3 identical letters in a row (except 'x' for kisses)
+    if (c !== 'x' && lastWord.length >= 2 && lastWord.slice(-1) === c && lastWord.slice(-2, -1) === c) {
       return;
     }
-    // Consonant-mash guard: if the current word already has 4 consonants in a row (not 'x'), ignore further consonant mashing
-    const lastWord = (cur.split(/\s+/).pop() || "").toLowerCase();
+
+    // 5. Alternating 2-Key Tremor Bounce Guard (Stops "eesseesseesess" / "eseseses")
+    if (lastWord.length >= 3) {
+      const a = lastWord.slice(-3, -2), b = lastWord.slice(-2, -1), d = lastWord.slice(-1);
+      if (a === d && a !== b && c === b) {
+        return; // Blocks 4th character of an A-B-A-B rock!
+      }
+    }
+
+    // 6. Consonant-mash guard: if the current word already has 4 consonants in a row (not 'x'), ignore further consonant mashing
     if (c !== 'x' && !/[aeiouy]/.test(c) && /[bcdfghjklmnpqrstvwz]{4}$/.test(lastWord)) {
       return;
     }
+
     lastLetterTapMs = now;
   }
 
@@ -764,7 +895,9 @@ window.submitTypedNanaMessage = async () => {
     if (st) { st.style.color = "#ffff00"; st.innerText = "⏳ One moment, then tap Send again"; }
     return;
   }
-  const text = autoCorrectLastWordInString(input.value.trim());
+  // Clean up all words in the final sentence before sending
+  const cleanedWords = input.value.trim().split(/\s+/).map(w => autoCorrectLastWordInString(w)).join(' ');
+  const text = collapseRestartedWordFragment(cleanedWords);
   input.value = "";
   savedChatScrollTop = null;
   syncChatInputDisplay();
