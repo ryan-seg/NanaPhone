@@ -632,31 +632,58 @@ onValue(refs.entertainment, snap => {
   }
 });
 
-// --- 5. RINGTONE SYNTHESIZER & 6-STAGE TELEGRAM RING BURST ---
-function playNote(freq, start, dur, type = 'sine', baseGain = 0.6, vol = 85) {
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, start);
-  gain.gain.setValueAtTime(baseGain * (vol / 100), start);
-  gain.gain.exponentialRampToValueAtTime(0.008, start + dur);
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start(start);
-  osc.stop(start + dur);
+// Generate a loud UK dual-tone phone ring WAV data URI so HTML5 <audio> can ring even when AudioContext is suspended after a reload
+let cachedUkRingWavUrl = null;
+function getFallbackRingWavUrl() {
+  if (cachedUkRingWavUrl) return cachedUkRingWavUrl;
+  const sampleRate = 8000, durationSec = 1.6, numSamples = sampleRate * durationSec;
+  const buf = new ArrayBuffer(44 + numSamples * 2);
+  const view = new DataView(buf);
+  const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+  writeStr(0, 'RIFF'); view.setUint32(4, 36 + numSamples * 2, true); writeStr(8, 'WAVE');
+  writeStr(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  writeStr(36, 'data'); view.setUint32(40, numSamples * 2, true);
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    // Classic UK "brrr-brrr" cadence: 0.0-0.4s ON, 0.4-0.6s OFF, 0.6-1.0s ON, 1.0-1.6s OFF
+    const isOn = (t >= 0 && t < 0.4) || (t >= 0.6 && t < 1.0);
+    const sample = isOn ? 0.45 * (Math.sin(2 * Math.PI * 400 * t) + Math.sin(2 * Math.PI * 450 * t)) : 0;
+    view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, sample)) * 32767, true);
+  }
+  cachedUkRingWavUrl = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  return cachedUkRingWavUrl;
 }
 
 export function playSelectedRingtoneAudio(tone, vol = 85, isPreview = false) {
+  const safeVol = Math.min(1.0, Math.max(0.25, (Number(vol) || 85) / 100));
   if (tone.endsWith('.mp3')) {
     if (activeMp3Ringtone && !isPreview) return;
     activeMp3Ringtone?.pause();
     activeMp3Ringtone = new Audio(tone);
-    activeMp3Ringtone.volume = Math.min(1.0, Math.max(0.2, vol / 100));
+    activeMp3Ringtone.volume = safeVol;
     if (!isPreview) activeMp3Ringtone.loop = true;
     activeMp3Ringtone.play().catch(() => {});
     return;
   }
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  // Try resuming AudioContext; if it's still suspended (e.g. after a remote reload with no screen touch yet),
+  // immediately play the HTML5 <audio> WAV ringtone so the tablet NEVER rings silently!
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+  if (audioCtx.state !== 'running') {
+    if (!activeMp3Ringtone || isPreview) {
+      activeMp3Ringtone?.pause();
+      activeMp3Ringtone = new Audio(getFallbackRingWavUrl());
+      activeMp3Ringtone.volume = safeVol;
+      if (!isPreview) activeMp3Ringtone.loop = true;
+      activeMp3Ringtone.play().catch(() => {});
+    }
+    return;
+  }
+
   const now = audioCtx.currentTime;
   if (tone === 'uk-phone') [0, 0.55].forEach(o => { playNote(400, now + o, 0.35, 'square', 0.45, vol); playNote(450, now + o, 0.35, 'square', 0.45, vol); });
   else if (tone === 'westminster') [[329.63,0,0.35],[415.3,0.35,0.35],[369.99,0.7,0.35],[246.94,1.05,0.65]].forEach(([f,o,d]) => playNote(f, now + o, d, 'triangle', 0.8, vol));
