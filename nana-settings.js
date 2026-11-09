@@ -305,6 +305,8 @@ onValue(refs.nanaDevices, snap => {
 });
 
 // --- 2. BRIGHTNESS, NIGHT MODE & CLOCK ---
+let lastSentHardwareVol = null;
+
 export function applyScreenBrightness(targetPercent) {
   if (role !== 'nana') return;
   // Never dim the screen while ringing or in an active call
@@ -318,7 +320,12 @@ export function applyScreenBrightness(targetPercent) {
   const activeVol = state.currentState === 'connected'
     ? Number(settings.callVolume ?? 85)
     : (state.isRadioPlaying ? Number(settings.radioVolume ?? 75) : Number(settings.ringVolume ?? 85));
-  window.AndroidBridge?.updateTabletHardwareSettings?.(activeVol, pct, Number(settings.dimDelaySec ?? 120), Number(settings.speechRate) || 0.9);
+  // Only call AndroidBridge when the target volume actually changes so idle dim/wake cycles
+  // never trigger the Lenovo Android STREAM_RING "ba-ba" volume confirmation beep!
+  if (activeVol !== lastSentHardwareVol) {
+    lastSentHardwareVol = activeVol;
+    window.AndroidBridge?.updateTabletHardwareSettings?.(activeVol, Number(settings.awakeBrightness ?? 85), Number(settings.dimDelaySec ?? 120), Number(settings.speechRate) || 0.9);
+  }
 }
 
 window.wakeScreenAndResetDimTimer = function () {
