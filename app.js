@@ -315,9 +315,8 @@ async function applyLiveNanaCameraAndMicChanges() {
   }
 }
 
-// Detect ALL Safari / WebKit browsers (iOS, iPadOS with "Request Desktop Website", and macOS Safari)
-// Safari WebKit has a known bug where routing a WebRTC MediaStreamTrack into AudioContext.createMediaStreamSource
-// causes crackling/dropouts, so Safari must always play directly through the native #remote-audio element.
+// Detect ALL Safari / WebKit browsers (macOS Safari, iPadOS desktop-mode Safari, and iOS Safari)
+// WebKit has a known WebRTC MediaStreamSource bug in Web Audio that causes crackling/dropouts if routed through AudioContext
 const isSafariOrIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
   || /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -859,14 +858,13 @@ async function joinDailyRoom() {
     lvPrev.srcObject = null;
   }
 
-  // Always resume AudioContext and build Nana's processed vocal-boost mic track
+  // Always resume AudioContext & build Nana's vocal boost DSP track before joining
   let customAudioSource = true;
   if (role === 'nana') {
     try { await withTimeout(audioCtx.resume(), 2000); } catch (_) {}
     const t = await withTimeout(buildNanaProcessedMicTrack(settings.nanaMicDeviceId), 6000);
     if (t && t !== '__timeout__' && typeof t === 'object' && audioCtx.state === 'running') {
       customAudioSource = t;
-      logCall('mic-dsp-active', settings.nanaMicDspMode || 'vocal-boost');
     } else {
       cleanupNanaMicDsp();
       logCall('mic-dsp-fallback', 'ctx=' + audioCtx.state);
@@ -875,7 +873,7 @@ async function joinDailyRoom() {
   logCall('join-start');
   const nanaCamConstraint = role === 'nana'
     ? getNanaVideoConstraintObject(settings.nanaCameraMode)
-    : { facingMode: 'user', width: { ideal: 640, max: 960 }, height: { ideal: 480, max: 540 }, frameRate: { ideal: 20, max: 24 } };
+    : { facingMode: 'user', width: { ideal: 640, max: 640 }, height: { ideal: 480, max: 480 }, frameRate: { ideal: 20, max: 24 } };
 
   if (role === 'nana') appliedNanaCameraMode = settings.nanaCameraMode || 'user';
 
@@ -1043,7 +1041,7 @@ async function joinDailyRoom() {
   });
   co.on('error', e => tryRecover('error ' + (e?.errorMsg || '')));
 
-  // Step down outgoing video on EITHER side if Wi-Fi/4G packet loss spikes so voice packets always get priority
+  // Step down video on EITHER side if Wi-Fi/mobile packet loss spikes so voice packets always get priority
   co.on('network-quality-change', e => {
     if (callObject !== co) return;
     const s = e?.networkState || (e?.threshold === 'very-low' ? 'bad' : e?.threshold === 'low' ? 'warning' : 'good');
@@ -1100,11 +1098,11 @@ async function joinDailyRoom() {
 
     setTimeout(() => { if (callObject === co && !hadRemote) window.endCall(true); }, 90000);
 
-    if (typeof co.updateInputSettings === 'function') {
+    if (!isSafariOrIOS && typeof co.updateInputSettings === 'function') {
       co.updateInputSettings({ audio: { processor: { type: 'krisp' } } }).catch(() => {});
     }
 
-    // Cap video at 600 kbps and use bandwidth-optimized layers on BOTH sides so video bursts never starve voice audio
+    // Cap video bandwidth to 600 kbps and use bandwidth-optimized encodings on BOTH sides to keep audio packet loss near 0%
     try { co.setBandwidth({ kbs: 600 }); } catch (_) {}
     co.updateSendSettings({ video: 'bandwidth-optimized' }).catch(() => {});
 
