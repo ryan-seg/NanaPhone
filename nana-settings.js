@@ -305,9 +305,6 @@ onValue(refs.nanaDevices, snap => {
 });
 
 // --- 2. BRIGHTNESS, NIGHT MODE & CLOCK ---
-let lastSentHardwareVol = null;
-
-// --- 2. BRIGHTNESS, NIGHT MODE & CLOCK ---
 export function applyScreenBrightness(targetPercent) {
   if (role !== 'nana') return;
   // Never dim the screen while ringing or in an active call
@@ -318,16 +315,10 @@ export function applyScreenBrightness(targetPercent) {
     overlay.style.opacity = inCallOrRinging ? '0' : Math.max(0, Math.min(0.88, (100 - pct) / 105)).toFixed(2);
     overlay.style.pointerEvents = (!inCallOrRinging && pct < (settings.awakeBrightness ?? 85)) ? 'auto' : 'none';
   }
-}
-  const activeVol = state.currentState === 'connected'
-    ? Number(settings.callVolume ?? 85)
-    : (state.isRadioPlaying ? Number(settings.radioVolume ?? 75) : Number(settings.ringVolume ?? 85));
-  // Only call AndroidBridge when the target volume actually changes so idle dim/wake cycles
-  // never trigger the Lenovo Android STREAM_RING "ba-ba" volume confirmation beep!
-  if (activeVol !== lastSentHardwareVol) {
-    lastSentHardwareVol = activeVol;
-    window.AndroidBridge?.updateTabletHardwareSettings?.(activeVol, Number(settings.awakeBrightness ?? 85), Number(settings.dimDelaySec ?? 120), Number(settings.speechRate) || 0.9);
-  }
+  // NOTE: Do NOT call window.AndroidBridge.updateTabletHardwareSettings here!
+  // The APK installed on the Lenovo tablet adjusts STREAM_RING inside updateTabletHardwareSettings,
+  // which causes Lenovo Android to play a loud volume confirmation beep on every call.
+  // Screen dimming is handled by #brightness-overlay opacity above, and audio volume is controlled via Web Audio / HTMLMediaElement.volume.
 }
 
 window.wakeScreenAndResetDimTimer = function () {
