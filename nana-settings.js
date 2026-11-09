@@ -307,6 +307,7 @@ onValue(refs.nanaDevices, snap => {
 // --- 2. BRIGHTNESS, NIGHT MODE & CLOCK ---
 let lastSentHardwareVol = null;
 
+// --- 2. BRIGHTNESS, NIGHT MODE & CLOCK ---
 export function applyScreenBrightness(targetPercent) {
   if (role !== 'nana') return;
   // Never dim the screen while ringing or in an active call
@@ -317,6 +318,7 @@ export function applyScreenBrightness(targetPercent) {
     overlay.style.opacity = inCallOrRinging ? '0' : Math.max(0, Math.min(0.88, (100 - pct) / 105)).toFixed(2);
     overlay.style.pointerEvents = (!inCallOrRinging && pct < (settings.awakeBrightness ?? 85)) ? 'auto' : 'none';
   }
+}
   const activeVol = state.currentState === 'connected'
     ? Number(settings.callVolume ?? 85)
     : (state.isRadioPlaying ? Number(settings.radioVolume ?? 75) : Number(settings.ringVolume ?? 85));
@@ -394,9 +396,6 @@ window.announceBatteryWarning = (text) => {
   if (isBatteryVoiceCurrentlyMuted() || (Date.now() - lastBatterySpokenMs < intervalMs)) return;
   lastBatterySpokenMs = Date.now();
   const battVol = Math.min(100, Math.max(20, Number(settings.batteryVoiceVolume) || 85));
-  if (role === 'nana' && window.AndroidBridge?.updateTabletHardwareSettings) {
-    window.AndroidBridge.updateTabletHardwareSettings(battVol, Number(settings.awakeBrightness ?? 85), Number(settings.dimDelaySec ?? 120), Number(settings.speechRate) || 0.9);
-  }
   speakMsg(text, true, battVol / 100);
 };
 
