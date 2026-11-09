@@ -80,6 +80,26 @@ function getNanaVideoConstraintObject(camSetting = settings.nanaCameraMode) {
   return { ...baseRes, deviceId: { ideal: mode } };
 }
 
+// Forcefully silence any background radio, video, ringtone, or TTS on Nana's tablet before & during a call
+function silenceAllBackgroundMediaOnTablet() {
+  try {
+    const rp = $('nana-radio-stream');
+    if (rp) {
+      rp.pause();
+      rp.muted = true;
+      rp.removeAttribute('src');
+      rp.load();
+    }
+    const vp = $('nana-video-el');
+    if (vp) {
+      if (!vp.paused) vp.pause();
+      vp.muted = true;
+    }
+    window.speechSynthesis?.cancel();
+    stopRingingUI();
+  } catch (_) {}
+}
+
 // Synchronous Audio Pre-Unlock (Run during physical Answer/Call tap AFTER any confirm() dialog)
 function unlockCallAudioImmediate() {
   try {
@@ -98,6 +118,7 @@ function unlockCallAudioImmediate() {
     if (rv) {
       // Permanently keep #remote-video muted so mobile/desktop browsers never block video autoplay
       rv.muted = true;
+      rv.volume = 0;
       rv.play().catch(() => {});
     }
   } catch (_) {}
@@ -303,12 +324,20 @@ async function applyLiveNanaCameraAndMicChanges() {
   const targetMic = settings.nanaMicDeviceId || 'default';
   if (targetMic !== appliedNanaMicDeviceId) {
     try {
-      const newProcessedTrack = await buildNanaProcessedMicTrack(targetMic);
-      if (newProcessedTrack && typeof newProcessedTrack === 'object') {
-        await callObject.setInputDevicesAsync({ audioSource: newProcessedTrack });
-        callObject.setLocalAudio(true);
-        logCall('mic-switch', targetMic);
+      if (settings.nanaMicDspMode === 'max-boost') {
+        const newProcessedTrack = await buildNanaProcessedMicTrack(targetMic);
+        if (newProcessedTrack && typeof newProcessedTrack === 'object') {
+          await callObject.setInputDevicesAsync({ audioSource: newProcessedTrack });
+        }
+      } else {
+        cleanupNanaMicDsp();
+        await callObject.setInputDevicesAsync({
+          audioDeviceId: targetMic === 'default' ? 'default' : targetMic
+        });
+        appliedNanaMicDeviceId = targetMic;
       }
+      callObject.setLocalAudio(true);
+      logCall('mic-switch', targetMic);
     } catch (e) {
       console.warn("Could not switch Nana microphone:", e);
     }
@@ -603,6 +632,7 @@ function startLocalRadioStream() {
   if (!radioPlayer) return;
   state.isRadioPlaying = true;
   window.wakeScreenAndResetDimTimer?.();
+  radioPlayer.muted = false;
   radioPlayer.volume = Math.min(1.0, Math.max(0.15, (Number(settings.radioVolume ?? 75)) / 100));
   radioPlayer.src = CONFIG.classicFmStream;
   radioPlayer.play().catch(() => {});
@@ -760,7 +790,7 @@ function stopTelegramRingBurst() {
   }
 }
 
-// --- 6. DAILY.CO WEBRTC VIDEO ENGINE (WITH VOCAL DSP, KRISP & AMPLIFIER) ---
+// --- 6. DAILY.CO WEBRTC VIDEO ENGINE (WITH NATIVE AEC, KRISP & AMPLIFIER) ---
 window.switchFamilyCamera = async () => {
   if (!callObject) return;
   try {
@@ -851,6 +881,11 @@ async function joinDailyRoom() {
     return;
   }
 
+  // Forcefully silence any radio, video, ringtone, or TTS on Nana's tablet
+  if (role === 'nana') {
+    silenceAllBackgroundMediaOnTablet();
+  }
+
   // Ensure any lingering camera tracks from a previous call are fully released first
   const lvPrev = $('local-video');
   if (lvPrev?.srcObject) {
@@ -858,9 +893,10 @@ async function joinDailyRoom() {
     lvPrev.srcObject = null;
   }
 
-  // Always resume AudioContext & build Nana's vocal boost DSP track before joining
+  // Use native Android hardware AEC/NS/AGC mic by default so Web Audio nodes never break hardware echo cancellation!
+  // Only insert the custom Web Audio mic DSP graph if 'max-boost' is explicitly selected in Supervisor Settings.
   let customAudioSource = true;
-  if (role === 'nana') {
+  if (role === 'nana' && settings.nanaMicDspMode === 'max-boost') {
     try { await withTimeout(audioCtx.resume(), 2000); } catch (_) {}
     const t = await withTimeout(buildNanaProcessedMicTrack(settings.nanaMicDeviceId), 6000);
     if (t && t !== '__timeout__' && typeof t === 'object' && audioCtx.state === 'running') {
@@ -869,11 +905,24 @@ async function joinDailyRoom() {
       cleanupNanaMicDsp();
       logCall('mic-dsp-fallback', 'ctx=' + audioCtx.state);
     }
+  } else if (role === 'nana') {
+    cleanupNanaMicDsp();
+    appliedNanaMicDeviceId = settings.nanaMicDeviceId || 'default';
   }
+
   logCall('join-start');
   const nanaCamConstraint = role === 'nana'
     ? getNanaVideoConstraintObject(settings.nanaCameraMode)
     : { facingMode: 'user', width: { ideal: 640, max: 640 }, height: { ideal: 480, max: 480 }, frameRate: { ideal: 20, max: 24 } };
+
+  const nanaMicConstraint = {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true
+  };
+  if (role === 'nana' && settings.nanaMicDeviceId && settings.nanaMicDeviceId !== 'default') {
+    nanaMicConstraint.deviceId = { ideal: settings.nanaMicDeviceId };
+  }
 
   if (role === 'nana') appliedNanaCameraMode = settings.nanaCameraMode || 'user';
 
@@ -882,7 +931,7 @@ async function joinDailyRoom() {
     videoSource: true,
     dailyConfig: {
       avoidEval: true,
-      userMediaAudioConstraints: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      userMediaAudioConstraints: nanaMicConstraint,
       userMediaVideoConstraints: nanaCamConstraint
     }
   });
@@ -962,6 +1011,7 @@ async function joinDailyRoom() {
       vTrack.onunmute = () => {
         if (rv) {
           rv.muted = true;
+          rv.volume = 0;
           rv.srcObject = new MediaStream([vTrack]);
           rv.play().catch(() => {});
           hideBannerIfOk();
@@ -973,10 +1023,12 @@ async function joinDailyRoom() {
       hideBannerIfOk();
       if (rv.srcObject?.getVideoTracks()[0] !== vTrack) {
         rv.muted = true;
+        rv.volume = 0;
         rv.srcObject = new MediaStream([vTrack]);
         rv.play().catch(() => {});
       } else if (rv.paused) {
         rv.muted = true;
+        rv.volume = 0;
         rv.play().catch(() => {});
       }
     } else if (role === 'family' && (!vTrack || target.tracks?.video?.state === 'loading' || target.tracks?.video?.state === 'interrupted')) {
@@ -1014,6 +1066,7 @@ async function joinDailyRoom() {
   const camWatchdog = setInterval(() => {
     if (callObject !== co) { clearInterval(camWatchdog); return; }
     if (role === 'nana') {
+      silenceAllBackgroundMediaOnTablet();
       const localV = co.participants()?.local?.tracks?.video;
       if (localV && !videoPausedForNetwork && (localV.state === 'off' || localV.state === 'blocked')) {
         co.setLocalVideo(true);
@@ -1106,7 +1159,7 @@ async function joinDailyRoom() {
     try { co.setBandwidth({ kbs: 600 }); } catch (_) {}
     co.updateSendSettings({ video: 'bandwidth-optimized' }).catch(() => {});
 
-    logCall('audio', `ctx=${audioCtx.state} safari=${isSafariOrIOS} base=${Math.round((audioCtx.baseLatency || 0) * 1000)}ms out=${Math.round((audioCtx.outputLatency || 0) * 1000)}ms`);
+    logCall('audio', `ctx=${audioCtx.state} safari=${isSafariOrIOS} dsp=${settings.nanaMicDspMode} base=${Math.round((audioCtx.baseLatency || 0) * 1000)}ms out=${Math.round((audioCtx.outputLatency || 0) * 1000)}ms`);
     try { co.getNetworkTopology?.().then(t => logCall('topology', t?.topology)).catch(() => {}); } catch (_) {}
     const statsTimer = setInterval(async () => {
       if (callObject !== co) { clearInterval(statsTimer); return; }
@@ -1165,6 +1218,7 @@ async function startCallFromNana(member) {
   unlockCallAudioImmediate();
   didManuallyInitiateOrAnswerOnThisTab = true;
   await window.stopRadioAndSync(true);
+  silenceAllBackgroundMediaOnTablet();
   $('bulletin-modal').style.display = 'none';
   window.closeSeniorKeyboard?.(false);
   state.currentState = 'calling_family';
@@ -1283,7 +1337,7 @@ window.answerCallAsNana = async () => {
   unlockCallAudioImmediate();
   didManuallyInitiateOrAnswerOnThisTab = true;
   clearTimeout(autoAnswerTimeout);
-  stopRingingUI();
+  silenceAllBackgroundMediaOnTablet();
   showScreen('call-screen');
   joinDailyRoom();
   const cId = state.callSnap?.callerId;
@@ -1489,6 +1543,9 @@ onValue(refs.callState, snap => {
         state.returnToVideoAfterCall = true;
       }
       hooks.pauseVideo?.('incoming_call');
+      if (data.status === 'connected') {
+        silenceAllBackgroundMediaOnTablet();
+      }
     }
   }
 
@@ -1528,6 +1585,9 @@ onValue(refs.callState, snap => {
         return;
       }
       if (!act) return;
+
+      // Silence any radio or video before playing the ringtone
+      silenceAllBackgroundMediaOnTablet();
 
       // 1. Force Night Dimmer & Brightness Overlay completely out of the way so 1st tap ALWAYS answers
       if ($('night-dimmer')) $('night-dimmer').style.display = 'none';
@@ -1584,7 +1644,7 @@ onValue(refs.callState, snap => {
       clearTimeout(incomingRingTimeout);
       clearTimeout(autoAnswerTimeout);
       stopTelegramRingBurst();
-      stopRingingUI();
+      silenceAllBackgroundMediaOnTablet();
       const partnerId = data.callerId === 'nana' ? data.targetId : data.callerId;
       if (partnerId && act) clearMissedCallsForMember(partnerId);
       if (act) { showScreen('call-screen'); joinDailyRoom(); }
