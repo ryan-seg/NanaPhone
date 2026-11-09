@@ -315,16 +315,21 @@ async function applyLiveNanaCameraAndMicChanges() {
   }
 }
 
-const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// Detect ALL Safari / WebKit browsers (iOS, iPadOS with "Request Desktop Website", and macOS Safari)
+// Safari WebKit has a known bug where routing a WebRTC MediaStreamTrack into AudioContext.createMediaStreamSource
+// causes crackling/dropouts, so Safari must always play directly through the native #remote-audio element.
+const isSafariOrIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  || /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
 // The Web Audio amplifier is the ONLY audible path while it is running (the muted #remote-audio element just keeps
-// Chrome decoding the stream). If audioCtx isn't running or boost <= 100%, #remote-audio is unmuted directly.
-const familyAmpIsExclusive = () => !!familyBoostNodes && audioCtx.state === 'running';
+// Chrome decoding the stream). If audioCtx isn't running, on Safari/iOS, or boost <= 100%, #remote-audio is unmuted directly.
+const familyAmpIsExclusive = () => !isSafariOrIOS && !!familyBoostNodes && audioCtx.state === 'running';
 
 function applyFamilyVoiceBoostGain() {
   const ra = $('remote-audio');
   const boostPct = Number(settings.familyVoiceBoostPct) || 180;
-  if (boostPct <= 100) {
+  if (isSafariOrIOS || boostPct <= 100) {
     cleanupFamilyVoiceAmplifier();
     if (ra && role === 'family') ra.muted = false;
     return;
@@ -340,7 +345,7 @@ function applyFamilyVoiceBoostGain() {
 
 function attachFamilyVoiceAmplifier(aTrack) {
   if (role !== 'family' || !aTrack) return false;
-  if (isIOSDevice || (Number(settings.familyVoiceBoostPct) || 180) <= 100) return false;
+  if (isSafariOrIOS || (Number(settings.familyVoiceBoostPct) || 180) <= 100) return false;
   if (attachedRemoteAudioTrack === aTrack && familyBoostNodes) {
     applyFamilyVoiceBoostGain();
     return true;
@@ -854,21 +859,23 @@ async function joinDailyRoom() {
     lvPrev.srcObject = null;
   }
 
+  // Always resume AudioContext and build Nana's processed vocal-boost mic track
   let customAudioSource = true;
   if (role === 'nana') {
-    try { if (audioCtx.state === 'suspended') await withTimeout(audioCtx.resume(), 1500); } catch (_) {}
-    if (audioCtx.state === 'running') {
-      const t = await withTimeout(buildNanaProcessedMicTrack(settings.nanaMicDeviceId), 8000);
-      if (t && t !== '__timeout__') customAudioSource = t;
-      else logCall('mic-dsp-fallback', 'timeout');
+    try { await withTimeout(audioCtx.resume(), 2000); } catch (_) {}
+    const t = await withTimeout(buildNanaProcessedMicTrack(settings.nanaMicDeviceId), 6000);
+    if (t && t !== '__timeout__' && typeof t === 'object' && audioCtx.state === 'running') {
+      customAudioSource = t;
+      logCall('mic-dsp-active', settings.nanaMicDspMode || 'vocal-boost');
     } else {
-      logCall('mic-dsp-fallback', 'audioCtx ' + audioCtx.state);
+      cleanupNanaMicDsp();
+      logCall('mic-dsp-fallback', 'ctx=' + audioCtx.state);
     }
   }
   logCall('join-start');
   const nanaCamConstraint = role === 'nana'
     ? getNanaVideoConstraintObject(settings.nanaCameraMode)
-    : { facingMode: 'user', width: { ideal: 640, max: 1280 }, height: { ideal: 480, max: 720 }, frameRate: { ideal: 24, max: 30 } };
+    : { facingMode: 'user', width: { ideal: 640, max: 960 }, height: { ideal: 480, max: 540 }, frameRate: { ideal: 20, max: 24 } };
 
   if (role === 'nana') appliedNanaCameraMode = settings.nanaCameraMode || 'user';
 
@@ -980,7 +987,7 @@ async function joinDailyRoom() {
 
     if (aTrack && aTrack.readyState === 'live') {
       if (role === 'family') {
-        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+        if (!isSafariOrIOS && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
         attachFamilyVoiceAmplifier(aTrack);
         if (ra && ra.srcObject?.getAudioTracks()[0] !== aTrack) {
           ra.loop = false;
@@ -1036,11 +1043,11 @@ async function joinDailyRoom() {
   });
   co.on('error', e => tryRecover('error ' + (e?.errorMsg || '')));
 
+  // Step down outgoing video on EITHER side if Wi-Fi/4G packet loss spikes so voice packets always get priority
   co.on('network-quality-change', e => {
     if (callObject !== co) return;
     const s = e?.networkState || (e?.threshold === 'very-low' ? 'bad' : e?.threshold === 'low' ? 'warning' : 'good');
     logCall('quality', `${s} ${(e?.networkStateReasons || []).join(',')}`);
-    if (role !== 'nana') return;
     if (s === 'bad' && !videoPausedForNetwork) {
       videoPausedForNetwork = true;
       try { co.setLocalVideo(false); } catch (_) {}
@@ -1054,7 +1061,7 @@ async function joinDailyRoom() {
   co.on('cpu-load-change', e => {
     if (callObject !== co) return;
     logCall('cpu', e?.cpuLoadState || '');
-    if (role === 'nana') co.updateSendSettings({ video: e?.cpuLoadState === 'high' ? { maxQuality: 'low' } : 'bandwidth-optimized' }).catch(() => {});
+    co.updateSendSettings({ video: e?.cpuLoadState === 'high' ? { maxQuality: 'low' } : 'bandwidth-optimized' }).catch(() => {});
   });
 
   try {
@@ -1097,10 +1104,11 @@ async function joinDailyRoom() {
       co.updateInputSettings({ audio: { processor: { type: 'krisp' } } }).catch(() => {});
     }
 
-    try { co.setBandwidth({ kbs: 1000 }); } catch (_) {}
-    if (role === 'nana') co.updateSendSettings({ video: 'bandwidth-optimized' }).catch(() => {});
+    // Cap video at 600 kbps and use bandwidth-optimized layers on BOTH sides so video bursts never starve voice audio
+    try { co.setBandwidth({ kbs: 600 }); } catch (_) {}
+    co.updateSendSettings({ video: 'bandwidth-optimized' }).catch(() => {});
 
-    logCall('audio', `ctx=${audioCtx.state} base=${Math.round((audioCtx.baseLatency || 0) * 1000)}ms out=${Math.round((audioCtx.outputLatency || 0) * 1000)}ms`);
+    logCall('audio', `ctx=${audioCtx.state} safari=${isSafariOrIOS} base=${Math.round((audioCtx.baseLatency || 0) * 1000)}ms out=${Math.round((audioCtx.outputLatency || 0) * 1000)}ms`);
     try { co.getNetworkTopology?.().then(t => logCall('topology', t?.topology)).catch(() => {}); } catch (_) {}
     const statsTimer = setInterval(async () => {
       if (callObject !== co) { clearInterval(statsTimer); return; }
