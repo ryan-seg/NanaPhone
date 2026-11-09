@@ -110,9 +110,6 @@ function applyVideoVolume(volPct) {
   settings.videoVolume = vol;
   if ($('nana-video-vol-display')) $('nana-video-vol-display').innerText = `${vol}%`;
   if (videoEl) videoEl.volume = Math.min(1.0, Math.max(0.1, vol / 100));
-  if (role === 'nana' && !videoEl?.paused) {
-    window.AndroidBridge?.updateTabletHardwareSettings?.(vol, Number(settings.awakeBrightness ?? 85), Number(settings.dimDelaySec ?? 120), Number(settings.speechRate) || 0.9);
-  }
 }
 
 window.adjustNanaVideoVolume = async (delta) => {
