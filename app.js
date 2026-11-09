@@ -1151,7 +1151,7 @@ async function joinDailyRoom() {
 
     setTimeout(() => { if (callObject === co && !hadRemote) window.endCall(true); }, 90000);
 
-    if (!isSafariOrIOS && typeof co.updateInputSettings === 'function') {
+    if (role === 'family' && !isSafariOrIOS && typeof co.updateInputSettings === 'function') {
       co.updateInputSettings({ audio: { processor: { type: 'krisp' } } }).catch(() => {});
     }
 
