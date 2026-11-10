@@ -158,13 +158,13 @@ export function getNanaMicShortLabel(micId = settings.nanaMicDeviceId) {
       <div class="opt-row">${optBtns('ringVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
     </div>
     <div class="settings-card">
-      <div class="settings-label"><span>🔋 Battery Unplugged Voice Interval, Volume & Mute</span><span class="lbl-battery-summary" style="color:#38bdf8;font-size:0.92rem;">Every 3m • 85%</span></div>
+      <div class="settings-label"><span>🔋 Battery Unplugged Voice Cadence, Volume & Mute</span><span class="lbl-battery-summary" style="color:#38bdf8;font-size:0.92rem;">Dynamic Urgency</span></div>
       <div class="settings-sub lbl-battery-mute">Battery Voice Status: Active</div>
       <div class="settings-sub" style="margin-bottom:4px;">🔌 Show Warning & Speak When Unplugged At or Below:</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceThresholdPct', [[100,'100% (Immediately)'],[80,'80%'],[50,'50%'],[35,'35%'],[25,'25%']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">⏱️ Unplugged Voice Repeat Interval:</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceIntervalMin', [[1,'1m'],[3,'3m'],[5,'5m'],[10,'10m'],[15,'15m'],[30,'30m']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">🔊 Unplugged Voice Alert Volume:</div>
+      <div class="settings-sub" style="margin-bottom:4px;">⏱️ Base Voice Interval (Auto-speeds up as battery drops: >50%=15m, 31-50%=8m, 16-30%=3m, ≤15%=1m):</div>
+      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceIntervalMin', [[1,'1m (Fast)'],[3,'3m (Auto)'],[5,'5m'],[10,'10m'],[15,'15m'],[30,'30m']])}</div>
+      <div class="settings-sub" style="margin-bottom:4px;">🔊 Unplugged Voice Alert Volume (Auto-boosts to 100% when battery ≤15%):</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
       <div class="opt-row" style="margin-bottom:8px;">
         <button class="opt-btn" style="background:#dc2626;border-color:#fff;color:#fff;" onclick="clearAllMissedCalls()">🧹 Clear Missed Calls</button>
@@ -367,8 +367,8 @@ window.wakeFromNightMode = () => {
   window.wakeScreenAndResetDimTimer();
 };
 
-// --- 3. BATTERY VOICE WARNINGS, CHIME & MUTE ---
-function playBatteryAttentionChime(vol = 0.85) {
+// --- 3. DYNAMIC URGENCY BATTERY VOICE WARNINGS, CHIME & MUTE ---
+function playBatteryAttentionChime(vol = 0.85, urgentDouble = false) {
   try {
     if (!cachedBatteryChimeWavUrl) {
       const sr = 8000, dur = 0.85, n = Math.floor(sr * dur);
@@ -386,10 +386,55 @@ function playBatteryAttentionChime(vol = 0.85) {
       }
       cachedBatteryChimeWavUrl = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
     }
+    const safeVol = Math.min(1.0, Math.max(0.25, vol));
     const chime = new Audio(cachedBatteryChimeWavUrl);
-    chime.volume = Math.min(1.0, Math.max(0.25, vol));
+    chime.volume = safeVol;
     chime.play().catch(() => {});
+    if (urgentDouble) {
+      setTimeout(() => {
+        const chime2 = new Audio(cachedBatteryChimeWavUrl);
+        chime2.volume = safeVol;
+        chime2.play().catch(() => {});
+      }, 450);
+    }
   } catch (_) {}
+}
+
+// Compute dynamic repeat interval, volume & message urgency based on battery percentage
+function getDynamicBatteryAlertPlan(levelPct) {
+  const lvl = (typeof levelPct === 'number' && !Number.isNaN(levelPct)) ? Math.round(levelPct) : 50;
+  const baseVol = Math.min(100, Math.max(25, Number(settings.batteryVoiceVolume) || 85));
+
+  if (lvl <= 15) {
+    return {
+      intervalMin: 1, // Critical: every 1 minute
+      volumePct: 100, // Maximum volume
+      urgentChime: true,
+      message: `Urgent. The tablet battery is critically low at ${lvl} percent. Please plug in the tablet charger now so it does not switch off.`
+    };
+  }
+  if (lvl <= 30) {
+    return {
+      intervalMin: 3, // High importance: every 3 minutes
+      volumePct: Math.max(baseVol, 90),
+      urgentChime: true,
+      message: `Important. The tablet battery is low at ${lvl} percent. Please plug in the tablet charger.`
+    };
+  }
+  if (lvl <= 50) {
+    return {
+      intervalMin: 8, // Moderate: every 8 minutes
+      volumePct: baseVol,
+      urgentChime: false,
+      message: `Please plug in the tablet charger. The battery is at ${lvl} percent.`
+    };
+  }
+  return {
+    intervalMin: 15, // Gentle reminder (>50%): every 15 minutes
+    volumePct: baseVol,
+    urgentChime: false,
+    message: `Please plug in the tablet charger when you can.`
+  };
 }
 
 window.muteBatteryVoiceForHours = async (hours) => {
@@ -398,24 +443,30 @@ window.muteBatteryVoiceForHours = async (hours) => {
   window.speechSynthesis?.cancel();
   window.AndroidBridge?.muteBatteryVoiceForMinutes?.(hours * 60);
   refreshSettingsUI();
+  hooks.syncBatteryUI?.();
   await update(refs.settings, { batteryVoiceMutedUntil: mutedUntil });
 };
 
-window.announceBatteryWarning = (text) => {
-  const intervalMs = Math.max(1, Number(settings.batteryVoiceIntervalMin) || 3) * 60000;
-  if (isBatteryVoiceCurrentlyMuted() || (Date.now() - lastBatterySpokenMs < intervalMs)) return;
+window.announceBatteryWarning = (levelOrText) => {
+  if (isBatteryVoiceCurrentlyMuted()) return;
+
+  const isNumericLevel = typeof levelOrText === 'number' && !Number.isNaN(levelOrText);
+  const plan = getDynamicBatteryAlertPlan(isNumericLevel ? levelOrText : 50);
+  const intervalMs = plan.intervalMin * 60000;
+
+  if (Date.now() - lastBatterySpokenMs < intervalMs) return;
   lastBatterySpokenMs = Date.now();
-  const battVol = Math.min(100, Math.max(20, Number(settings.batteryVoiceVolume) || 85));
 
-  // Wake screen brightness so Nana sees the red plug-in banner clearly
+  const spokenText = isNumericLevel ? plan.message : String(levelOrText || plan.message);
+  const volNorm = plan.volumePct / 100;
+
   window.wakeScreenAndResetDimTimer?.();
+  playBatteryAttentionChime(volNorm, plan.urgentChime);
 
-  // Play attention chime + speak warning aloud
-  playBatteryAttentionChime(battVol / 100);
   setTimeout(() => {
     try { window.speechSynthesis?.cancel(); } catch (_) {}
-    speakMsg(text, true, battVol / 100);
-  }, 900);
+    speakMsg(spokenText, true, volNorm);
+  }, plan.urgentChime ? 1050 : 900);
 };
 
 // --- 4. SUPERVISOR PIN, ANDROID ADMIN & PHONE GUIDE MODALS ---
@@ -584,7 +635,7 @@ export function refreshSettingsUI() {
   const awakeB = Number(settings.awakeBrightness ?? 85), dimB = Number(settings.dimBrightness ?? 15), dimSec = Number(settings.dimDelaySec ?? 120);
   const nStart = Number(settings.nightStartHour ?? 21), nEnd = Number(settings.nightEndHour ?? 8);
   const kbLayout = settings.keyboardLayout || 'qwerty', kbHideSec = Number(settings.keyboardTimeoutSec ?? 60);
-  const battIntMin = Number(settings.batteryVoiceIntervalMin ?? 3), battVol = Number(settings.batteryVoiceVolume ?? 85);
+  const battVol = Number(settings.batteryVoiceVolume ?? 85);
 
   if ($('in-call-vol-label')) $('in-call-vol-label').innerText = `${callVol}%`;
   if ($('nana-vol-display')) $('nana-vol-display').innerText = `${radVol}%`;
@@ -603,7 +654,7 @@ export function refreshSettingsUI() {
   document.querySelectorAll('.lbl-vol-summary').forEach(e => {
     e.innerText = `Mic: ${dspMode} • Boost: ${boostPct}% • Call ${callVol}%`;
   });
-  document.querySelectorAll('.lbl-battery-summary').forEach(e => { e.innerText = `Every ${battIntMin}m • Vol ${battVol}%`; });
+  document.querySelectorAll('.lbl-battery-summary').forEach(e => { e.innerText = `Dynamic (15m➔1m) • Vol ${battVol}%`; });
   document.querySelectorAll('.lbl-night-window').forEach(e => {
     e.innerText = settings.nightModeEnabled ? `${String(nStart).padStart(2,'0')}:00 – ${String(nEnd).padStart(2,'0')}:00` : "Disabled";
   });
@@ -611,7 +662,7 @@ export function refreshSettingsUI() {
   const mutedUntil = Number(settings.batteryVoiceMutedUntil) || 0;
   const muteTxt = mutedUntil > Date.now()
     ? `🔇 Muted until ${new Date(mutedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    : `🔊 Battery Voice: Active (Every ${battIntMin}m at ${battVol}% vol, <= ${settings.batteryVoiceThresholdPct ?? 100}%)`;
+    : `🔊 Battery Voice: Dynamic Urgency (>50%=15m, 31-50%=8m, 16-30%=3m, ≤15%=1m at 100% vol)`;
   document.querySelectorAll('.lbl-battery-mute').forEach(e => { e.innerText = muteTxt; });
 
   const sCall = Math.min(1.0, Math.max(0.2, callVol / 100)), sRad = Math.min(1.0, Math.max(0.15, radVol / 100));
@@ -643,6 +694,7 @@ export function refreshSettingsUI() {
     }
   }
 
+  hooks.syncBatteryUI?.();
   hooks.renderTodaysCallsBanner?.();
   hooks.onSettingsChanged.forEach(fn => fn(settings));
 }
