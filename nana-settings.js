@@ -12,7 +12,6 @@ let enteredPin = "";
 let idleDimTimer = null;
 let nightDismissedUntilMs = 0;
 let lastBatterySpokenMs = 0;
-let cachedBatteryChimeWavUrl = null;
 const HIDE_FOREVER = 4102444800000;
 
 function parseHoursArray(val, fallback) {
@@ -33,25 +32,6 @@ const fmtDelay = (sec) => {
   const s = Number(sec ?? 120);
   return s === 0 ? "Never" : (s < 60 ? `${s}s` : `${Math.round(s / 60)}m`);
 };
-
-export function getNanaCameraShortLabel(mode = settings.nanaCameraMode) {
-  const m = mode || 'user';
-  if (m === 'user') return 'Front';
-  if (m === 'environment') return 'Rear';
-  const cams = state.nanaDevicesSnap?.cameras || [];
-  const idx = cams.findIndex(c => c.deviceId === m);
-  if (idx >= 0) return cams[idx].label || `Cam ${idx + 1}`;
-  return 'Custom';
-}
-
-export function getNanaMicShortLabel(micId = settings.nanaMicDeviceId) {
-  const id = micId || 'default';
-  if (id === 'default') return 'Default';
-  const mics = state.nanaDevicesSnap?.mics || [];
-  const idx = mics.findIndex(m => m.deviceId === id);
-  if (idx >= 0) return mics[idx].label || `Mic ${idx + 1}`;
-  return 'Custom';
-}
 
 // --- 1. SINGLE-PASS DYNAMIC CONTROLS & SETTINGS BUILDER ---
 (function buildAllSettingsControls() {
@@ -101,16 +81,6 @@ export function getNanaMicShortLabel(micId = settings.nanaMicDeviceId) {
         <button class="opt-btn calling-on-btn" onclick="setCallingEnabled(true)">✅ Turn ON</button>
       </div>
     </div>
-    <div class="settings-card">
-      <div class="settings-label">
-        <span>📷🎙️ Nana's Camera & Microphone Hardware</span>
-        <span class="lbl-hw-summary" style="color:#38bdf8;font-size:0.88rem;">Front • Default Mic</span>
-      </div>
-      <div class="settings-sub" style="margin-bottom:4px;">📷 Nana's Active Camera (Switch if a camera lens is black or facing away):</div>
-      <div id="nana-cam-options-row" class="opt-row" style="margin-bottom:8px;"></div>
-      <div class="settings-sub" style="margin-bottom:4px;">🎙️ Nana's Active Microphone:</div>
-      <div id="nana-mic-options-row" class="opt-row"></div>
-    </div>
     <div class="settings-card" id="test-links-card">
       <div class="settings-label"><span>🧪 Test Calls Without Nana</span></div>
       <div class="settings-sub">Practice calls in a private sandbox without ringing Nana's tablet.</div>
@@ -145,11 +115,7 @@ export function getNanaMicShortLabel(micId = settings.nanaMicDeviceId) {
       <div class="opt-row">${optBtns('dimDelaySec', [[30,'30s'],[60,'1m'],[120,'2m'],[300,'5m'],[600,'10m'],[0,'Never']])}</div>
     </div>
     <div class="settings-card">
-      <div class="settings-label"><span>🔊 Volumes & Vocal Clarity DSP</span><span class="lbl-vol-summary" style="color:#38bdf8;font-size:0.92rem;"></span></div>
-      <div class="settings-sub" style="margin-bottom:4px;">🎙️ Nana's Tablet Mic DSP (Default uses Hardware Echo Cancellation; Max Boost adds 2.5x Web Audio DSP):</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('nanaMicDspMode', [['raw','🎙️ Native AEC Mic'],['vocal-boost','🗣️ Native AEC + Boost'],['max-boost','📢 Max Vocal Boost (2.5x)']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">📢 Boost Nana's Incoming Voice on Family Phones (Web Audio Amplifier):</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('familyVoiceBoostPct', [[100,'100% (Normal)'],[180,'180% (Boost)'],[250,'250% (High)'],[300,'300% (Max)']])}</div>
+      <div class="settings-label"><span>🔊 Tablet Volumes</span><span class="lbl-vol-summary" style="color:#38bdf8;font-size:0.92rem;"></span></div>
       <div class="settings-sub" style="margin-bottom:4px;">📹 Video Call Voice Volume (On Nana's Tablet Speaker):</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('callVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
       <div class="settings-sub" style="margin-bottom:4px;">🎻 Classic FM Radio Volume:</div>
@@ -158,13 +124,11 @@ export function getNanaMicShortLabel(micId = settings.nanaMicDeviceId) {
       <div class="opt-row">${optBtns('ringVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
     </div>
     <div class="settings-card">
-      <div class="settings-label"><span>🔋 Battery Unplugged Voice Cadence, Volume & Mute</span><span class="lbl-battery-summary" style="color:#38bdf8;font-size:0.92rem;">Dynamic Urgency</span></div>
+      <div class="settings-label"><span>🔋 Battery Unplugged Voice Alert & Mute</span><span class="lbl-battery-summary" style="color:#38bdf8;font-size:0.92rem;"></span></div>
       <div class="settings-sub lbl-battery-mute">Battery Voice Status: Active</div>
       <div class="settings-sub" style="margin-bottom:4px;">🔌 Show Warning & Speak When Unplugged At or Below:</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceThresholdPct', [[100,'100% (Immediately)'],[80,'80%'],[50,'50%'],[35,'35%'],[25,'25%']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">⏱️ Base Voice Interval (Auto-speeds up as battery drops: >50%=15m, 31-50%=8m, 16-30%=3m, ≤15%=1m):</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceIntervalMin', [[1,'1m (Fast)'],[3,'3m (Auto)'],[5,'5m'],[10,'10m'],[15,'15m'],[30,'30m']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">🔊 Unplugged Voice Alert Volume (Auto-boosts to 100% when battery ≤15%):</div>
+      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceThresholdPct', [[0,'Off'],[15,'15%'],[25,'25%'],[30,'30%'],[50,'50%'],[80,'80%']])}</div>
+      <div class="settings-sub" style="margin-bottom:4px;">🔊 Unplugged Voice Alert Volume:</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
       <div class="opt-row" style="margin-bottom:8px;">
         <button class="opt-btn" style="background:#dc2626;border-color:#fff;color:#fff;" onclick="clearAllMissedCalls()">🧹 Clear Missed Calls</button>
@@ -234,77 +198,6 @@ export function getNanaMicShortLabel(micId = settings.nanaMicDeviceId) {
   `;
 })();
 
-function renderNanaHardwareDeviceOptions() {
-  const camRow = $('nana-cam-options-row');
-  const micRow = $('nana-mic-options-row');
-  const curCam = settings.nanaCameraMode || 'user';
-  const curMic = settings.nanaMicDeviceId || 'default';
-  const cams = state.nanaDevicesSnap?.cameras || [];
-  const mics = state.nanaDevicesSnap?.mics || [];
-
-  if (camRow) {
-    const camChoices = [
-      ['user', '📷 Front Camera'],
-      ['environment', '📷 Rear Camera'],
-      ...cams.map((c, i) => [c.deviceId, `🎥 ${c.label || `Camera ${i + 1}`}`])
-    ];
-    camRow.innerHTML = '';
-    camChoices.forEach(([val, lbl]) => {
-      const b = document.createElement('button');
-      b.className = 'opt-btn' + (curCam === val ? ' selected' : '');
-      b.textContent = lbl;
-      b.onclick = () => window.updateSetting('nanaCameraMode', val);
-      camRow.appendChild(b);
-    });
-  }
-
-  if (micRow) {
-    const micChoices = [
-      ['default', '🎙️ Default Mic'],
-      ...mics.filter(m => m.deviceId !== 'default').map((m, i) => [m.deviceId, `🎤 ${m.label || `Mic ${i + 1}`}`])
-    ];
-    micRow.innerHTML = '';
-    micChoices.forEach(([val, lbl]) => {
-      const b = document.createElement('button');
-      b.className = 'opt-btn' + (curMic === val ? ' selected' : '');
-      b.textContent = lbl;
-      b.onclick = () => window.updateSetting('nanaMicDeviceId', val);
-      micRow.appendChild(b);
-    });
-  }
-
-  const camShort = getNanaCameraShortLabel(curCam);
-  const micShort = getNanaMicShortLabel(curMic);
-  document.querySelectorAll('.lbl-hw-summary').forEach(el => {
-    el.innerText = `${camShort} • ${micShort}`;
-  });
-  if ($('btn-nana-cam-cycle')) $('btn-nana-cam-cycle').innerText = `📷 Nana Cam: ${camShort}`;
-  if ($('btn-nana-mic-cycle')) $('btn-nana-mic-cycle').innerText = `🎙️ Nana Mic: ${micShort}`;
-}
-
-window.cycleNanaCamera = () => {
-  const cams = state.nanaDevicesSnap?.cameras || [];
-  const options = ['user', 'environment', ...cams.map(c => c.deviceId)];
-  const uniqueOpts = [...new Set(options)];
-  const cur = settings.nanaCameraMode || 'user';
-  const next = uniqueOpts[(uniqueOpts.indexOf(cur) + 1) % uniqueOpts.length] || 'user';
-  window.updateSetting('nanaCameraMode', next);
-};
-
-window.cycleNanaMicrophone = () => {
-  const mics = (state.nanaDevicesSnap?.mics || []).filter(m => m.deviceId && m.deviceId !== 'default');
-  const options = ['default', ...mics.map(m => m.deviceId)];
-  const uniqueOpts = [...new Set(options)];
-  const cur = settings.nanaMicDeviceId || 'default';
-  const next = uniqueOpts[(uniqueOpts.indexOf(cur) + 1) % uniqueOpts.length] || 'default';
-  window.updateSetting('nanaMicDeviceId', next);
-};
-
-onValue(refs.nanaDevices, snap => {
-  state.nanaDevicesSnap = snap.val() || { cameras: [], mics: [] };
-  renderNanaHardwareDeviceOptions();
-});
-
 // --- 2. BRIGHTNESS, NIGHT MODE & CLOCK ---
 export function applyScreenBrightness(targetPercent) {
   if (role !== 'nana') return;
@@ -367,72 +260,28 @@ window.wakeFromNightMode = () => {
   window.wakeScreenAndResetDimTimer();
 };
 
-// --- 3. DYNAMIC URGENCY BATTERY VOICE WARNINGS, CHIME & MUTE ---
-function playBatteryAttentionChime(vol = 0.85, urgentDouble = false) {
-  try {
-    if (!cachedBatteryChimeWavUrl) {
-      const sr = 8000, dur = 0.85, n = Math.floor(sr * dur);
-      const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
-      const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
-      w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE');
-      w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-      v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
-      w(36, 'data'); v.setUint32(40, n * 2, true);
-      for (let i = 0; i < n; i++) {
-        const t = i / sr;
-        const f = t < 0.38 ? 587.33 : (t > 0.43 ? 880 : 0);
-        const s = f ? 0.5 * Math.sin(2 * Math.PI * f * t) : 0;
-        v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, s)) * 32767, true);
-      }
-      cachedBatteryChimeWavUrl = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
-    }
-    const safeVol = Math.min(1.0, Math.max(0.25, vol));
-    const chime = new Audio(cachedBatteryChimeWavUrl);
-    chime.volume = safeVol;
-    chime.play().catch(() => {});
-    if (urgentDouble) {
-      setTimeout(() => {
-        const chime2 = new Audio(cachedBatteryChimeWavUrl);
-        chime2.volume = safeVol;
-        chime2.play().catch(() => {});
-      }, 450);
-    }
-  } catch (_) {}
-}
-
-// Compute dynamic repeat interval, volume & message urgency based on battery percentage
+// --- 3. BATTERY VOICE WARNINGS & MUTE (NO SYNTHESIZED BEEP CHIMES) ---
 function getDynamicBatteryAlertPlan(levelPct) {
-  const lvl = (typeof levelPct === 'number' && !Number.isNaN(levelPct)) ? Math.round(levelPct) : 50;
+  const lvl = (typeof levelPct === 'number' && !Number.isNaN(levelPct)) ? Math.round(levelPct) : 30;
   const baseVol = Math.min(100, Math.max(25, Number(settings.batteryVoiceVolume) || 85));
 
   if (lvl <= 15) {
     return {
-      intervalMin: 1, // Critical: every 1 minute
-      volumePct: 100, // Maximum volume
-      urgentChime: true,
-      message: `Urgent. The tablet battery is critically low at ${lvl} percent. Please plug in the tablet charger now so it does not switch off.`
+      intervalMin: 2,
+      volumePct: 100,
+      message: `The tablet battery is low at ${lvl} percent. Please plug in the tablet charger.`
     };
   }
   if (lvl <= 30) {
     return {
-      intervalMin: 3, // High importance: every 3 minutes
-      volumePct: Math.max(baseVol, 90),
-      urgentChime: true,
-      message: `Important. The tablet battery is low at ${lvl} percent. Please plug in the tablet charger.`
-    };
-  }
-  if (lvl <= 50) {
-    return {
-      intervalMin: 8, // Moderate: every 8 minutes
-      volumePct: baseVol,
-      urgentChime: false,
+      intervalMin: 5,
+      volumePct: Math.max(baseVol, 85),
       message: `Please plug in the tablet charger. The battery is at ${lvl} percent.`
     };
   }
   return {
-    intervalMin: 15, // Gentle reminder (>50%): every 15 minutes
+    intervalMin: 15,
     volumePct: baseVol,
-    urgentChime: false,
     message: `Please plug in the tablet charger when you can.`
   };
 }
@@ -451,7 +300,7 @@ window.announceBatteryWarning = (levelOrText) => {
   if (isBatteryVoiceCurrentlyMuted()) return;
 
   const isNumericLevel = typeof levelOrText === 'number' && !Number.isNaN(levelOrText);
-  const plan = getDynamicBatteryAlertPlan(isNumericLevel ? levelOrText : 50);
+  const plan = getDynamicBatteryAlertPlan(isNumericLevel ? levelOrText : 30);
   const intervalMs = plan.intervalMin * 60000;
 
   if (Date.now() - lastBatterySpokenMs < intervalMs) return;
@@ -461,12 +310,8 @@ window.announceBatteryWarning = (levelOrText) => {
   const volNorm = plan.volumePct / 100;
 
   window.wakeScreenAndResetDimTimer?.();
-  playBatteryAttentionChime(volNorm, plan.urgentChime);
-
-  setTimeout(() => {
-    try { window.speechSynthesis?.cancel(); } catch (_) {}
-    speakMsg(spokenText, true, volNorm);
-  }, plan.urgentChime ? 1050 : 900);
+  try { window.speechSynthesis?.cancel(); } catch (_) {}
+  speakMsg(spokenText, true, volNorm);
 };
 
 // --- 4. SUPERVISOR PIN, ANDROID ADMIN & PHONE GUIDE MODALS ---
@@ -551,13 +396,6 @@ window.setCallingEnabled = (on) => window.updateSetting('callingEnabled', !!on);
 window.stepNanaCallVolume = (delta) => window.updateSetting('callVolume', Math.max(25, Math.min(100, (Number(settings.callVolume) || 85) + delta)));
 window.adjustNanaRadioVolume = (delta) => window.updateSetting('radioVolume', Math.max(15, Math.min(100, (Number(settings.radioVolume ?? 75)) + delta)));
 
-window.cycleFamilyVoiceBoost = () => {
-  const steps = [100, 180, 250, 300];
-  const cur = Number(settings.familyVoiceBoostPct ?? 180);
-  const next = steps[(steps.indexOf(cur) + 1) % steps.length] || 180;
-  window.updateSetting('familyVoiceBoostPct', next);
-};
-
 window.setFamilyQuestionSilentMode = (silent) => {
   state.familyComposerSilent = !!silent;
   $('btn-q-voice-loud')?.classList.toggle('selected', !state.familyComposerSilent);
@@ -629,32 +467,24 @@ export function refreshSettingsUI() {
   document.body.classList.remove('theme-yellow-black', 'theme-white-black', 'theme-black-cream');
   if (theme !== 'classic-dark') document.body.classList.add(`theme-${theme}`);
 
-  const callVol = Number(settings.callVolume ?? 85), radVol = Number(settings.radioVolume ?? 75);
-  const boostPct = Number(settings.familyVoiceBoostPct ?? 180);
-  const dspMode = settings.nanaMicDspMode || 'vocal-boost';
+  const callVol = Number(settings.callVolume ?? 85), radVol = Number(settings.radioVolume ?? 75), ringVol = Number(settings.ringVolume ?? 85);
   const awakeB = Number(settings.awakeBrightness ?? 85), dimB = Number(settings.dimBrightness ?? 15), dimSec = Number(settings.dimDelaySec ?? 120);
   const nStart = Number(settings.nightStartHour ?? 21), nEnd = Number(settings.nightEndHour ?? 8);
   const kbLayout = settings.keyboardLayout || 'qwerty', kbHideSec = Number(settings.keyboardTimeoutSec ?? 60);
   const battVol = Number(settings.batteryVoiceVolume ?? 85);
+  const battThresh = Number(settings.batteryVoiceThresholdPct ?? 30);
 
   if ($('in-call-vol-label')) $('in-call-vol-label').innerText = `${callVol}%`;
   if ($('nana-vol-display')) $('nana-vol-display').innerText = `${radVol}%`;
 
-  const boostBtn = $('btn-family-voice-boost');
-  if (boostBtn) {
-    boostBtn.innerText = `📢 Boost Nana: ${boostPct}%`;
-    boostBtn.style.background = boostPct > 100 ? '#7c3aed' : '#334155';
-    boostBtn.style.borderColor = boostPct >= 250 ? '#fef08a' : '#fff';
-  }
-
-  renderNanaHardwareDeviceOptions();
-
   document.querySelectorAll('.lbl-bright-summary').forEach(e => { e.innerText = `${awakeB}% ➔ ${dimB}% (${fmtDelay(dimSec)})`; });
   document.querySelectorAll('.lbl-kb-summary').forEach(e => { e.innerText = `${kbLayout.toUpperCase()} • ${fmtDelay(kbHideSec)}`; });
   document.querySelectorAll('.lbl-vol-summary').forEach(e => {
-    e.innerText = `Mic: ${dspMode} • Boost: ${boostPct}% • Call ${callVol}%`;
+    e.innerText = `Call ${callVol}% • Radio ${radVol}% • Ring ${ringVol}%`;
   });
-  document.querySelectorAll('.lbl-battery-summary').forEach(e => { e.innerText = `Dynamic (15m➔1m) • Vol ${battVol}%`; });
+  document.querySelectorAll('.lbl-battery-summary').forEach(e => {
+    e.innerText = battThresh <= 0 ? 'Off' : `≤${battThresh}% • Vol ${battVol}%`;
+  });
   document.querySelectorAll('.lbl-night-window').forEach(e => {
     e.innerText = settings.nightModeEnabled ? `${String(nStart).padStart(2,'0')}:00 – ${String(nEnd).padStart(2,'0')}:00` : "Disabled";
   });
@@ -662,11 +492,11 @@ export function refreshSettingsUI() {
   const mutedUntil = Number(settings.batteryVoiceMutedUntil) || 0;
   const muteTxt = mutedUntil > Date.now()
     ? `🔇 Muted until ${new Date(mutedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    : `🔊 Battery Voice: Dynamic Urgency (>50%=15m, 31-50%=8m, 16-30%=3m, ≤15%=1m at 100% vol)`;
+    : (battThresh <= 0 ? '🔕 Unplugged voice alerts switched OFF' : `🔊 Alerts when unplugged at ≤${battThresh}%`);
   document.querySelectorAll('.lbl-battery-mute').forEach(e => { e.innerText = muteTxt; });
 
   const sCall = Math.min(1.0, Math.max(0.2, callVol / 100)), sRad = Math.min(1.0, Math.max(0.15, radVol / 100));
-  if ($('remote-audio') && role === 'nana') $('remote-audio').volume = sCall;
+  if ($('remote-audio')) $('remote-audio').volume = role === 'nana' ? sCall : 1.0;
   if ($('remote-video') && role === 'nana') $('remote-video').volume = 0;
   if ($('nana-radio-stream') && role === 'nana') $('nana-radio-stream').volume = sRad;
 
@@ -703,6 +533,10 @@ onValue(refs.settings, snap => {
   const remote = snap.val();
   if (remote) {
     Object.assign(settings, remote);
+    // Migrate legacy 100% battery threshold to 30% so trickle-charge cycling at 99-100% never nags
+    if (Number(remote.batteryVoiceThresholdPct) >= 95) {
+      settings.batteryVoiceThresholdPct = 30;
+    }
     if (remote.radioPromptHours !== undefined) settings.radioPromptHours = parseHoursArray(remote.radioPromptHours, [10, 15]);
     if (remote.videoPromptHours !== undefined) settings.videoPromptHours = parseHoursArray(remote.videoPromptHours, [14, 19]);
     if (remote.speakQuestions !== undefined) window.setFamilyQuestionSilentMode(!settings.speakQuestions);
