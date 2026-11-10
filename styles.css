@@ -1,5 +1,5 @@
 :root {
-  --nana-styles-version: "2.9.4";
+  --nana-styles-version: "2.9.5";
   --bg-main: #090d16; --bg-panel: #17212b; --bg-card: #1e293b; --bg-nameplate: #0f172a;
   --text-main: #ffffff; --text-accent: #fef08a; --text-muted: #cbd5e1;
   --border-main: #94a3b8; --border-accent: #facc15;
@@ -31,7 +31,7 @@ body.theme-black-cream {
 }
 * { box-sizing: border-box; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; height: 100dvh; background: var(--bg-main); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif; overflow: hidden; }
-.screen { display: none; width: 100vw; height: 100vh; height: 100dvh; flex-direction: column; align-items: center; justify-content: flex-start; padding: 68px 18px 16px 18px; gap: 8px; text-align: center; overflow: hidden; background: var(--bg-main); }
+.screen { display: none; width: 100vw; height: 100vh; height: 100dvh; flex-direction: column; align-items: center; justify-content: flex-start; padding: 68px 18px 28px 18px; gap: 8px; text-align: center; overflow: hidden; background: var(--bg-main); }
 .active { display: flex; }
 
 /* Main Header & Top Navigation Pills across all Nana Screens */
@@ -102,6 +102,9 @@ body.theme-black-cream .tg-send-btn { border-color: #000 !important; }
   animation: pulseMissed 1.4s infinite;
 }
 .gear-pill { font-size: 1.05rem; font-weight: 900; color: var(--text-main); background: var(--bg-card); padding: 8px 12px; border-radius: 12px; border: 2px solid var(--border-main); white-space: nowrap; cursor: pointer; }
+.staff-pill { font-size: 1.05rem; font-weight: 900; color: #e2e8f0; background: #1e293b; padding: 8px 12px; border-radius: 12px; border: 2px solid #38bdf8; white-space: nowrap; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.45); flex-shrink: 0; }
+.staff-pill:active { transform: scale(0.95); background: #0284c7; color: #fff; }
+body.theme-black-cream .staff-pill { background: #e0f2fe; color: #000; border-color: #000; }
 
 /* Core Shared Action Buttons (.cancel-btn, .giant-btn, .tone-btn) */
 .cancel-btn {
@@ -315,7 +318,7 @@ body.theme-black-cream .todays-call-pill { background: #fff; border-color: #000;
 #bulletin-modal.kb-fullscreen .tg-flashing-cursor { display: inline-block; }
 .tg-send-btn { height: 60px; padding: 0 30px; background: #22c55e; color: #000; border: 4px solid #fff; border-radius: 28px; font-size: 1.55rem; font-weight: 900; cursor: pointer; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 
-#senior-onscreen-keyboard { display: none; width: 100%; flex: 1; min-height: 0; flex-direction: column; justify-content: space-between; gap: 8px; background: var(--bg-panel); padding: 8px 18px 24px 18px; border-top: 4px solid var(--border-accent); z-index: 25; }
+#senior-onscreen-keyboard { display: none; width: 100%; flex: 1; min-height: 0; flex-direction: column; justify-content: space-between; gap: 8px; background: var(--bg-panel); padding: 8px 18px 30px 18px; border-top: 4px solid var(--border-accent); z-index: 25; }
 .emoji-fav-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; width: 100%; flex-shrink: 0; }
 
 /* Nana 3-Slot Predictive Word & Auto-Correct Bar Above Keyboard */
@@ -371,7 +374,7 @@ body.theme-black-cream .todays-call-pill { background: #fff; border-color: #000;
 /* Edge-to-Edge Cinema Layout for Video Player Screen */
 #video-screen {
   justify-content: space-between;
-  padding: 64px 8px 8px 8px;
+  padding: 66px 10px 28px 10px;
   gap: 6px;
 }
 
