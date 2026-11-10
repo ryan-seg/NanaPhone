@@ -7,6 +7,9 @@ const {
 } = NanaCore;
 
 let lastTouchWriteMs = 0;
+let webBatteryObj = null;
+let cachedBatteryLevel = null;
+let cachedIsCharging = null;
 
 // --- 1. TOP 62PX NO-TOUCH ORIENTATION BANNER (DAY, TIME OF DAY, DATE & CLOCK) ---
 if (role === 'nana') {
@@ -31,21 +34,93 @@ if (role === 'nana') {
   setInterval(updateTopOrientationBanner, 10000);
 }
 
-// --- 2. BATTERY READING, TOUCH ACTIVITY & BACKGROUND HEARTBEAT ---
+// --- 2. ON-SCREEN "PLEASE PLUG IN" BANNER & WEB BATTERY API MONITOR ---
+function ensureUnpluggedWarningBanner() {
+  let banner = $('nana-unplugged-warning-banner');
+  if (banner) return banner;
+
+  banner = document.createElement('div');
+  banner.id = 'nana-unplugged-warning-banner';
+  banner.style.cssText = [
+    'position:fixed', 'bottom:18px', 'left:50%', 'transform:translateX(-50%)',
+    'z-index:9990', 'background:#991b1b', 'color:#fef08a', 'border:5px solid #fde047',
+    'border-radius:26px', 'padding:16px 28px', 'font-size:2rem', 'font-weight:900',
+    'box-shadow:0 12px 35px rgba(0,0,0,0.9)', 'display:none', 'align-items:center',
+    'justify-content:center', 'gap:16px', 'text-align:center', 'width:92vw', 'max-width:960px',
+    'pointer-events:none'
+  ].join(';');
+  banner.innerHTML = `
+    <span style="font-size:2.6rem;line-height:1;">🔌</span>
+    <span id="nana-unplugged-warning-text">PLEASE PLUG IN THE TABLET CHARGER</span>
+  `;
+  document.body.appendChild(banner);
+  return banner;
+}
+
+function syncUnpluggedBannerAndVoice(level, isCharging) {
+  if (role !== 'nana') return;
+  const banner = ensureUnpluggedWarningBanner();
+  const txtEl = $('nana-unplugged-warning-text');
+  const battThresh = Number(settings.batteryVoiceThresholdPct ?? 100);
+  const inCall = !!state.currentState && state.currentState !== 'idle';
+
+  // Hide immediately when charging, above threshold, or during an active video call
+  if (isCharging !== false || level === null || level > battThresh || inCall) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  // Tablet is UNPLUGGED and at/below threshold -> show visual warning on screen!
+  if (txtEl) {
+    txtEl.textContent = `PLEASE PLUG IN THE TABLET CHARGER (${level}%)`;
+  }
+  banner.style.display = 'flex';
+
+  // Speak out loud if not muted and not in Night Mode
+  if (!isBatteryVoiceCurrentlyMuted() && !NanaCore.isCurrentlyInNightWindow?.()) {
+    window.announceBatteryWarning?.("Please plug in the tablet charger.");
+  }
+}
+
+// Initialize Chromium's native navigator.getBattery() so we get instant hardware events & real readings
+if (role === 'nana' && navigator.getBattery) {
+  navigator.getBattery().then(bm => {
+    webBatteryObj = bm;
+    const onBattChange = () => {
+      cachedBatteryLevel = Math.round((bm.level ?? 1) * 100);
+      cachedIsCharging = !!bm.charging;
+      syncUnpluggedBannerAndVoice(cachedBatteryLevel, cachedIsCharging);
+      update(refs.presence, {
+        online: true,
+        lastPing: Date.now(),
+        batteryLevel: cachedBatteryLevel,
+        isCharging: cachedIsCharging
+      }).catch(() => {});
+    };
+    bm.addEventListener('chargingchange', onBattChange);
+    bm.addEventListener('levelchange', onBattChange);
+    onBattChange();
+  }).catch(() => {});
+}
+
 export function readTabletBatteryStatus() {
-  let batteryLevel = null, isCharging = null;
-  if (window.AndroidBridge?.getBatteryStatusJson) {
+  // 1. Prefer Chromium's native Web Battery API (never affected by APK bridge exceptions)
+  if (webBatteryObj && typeof webBatteryObj.level === 'number' && !Number.isNaN(webBatteryObj.level)) {
+    cachedBatteryLevel = Math.round(webBatteryObj.level * 100);
+    cachedIsCharging = !!webBatteryObj.charging;
+  } else if (window.AndroidBridge?.getBatteryStatusJson) {
+    // 2. Fallback to AndroidBridge only if Web Battery API isn't ready yet
     try {
       const b = JSON.parse(window.AndroidBridge.getBatteryStatusJson());
-      batteryLevel = b.level;
-      isCharging = b.charging;
-      const battThresh = Number(settings.batteryVoiceThresholdPct ?? 100);
-      if (!isCharging && batteryLevel !== null && batteryLevel <= battThresh && !isBatteryVoiceCurrentlyMuted()) {
-        window.announceBatteryWarning?.("Please plug in the tablet charger.");
+      if (typeof b.level === 'number') {
+        cachedBatteryLevel = b.level;
+        cachedIsCharging = !!b.charging;
       }
     } catch (_) {}
   }
-  return { batteryLevel, isCharging };
+
+  syncUnpluggedBannerAndVoice(cachedBatteryLevel, cachedIsCharging);
+  return { batteryLevel: cachedBatteryLevel, isCharging: cachedIsCharging };
 }
 
 export function recordTouchActivity(customActivity = null) {
@@ -78,6 +153,7 @@ window.addEventListener('pointerdown', () => {
 }, { passive: true });
 
 // --- 3. TABLET DISCONNECT, WIFI, BACKGROUND & SCREEN STATE TELEMETRY ---
+let lastBroadcastScreenState = '';
 export function broadcastNanaCurrentScreen() {
   if (role !== 'nana') return;
   const videoEl = $('nana-video-el');
@@ -93,10 +169,15 @@ export function broadcastNanaCurrentScreen() {
   } else if ($('radio-screen')?.classList.contains('active')) {
     screenState = 'radio';
   }
+  const appState = document.visibilityState === 'hidden' ? 'backgrounded' : 'foreground';
+  const sig = `${screenState}|${appState}`;
+  if (sig === lastBroadcastScreenState) return;
+  lastBroadcastScreenState = sig;
+
   update(refs.presence, {
     online: true,
     currentScreen: screenState,
-    appState: document.visibilityState === 'hidden' ? 'backgrounded' : 'foreground'
+    appState
   }).catch(() => {});
 }
 hooks.broadcastScreen = broadcastNanaCurrentScreen;
@@ -180,7 +261,6 @@ export function getTodaysCompletedCallsList() {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const todayMs = startOfToday.getTime();
-  // Strictly include only connected calls from today lasting >= 15 seconds (never missed or unanswered calls)
   return Object.values(state.callHistorySnap || {})
     .filter(c =>
       c &&
