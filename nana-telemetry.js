@@ -42,15 +42,32 @@ function ensureUnpluggedWarningBanner() {
   banner = document.createElement('div');
   banner.id = 'nana-unplugged-warning-banner';
   banner.style.cssText = [
-    'position:fixed', 'bottom:18px', 'left:50%', 'transform:translateX(-50%)',
-    'z-index:9990', 'background:#991b1b', 'color:#fef08a', 'border:5px solid #fde047',
-    'border-radius:26px', 'padding:16px 28px', 'font-size:2rem', 'font-weight:900',
-    'box-shadow:0 12px 35px rgba(0,0,0,0.9)', 'display:none', 'align-items:center',
-    'justify-content:center', 'gap:16px', 'text-align:center', 'width:92vw', 'max-width:960px',
-    'pointer-events:none'
+    'position:fixed',
+    'top:2px',
+    'left:50%',
+    'transform:translateX(-50%)',
+    'height:54px',
+    'z-index:9995',
+    'background:#991b1b',
+    'color:#fef08a',
+    'border:3px solid #fde047',
+    'border-radius:16px',
+    'padding:0 24px',
+    'font-size:1.45rem',
+    'font-weight:900',
+    'box-shadow:0 6px 20px rgba(0,0,0,0.85)',
+    'display:none',
+    'align-items:center',
+    'justify-content:center',
+    'gap:12px',
+    'text-align:center',
+    'width:auto',
+    'max-width:96vw',
+    'white-space:nowrap',
+    'pointer-events:none' // Keeps underlying buttons and touches 100% responsive
   ].join(';');
   banner.innerHTML = `
-    <span style="font-size:2.6rem;line-height:1;">🔌</span>
+    <span style="font-size:1.8rem;line-height:1;">🔌</span>
     <span id="nana-unplugged-warning-text">PLEASE PLUG IN THE TABLET CHARGER</span>
   `;
   document.body.appendChild(banner);
