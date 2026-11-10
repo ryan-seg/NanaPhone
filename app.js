@@ -18,9 +18,6 @@ let callObject = null;
 let isJoiningOrInRoom = false;
 let didManuallyInitiateOrAnswerOnThisTab = false;
 let currentFacingMode = 'user';
-let appliedNanaCameraMode = null;
-let appliedNanaMicDeviceId = null;
-let failedNanaCameraMode = null;
 let pendingCallContact = null;
 let confirmTimer = null;
 let ringInterval = null;
@@ -38,61 +35,22 @@ let endCallConfirmedByUser = false;
 let endCallModalTimer = null;
 let jitterHoldTimer = null;
 
-// Web Audio DSP Nodes (Outbound Nana Mic & Inbound Family Voice Boost)
-let nanaRawMicStream = null;
-let nanaMicNodes = null;
-let familyBoostNodes = null;
-let attachedRemoteAudioTrack = null;
-
 const radioPlayer = $('nana-radio-stream');
 
-// --- 1. DISPLAY ADAPTERS, DEVICE ENUMERATION & AUDIO UNLOCK ---
-async function publishNanaHardwareDevices() {
-  if (role !== 'nana' || !navigator.mediaDevices?.enumerateDevices || !refs.nanaDevices) return;
-  try {
-    const list = await navigator.mediaDevices.enumerateDevices();
-    const cameras = list
-      .filter(d => d.kind === 'videoinput' && d.deviceId)
-      .map((d, i) => ({ deviceId: d.deviceId, label: (d.label || `Camera ${i + 1}`).slice(0, 38) }));
-    const mics = list
-      .filter(d => d.kind === 'audioinput' && d.deviceId)
-      .map((d, i) => ({ deviceId: d.deviceId, label: (d.label || `Mic ${i + 1}`).slice(0, 38) }));
-    await set(refs.nanaDevices, { cameras, mics, updatedAt: Date.now() });
-  } catch (_) {}
-}
-
-if (role === 'nana' && navigator.mediaDevices) {
-  setTimeout(publishNanaHardwareDevices, 2500);
-  navigator.mediaDevices.addEventListener?.('devicechange', publishNanaHardwareDevices);
-}
-
-// Modest 640x480 @ 20-24fps resolution on Nana's tablet while honoring selected camera
-function getNanaVideoConstraintObject(camSetting = settings.nanaCameraMode) {
-  const mode = camSetting || 'user';
-  const baseRes = {
-    width: { ideal: 640, max: 640 },
-    height: { ideal: 480, max: 480 },
-    frameRate: { ideal: 20, max: 24 }
-  };
-  if (mode === 'user' || mode === 'environment') {
-    return { ...baseRes, facingMode: mode };
-  }
-  return { ...baseRes, deviceId: { ideal: mode } };
-}
-
-// Forcefully silence any background radio, video, ringtone, or TTS on Nana's tablet before & during a call
+// --- 1. DISPLAY ADAPTERS & AUDIO UNLOCK ---
+// Silence background radio, video, ringtone, or TTS on Nana's tablet when starting/answering a call
 function silenceAllBackgroundMediaOnTablet() {
   try {
     const rp = $('nana-radio-stream');
-    if (rp) {
+    if (rp && !rp.paused) {
       rp.pause();
       rp.muted = true;
       rp.removeAttribute('src');
       rp.load();
     }
     const vp = $('nana-video-el');
-    if (vp) {
-      if (!vp.paused) vp.pause();
+    if (vp && !vp.paused) {
+      vp.pause();
       vp.muted = true;
     }
     window.speechSynthesis?.cancel();
@@ -116,7 +74,6 @@ function unlockCallAudioImmediate() {
       }
     }
     if (rv) {
-      // Permanently keep #remote-video muted so mobile/desktop browsers never block video autoplay
       rv.muted = true;
       rv.volume = 0;
       rv.play().catch(() => {});
@@ -127,15 +84,19 @@ function unlockCallAudioImmediate() {
 (function initVideoCallStageAdapters() {
   let inCallTouchWakeTimer = null;
 
+  // Hide legacy in-call buttons if cached HTML still has them
+  ['btn-family-voice-boost', 'btn-nana-cam-cycle', 'btn-nana-mic-cycle'].forEach(id => {
+    const el = $(id);
+    if (el) el.style.display = 'none';
+  });
+
   window.wakeInCallControls = (ev) => {
     window.resetIdleTimer?.();
     const cs = $('call-screen');
     if (!cs) return;
 
-    // Make translucent End Call button & status pill opaque for 5 seconds
     cs.classList.add('touch-awake');
 
-    // Close the top-right cog drawer if tapping outside the menu
     if (!ev || !ev.target?.closest?.('#in-call-menu-wrap')) {
       $('in-call-menu-wrap')?.classList.remove('menu-open');
     }
@@ -177,10 +138,9 @@ function unlockCallAudioImmediate() {
     ['pointerdown', 'touchstart'].forEach(evtName => {
       cs.addEventListener(evtName, (ev) => {
         window.wakeInCallControls(ev);
-        if (audioCtx?.state === 'suspended') audioCtx.resume().catch(() => {});
         const ra = $('remote-audio');
         if (ra?.srcObject) {
-          ra.muted = role === 'family' ? familyAmpIsExclusive() : false;
+          ra.muted = false;
           ra.play().catch(() => {});
         }
         if (rv?.srcObject && rv.paused) {
@@ -192,245 +152,7 @@ function unlockCallAudioImmediate() {
   }
 })();
 
-// --- 2. OUTBOUND NANA MIC DSP PIPELINE & INBOUND FAMILY VOICE AMPLIFIER ---
-function applyNanaMicDspParameters() {
-  if (!nanaMicNodes) return;
-  const mode = settings.nanaMicDspMode || 'vocal-boost';
-  const now = audioCtx.currentTime;
-  const isRaw = mode === 'raw';
-
-  nanaMicNodes.hp.frequency.setTargetAtTime(isRaw ? 20 : 130, now, 0.03);
-  nanaMicNodes.lp.frequency.setTargetAtTime(isRaw ? 18000 : 4200, now, 0.03);
-  nanaMicNodes.presence.gain.setTargetAtTime(isRaw ? 0 : (mode === 'max-boost' ? 6.0 : 4.5), now, 0.03);
-  nanaMicNodes.comp.threshold.setTargetAtTime(isRaw ? -6 : -34, now, 0.03);
-  nanaMicNodes.comp.ratio.setTargetAtTime(isRaw ? 1.5 : 5, now, 0.03);
-
-  const targetGain = isRaw ? 1.0 : (mode === 'max-boost' ? 2.5 : 1.8);
-  nanaMicNodes.makeupGain.gain.setTargetAtTime(targetGain, now, 0.03);
-}
-
-async function buildNanaProcessedMicTrack(preferredMicId = settings.nanaMicDeviceId) {
-  cleanupNanaMicDsp();
-  try {
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-    const audioConstraints = {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-      channelCount: 1
-    };
-    if (preferredMicId && preferredMicId !== 'default') {
-      audioConstraints.deviceId = { ideal: preferredMicId };
-    }
-
-    nanaRawMicStream = await navigator.mediaDevices.getUserMedia({
-      audio: audioConstraints,
-      video: false
-    });
-    appliedNanaMicDeviceId = preferredMicId || 'default';
-
-    const source = audioCtx.createMediaStreamSource(nanaRawMicStream);
-
-    const hp = audioCtx.createBiquadFilter();
-    hp.type = 'highpass';
-    hp.frequency.value = 130;
-    hp.Q.value = 0.7;
-
-    const lp = audioCtx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = 4200;
-    lp.Q.value = 0.7;
-
-    const presence = audioCtx.createBiquadFilter();
-    presence.type = 'peaking';
-    presence.frequency.value = 2200;
-    presence.Q.value = 1.1;
-    presence.gain.value = 4.5;
-
-    const comp = audioCtx.createDynamicsCompressor();
-    comp.threshold.value = -34;
-    comp.knee.value = 18;
-    comp.ratio.value = 5;
-    comp.attack.value = 0.004;
-    comp.release.value = 0.22;
-
-    const makeupGain = audioCtx.createGain();
-    const dest = audioCtx.createMediaStreamDestination();
-
-    source.connect(hp);
-    hp.connect(lp);
-    lp.connect(presence);
-    presence.connect(comp);
-    comp.connect(makeupGain);
-    makeupGain.connect(dest);
-
-    nanaMicNodes = { source, hp, lp, presence, comp, makeupGain, dest };
-    applyNanaMicDspParameters();
-
-    const processedTrack = dest.stream.getAudioTracks()[0];
-    return processedTrack || true;
-  } catch (e) {
-    console.warn("Falling back to default browser mic stream:", e);
-    return true;
-  }
-}
-
-function cleanupNanaMicDsp() {
-  if (nanaMicNodes) {
-    try { nanaMicNodes.source.disconnect(); nanaMicNodes.makeupGain.disconnect(); } catch (_) {}
-    nanaMicNodes = null;
-  }
-  if (nanaRawMicStream) {
-    nanaRawMicStream.getTracks().forEach(t => t.stop());
-    nanaRawMicStream = null;
-  }
-}
-
-// Resolve Front/Rear into a real device ID using the cached device list first (avoids opening a 2nd camera stream on Android)
-async function resolveNanaCameraDeviceId(mode) {
-  if (mode !== 'user' && mode !== 'environment') return mode;
-  const cams = state.nanaDevicesSnap?.cameras || [];
-  const pattern = mode === 'environment' ? /back|rear|environment|0/i : /front|user|selfie|1/i;
-  const matched = cams.find(c => pattern.test(c.label)) || (mode === 'environment' ? cams[1] : cams[0]);
-  if (matched?.deviceId) return matched.deviceId;
-
-  const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
-  const id = s.getVideoTracks()[0]?.getSettings?.().deviceId || null;
-  s.getTracks().forEach(t => t.stop());
-  return id;
-}
-
-async function applyLiveNanaCameraAndMicChanges() {
-  if (role !== 'nana' || !callObject) return;
-
-  const targetCam = settings.nanaCameraMode || 'user';
-  if (failedNanaCameraMode && targetCam !== failedNanaCameraMode) failedNanaCameraMode = null;
-  if (targetCam !== appliedNanaCameraMode && targetCam !== failedNanaCameraMode) {
-    try {
-      const camId = await resolveNanaCameraDeviceId(targetCam);
-      if (!camId) throw new Error('camera not found');
-      await callObject.setInputDevicesAsync({ videoDeviceId: camId });
-      appliedNanaCameraMode = targetCam;
-      if ($('local-video')) {
-        $('local-video').style.transform = targetCam === 'environment' ? 'scaleX(1)' : 'scaleX(-1)';
-      }
-      logCall('cam-switch', targetCam);
-    } catch (e) {
-      failedNanaCameraMode = targetCam;
-      logCall('cam-switch-fail', e?.message || e);
-    }
-  }
-
-  const targetMic = settings.nanaMicDeviceId || 'default';
-  if (targetMic !== appliedNanaMicDeviceId) {
-    try {
-      if (settings.nanaMicDspMode === 'max-boost') {
-        const newProcessedTrack = await buildNanaProcessedMicTrack(targetMic);
-        if (newProcessedTrack && typeof newProcessedTrack === 'object') {
-          await callObject.setInputDevicesAsync({ audioSource: newProcessedTrack });
-        }
-      } else {
-        cleanupNanaMicDsp();
-        await callObject.setInputDevicesAsync({
-          audioDeviceId: targetMic === 'default' ? 'default' : targetMic
-        });
-        appliedNanaMicDeviceId = targetMic;
-      }
-      callObject.setLocalAudio(true);
-      logCall('mic-switch', targetMic);
-    } catch (e) {
-      console.warn("Could not switch Nana microphone:", e);
-    }
-  }
-}
-
-// Detect ALL Safari / WebKit browsers (macOS Safari, iPadOS desktop-mode Safari, and iOS Safari)
-// WebKit has a known WebRTC MediaStreamSource bug in Web Audio that causes crackling/dropouts if routed through AudioContext
-const isSafariOrIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-  || /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
-// The Web Audio amplifier is the ONLY audible path while it is running (the muted #remote-audio element just keeps
-// Chrome decoding the stream). If audioCtx isn't running, on Safari/iOS, or boost <= 100%, #remote-audio is unmuted directly.
-const familyAmpIsExclusive = () => !isSafariOrIOS && !!familyBoostNodes && audioCtx.state === 'running';
-
-function applyFamilyVoiceBoostGain() {
-  const ra = $('remote-audio');
-  const boostPct = Number(settings.familyVoiceBoostPct) || 180;
-  if (isSafariOrIOS || boostPct <= 100) {
-    cleanupFamilyVoiceAmplifier();
-    if (ra && role === 'family') ra.muted = false;
-    return;
-  }
-  if (!familyBoostNodes) {
-    if (ra && role === 'family') ra.muted = false;
-    return;
-  }
-  const gain = familyAmpIsExclusive() ? boostPct / 100 : (boostPct - 100) / 100;
-  familyBoostNodes.gainNode.gain.setTargetAtTime(Math.max(0, Math.min(3.5, gain)), audioCtx.currentTime, 0.03);
-  if (ra && role === 'family') ra.muted = familyAmpIsExclusive();
-}
-
-function attachFamilyVoiceAmplifier(aTrack) {
-  if (role !== 'family' || !aTrack) return false;
-  if (isSafariOrIOS || (Number(settings.familyVoiceBoostPct) || 180) <= 100) return false;
-  if (attachedRemoteAudioTrack === aTrack && familyBoostNodes) {
-    applyFamilyVoiceBoostGain();
-    return true;
-  }
-  cleanupFamilyVoiceAmplifier();
-  try {
-    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-    const stream = new MediaStream([aTrack]);
-    const source = audioCtx.createMediaStreamSource(stream);
-
-    const hp = audioCtx.createBiquadFilter();
-    hp.type = 'highpass';
-    hp.frequency.value = 115;
-
-    const presence = audioCtx.createBiquadFilter();
-    presence.type = 'peaking';
-    presence.frequency.value = 2200;
-    presence.Q.value = 1.0;
-    presence.gain.value = 2.5;
-
-    const gainNode = audioCtx.createGain();
-
-    const limiter = audioCtx.createDynamicsCompressor();
-    limiter.threshold.value = -3.0;
-    limiter.knee.value = 6.0;
-    limiter.ratio.value = 12.0;
-    limiter.attack.value = 0.002;
-    limiter.release.value = 0.15;
-
-    source.connect(hp);
-    hp.connect(presence);
-    presence.connect(gainNode);
-    gainNode.connect(limiter);
-    limiter.connect(audioCtx.destination);
-
-    familyBoostNodes = { source, hp, presence, gainNode, limiter };
-    attachedRemoteAudioTrack = aTrack;
-    applyFamilyVoiceBoostGain();
-    return true;
-  } catch (e) {
-    console.warn("Web Audio Family Amplifier fallback:", e);
-    return false;
-  }
-}
-
-function cleanupFamilyVoiceAmplifier() {
-  attachedRemoteAudioTrack = null;
-  if (familyBoostNodes) {
-    try { familyBoostNodes.source.disconnect(); familyBoostNodes.limiter.disconnect(); } catch (_) {}
-    familyBoostNodes = null;
-  }
-}
-
 hooks.onSettingsChanged.push((s) => {
-  applyNanaMicDspParameters();
-  applyFamilyVoiceBoostGain();
-  applyLiveNanaCameraAndMicChanges();
   if (role === 'nana' && state.settingsLoaded && !s.callingEnabled && state.callSnap?.status !== 'idle') {
     stopRingingUI();
     set(refs.callState, { status: 'idle', timestamp: Date.now() });
@@ -881,58 +603,37 @@ async function joinDailyRoom() {
     return;
   }
 
-  // Forcefully silence any radio, video, ringtone, or TTS on Nana's tablet
+  // Silence any background radio, video, ringtone, or TTS once before joining the call
   if (role === 'nana') {
     silenceAllBackgroundMediaOnTablet();
   }
 
-  // Ensure any lingering camera tracks from a previous call are fully released first
+  // Release any lingering local preview tracks from a previous call
   const lvPrev = $('local-video');
   if (lvPrev?.srcObject) {
     lvPrev.srcObject.getTracks().forEach(t => t.stop());
     lvPrev.srcObject = null;
   }
 
-  // Use native Android hardware AEC/NS/AGC mic by default so Web Audio nodes never break hardware echo cancellation!
-  // Only insert the custom Web Audio mic DSP graph if 'max-boost' is explicitly selected in Supervisor Settings.
-  let customAudioSource = true;
-  if (role === 'nana' && settings.nanaMicDspMode === 'max-boost') {
-    try { await withTimeout(audioCtx.resume(), 2000); } catch (_) {}
-    const t = await withTimeout(buildNanaProcessedMicTrack(settings.nanaMicDeviceId), 6000);
-    if (t && t !== '__timeout__' && typeof t === 'object' && audioCtx.state === 'running') {
-      customAudioSource = t;
-    } else {
-      cleanupNanaMicDsp();
-      logCall('mic-dsp-fallback', 'ctx=' + audioCtx.state);
-    }
-  } else if (role === 'nana') {
-    cleanupNanaMicDsp();
-    appliedNanaMicDeviceId = settings.nanaMicDeviceId || 'default';
-  }
-
   logCall('join-start');
-  const nanaCamConstraint = role === 'nana'
-    ? getNanaVideoConstraintObject(settings.nanaCameraMode)
-    : { facingMode: 'user', width: { ideal: 640, max: 640 }, height: { ideal: 480, max: 480 }, frameRate: { ideal: 20, max: 24 } };
 
-  const nanaMicConstraint = {
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true
-  };
-  if (role === 'nana' && settings.nanaMicDeviceId && settings.nanaMicDeviceId !== 'default') {
-    nanaMicConstraint.deviceId = { ideal: settings.nanaMicDeviceId };
-  }
-
-  if (role === 'nana') appliedNanaCameraMode = settings.nanaCameraMode || 'user';
-
+  // Direct native WebRTC audio and video — lets Android/iOS hardware handle Echo Cancellation, Noise Suppression, and Auto Gain Control with zero buffer lag
   const co = window.DailyIframe.createCallObject({
-    audioSource: customAudioSource,
+    audioSource: true,
     videoSource: true,
     dailyConfig: {
       avoidEval: true,
-      userMediaAudioConstraints: nanaMicConstraint,
-      userMediaVideoConstraints: nanaCamConstraint
+      userMediaAudioConstraints: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      },
+      userMediaVideoConstraints: {
+        facingMode: 'user',
+        width: { ideal: 640, max: 640 },
+        height: { ideal: 480, max: 480 },
+        frameRate: { ideal: 24, max: 30 }
+      }
     }
   });
   callObject = co;
@@ -941,7 +642,6 @@ async function joinDailyRoom() {
   const targetVol = () => role === 'nana' ? Math.min(1.0, Math.max(0.2, (Number(settings.callVolume) || 85) / 100)) : 1.0;
   const showProblem = (t) => { banner.style.display = 'block'; banner.innerText = t; };
   let audioBlocked = false;
-  let videoPausedForNetwork = false;
   let joinedOk = false;
   const hideBannerIfOk = () => { if (!audioBlocked) banner.style.display = 'none'; };
   const playEl = (el) => el.play().then(() => { if (el.id === 'remote-audio') audioBlocked = false; }).catch(() => {
@@ -1035,29 +735,19 @@ async function joinDailyRoom() {
       showProblem('📹 Waiting for Nana\'s camera video...');
     }
 
-    if (aTrack && aTrack.readyState === 'live') {
-      if (role === 'family') {
-        if (!isSafariOrIOS && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-        attachFamilyVoiceAmplifier(aTrack);
-        if (ra && ra.srcObject?.getAudioTracks()[0] !== aTrack) {
-          ra.loop = false;
-          ra.removeAttribute('src');
-          ra.srcObject = new MediaStream([aTrack]);
-          ra.muted = false;
-          ra.volume = 1.0;
-          playEl(ra);
-        }
-        if (ra) ra.muted = familyAmpIsExclusive();
-        applyFamilyVoiceBoostGain();
-      } else if (ra && ra.srcObject?.getAudioTracks()[0] !== aTrack) {
+    if (aTrack && aTrack.readyState === 'live' && ra) {
+      if (ra.srcObject?.getAudioTracks()[0] !== aTrack) {
         ra.loop = false;
         ra.removeAttribute('src');
         ra.srcObject = new MediaStream([aTrack]);
         ra.muted = false;
         ra.volume = targetVol();
         playEl(ra);
+      } else {
+        ra.muted = false;
+        ra.volume = targetVol();
+        if (ra.paused) playEl(ra);
       }
-      if (ra && ra.srcObject && ra.paused) { ra.muted = role === 'family' ? familyAmpIsExclusive() : false; playEl(ra); }
     }
   };
 
@@ -1066,14 +756,13 @@ async function joinDailyRoom() {
   const camWatchdog = setInterval(() => {
     if (callObject !== co) { clearInterval(camWatchdog); return; }
     if (role === 'nana') {
-      silenceAllBackgroundMediaOnTablet();
       const localV = co.participants()?.local?.tracks?.video;
-      if (localV && !videoPausedForNetwork && (localV.state === 'off' || localV.state === 'blocked')) {
+      if (localV && (localV.state === 'off' || localV.state === 'blocked')) {
         co.setLocalVideo(true);
       }
     }
     attachTracks();
-  }, 3500);
+  }, 4000);
 
   co.on('participant-left', () => {
     if (callObject !== co) return;
@@ -1093,27 +782,6 @@ async function joinDailyRoom() {
     if (callObject === co && e?.event === 'interrupted') showProblem('📡 Connection wobble - please hold on...');
   });
   co.on('error', e => tryRecover('error ' + (e?.errorMsg || '')));
-
-  // Step down video on EITHER side if Wi-Fi/mobile packet loss spikes so voice packets always get priority
-  co.on('network-quality-change', e => {
-    if (callObject !== co) return;
-    const s = e?.networkState || (e?.threshold === 'very-low' ? 'bad' : e?.threshold === 'low' ? 'warning' : 'good');
-    logCall('quality', `${s} ${(e?.networkStateReasons || []).join(',')}`);
-    if (s === 'bad' && !videoPausedForNetwork) {
-      videoPausedForNetwork = true;
-      try { co.setLocalVideo(false); } catch (_) {}
-      logCall('video-off-network');
-    } else if (s === 'good' && videoPausedForNetwork) {
-      videoPausedForNetwork = false;
-      try { co.setLocalVideo(true); } catch (_) {}
-      logCall('video-on-network');
-    }
-  });
-  co.on('cpu-load-change', e => {
-    if (callObject !== co) return;
-    logCall('cpu', e?.cpuLoadState || '');
-    co.updateSendSettings({ video: e?.cpuLoadState === 'high' ? { maxQuality: 'low' } : 'bandwidth-optimized' }).catch(() => {});
-  });
 
   try {
     let joined = false;
@@ -1142,33 +810,12 @@ async function joinDailyRoom() {
     co.setLocalVideo(true);
     co.setLocalAudio(true);
 
-    if (role === 'nana') publishNanaHardwareDevices();
-
     clearInterval(callBeatTimer);
     const beat = () => set(refs.callBeat, Date.now()).catch(() => {});
     beat();
     callBeatTimer = setInterval(beat, 25000);
 
     setTimeout(() => { if (callObject === co && !hadRemote) window.endCall(true); }, 90000);
-
-    if (role === 'family' && !isSafariOrIOS && typeof co.updateInputSettings === 'function') {
-      co.updateInputSettings({ audio: { processor: { type: 'krisp' } } }).catch(() => {});
-    }
-
-    // Cap video bandwidth to 600 kbps and use bandwidth-optimized encodings on BOTH sides to keep audio packet loss near 0%
-    try { co.setBandwidth({ kbs: 600 }); } catch (_) {}
-    co.updateSendSettings({ video: 'bandwidth-optimized' }).catch(() => {});
-
-    logCall('audio', `ctx=${audioCtx.state} safari=${isSafariOrIOS} dsp=${settings.nanaMicDspMode} base=${Math.round((audioCtx.baseLatency || 0) * 1000)}ms out=${Math.round((audioCtx.outputLatency || 0) * 1000)}ms`);
-    try { co.getNetworkTopology?.().then(t => logCall('topology', t?.topology)).catch(() => {}); } catch (_) {}
-    const statsTimer = setInterval(async () => {
-      if (callObject !== co) { clearInterval(statsTimer); return; }
-      try {
-        const n = await co.getNetworkStats();
-        const l = n?.stats?.latest || {};
-        logCall('stats', `${n?.networkState || n?.threshold} rtt=${Math.round((n?.stats?.averageNetworkRoundTripTime || 0) * 1000)}ms in=${Math.round((l.recvBitsPerSecond || 0) / 1000)}k out=${Math.round((l.sendBitsPerSecond || 0) / 1000)}k ctxOut=${Math.round((audioCtx.outputLatency || 0) * 1000)}ms`);
-      } catch (_) {}
-    }, 30000);
   } catch (_) {
     clearInterval(camWatchdog);
     if (callObject !== co) return;
@@ -1180,14 +827,9 @@ async function joinDailyRoom() {
 async function destroyDailyRoom() {
   isJoiningOrInRoom = false;
   didManuallyInitiateOrAnswerOnThisTab = false;
-  appliedNanaCameraMode = null;
-  appliedNanaMicDeviceId = null;
-  failedNanaCameraMode = null;
   rejoinAttempts = 0;
   clearInterval(callBeatTimer);
   callBeatTimer = null;
-  cleanupNanaMicDsp();
-  cleanupFamilyVoiceAmplifier();
   await teardownCallObject();
   ['remote-video', 'remote-audio', 'local-video'].forEach(id => {
     const el = $(id);
@@ -1598,9 +1240,7 @@ onValue(refs.callState, snap => {
       window.wakeFromNightMode?.();
       window.wakeScreenAndResetDimTimer?.();
 
-      // 2. Force Lenovo hardware speaker volume to ringVolume & screen brightness to 100%
       const rVol = Number(settings.ringVolume) || 85;
-      window.AndroidBridge?.updateTabletHardwareSettings?.(rVol, 100, Number(settings.dimDelaySec ?? 120), Number(settings.speechRate) || 0.9);
 
       const img = $('caller-photo');
       img.onerror = () => { img.src = caller.fallback; };
