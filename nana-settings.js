@@ -12,6 +12,7 @@ let enteredPin = "";
 let idleDimTimer = null;
 let nightDismissedUntilMs = 0;
 let lastBatterySpokenMs = 0;
+let cachedBatteryChimeWavUrl = null;
 const HIDE_FOREVER = 4102444800000;
 
 function parseHoursArray(val, fallback) {
@@ -145,8 +146,8 @@ export function getNanaMicShortLabel(micId = settings.nanaMicDeviceId) {
     </div>
     <div class="settings-card">
       <div class="settings-label"><span>🔊 Volumes & Vocal Clarity DSP</span><span class="lbl-vol-summary" style="color:#38bdf8;font-size:0.92rem;"></span></div>
-      <div class="settings-sub" style="margin-bottom:4px;">🎙️ Nana's Tablet Mic DSP (Bandpass 130Hz–4.2kHz + 2.2kHz Presence EQ + Leveller + Krisp AI):</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('nanaMicDspMode', [['raw','🎙️ Raw Mic'],['vocal-boost','🗣️ Vocal Boost (1.8x)'],['max-boost','📢 Max Vocal Boost (2.5x)']])}</div>
+      <div class="settings-sub" style="margin-bottom:4px;">🎙️ Nana's Tablet Mic DSP (Default uses Hardware Echo Cancellation; Max Boost adds 2.5x Web Audio DSP):</div>
+      <div class="opt-row" style="margin-bottom:8px;">${optBtns('nanaMicDspMode', [['raw','🎙️ Native AEC Mic'],['vocal-boost','🗣️ Native AEC + Boost'],['max-boost','📢 Max Vocal Boost (2.5x)']])}</div>
       <div class="settings-sub" style="margin-bottom:4px;">📢 Boost Nana's Incoming Voice on Family Phones (Web Audio Amplifier):</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('familyVoiceBoostPct', [[100,'100% (Normal)'],[180,'180% (Boost)'],[250,'250% (High)'],[300,'300% (Max)']])}</div>
       <div class="settings-sub" style="margin-bottom:4px;">📹 Video Call Voice Volume (On Nana's Tablet Speaker):</div>
@@ -159,7 +160,7 @@ export function getNanaMicShortLabel(micId = settings.nanaMicDeviceId) {
     <div class="settings-card">
       <div class="settings-label"><span>🔋 Battery Unplugged Voice Interval, Volume & Mute</span><span class="lbl-battery-summary" style="color:#38bdf8;font-size:0.92rem;">Every 3m • 85%</span></div>
       <div class="settings-sub lbl-battery-mute">Battery Voice Status: Active</div>
-      <div class="settings-sub" style="margin-bottom:4px;">🔌 Start Speaking When Unplugged At or Below:</div>
+      <div class="settings-sub" style="margin-bottom:4px;">🔌 Show Warning & Speak When Unplugged At or Below:</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceThresholdPct', [[100,'100% (Immediately)'],[80,'80%'],[50,'50%'],[35,'35%'],[25,'25%']])}</div>
       <div class="settings-sub" style="margin-bottom:4px;">⏱️ Unplugged Voice Repeat Interval:</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceIntervalMin', [[1,'1m'],[3,'3m'],[5,'5m'],[10,'10m'],[15,'15m'],[30,'30m']])}</div>
@@ -307,7 +308,6 @@ onValue(refs.nanaDevices, snap => {
 // --- 2. BRIGHTNESS, NIGHT MODE & CLOCK ---
 export function applyScreenBrightness(targetPercent) {
   if (role !== 'nana') return;
-  // Never dim the screen while ringing or in an active call
   const inCallOrRinging = state.currentState && state.currentState !== 'idle';
   const pct = inCallOrRinging ? 100 : Math.max(5, Math.min(100, Number(targetPercent) || 85));
   const overlay = $('brightness-overlay');
@@ -315,15 +315,10 @@ export function applyScreenBrightness(targetPercent) {
     overlay.style.opacity = inCallOrRinging ? '0' : Math.max(0, Math.min(0.88, (100 - pct) / 105)).toFixed(2);
     overlay.style.pointerEvents = (!inCallOrRinging && pct < (settings.awakeBrightness ?? 85)) ? 'auto' : 'none';
   }
-  // NOTE: Do NOT call window.AndroidBridge.updateTabletHardwareSettings here!
-  // The APK installed on the Lenovo tablet adjusts STREAM_RING inside updateTabletHardwareSettings,
-  // which causes Lenovo Android to play a loud volume confirmation beep on every call.
-  // Screen dimming is handled by #brightness-overlay opacity above, and audio volume is controlled via Web Audio / HTMLMediaElement.volume.
 }
 
 window.wakeScreenAndResetDimTimer = function () {
   if (role !== 'nana') return;
-  // If a call is ringing when Nana touches a dimmed screen, immediately answer the call on that single tap!
   if (state.currentState === 'ringing_nana') {
     applyScreenBrightness(100);
     if ($('ringing-screen')?.classList.contains('active')) {
@@ -372,7 +367,31 @@ window.wakeFromNightMode = () => {
   window.wakeScreenAndResetDimTimer();
 };
 
-// --- 3. BATTERY VOICE WARNINGS & MUTE ---
+// --- 3. BATTERY VOICE WARNINGS, CHIME & MUTE ---
+function playBatteryAttentionChime(vol = 0.85) {
+  try {
+    if (!cachedBatteryChimeWavUrl) {
+      const sr = 8000, dur = 0.85, n = Math.floor(sr * dur);
+      const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+      const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+      w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE');
+      w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+      w(36, 'data'); v.setUint32(40, n * 2, true);
+      for (let i = 0; i < n; i++) {
+        const t = i / sr;
+        const f = t < 0.38 ? 587.33 : (t > 0.43 ? 880 : 0);
+        const s = f ? 0.5 * Math.sin(2 * Math.PI * f * t) : 0;
+        v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, s)) * 32767, true);
+      }
+      cachedBatteryChimeWavUrl = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+    }
+    const chime = new Audio(cachedBatteryChimeWavUrl);
+    chime.volume = Math.min(1.0, Math.max(0.25, vol));
+    chime.play().catch(() => {});
+  } catch (_) {}
+}
+
 window.muteBatteryVoiceForHours = async (hours) => {
   const mutedUntil = hours > 0 ? (Date.now() + hours * 3600 * 1000) : 0;
   settings.batteryVoiceMutedUntil = mutedUntil;
@@ -387,7 +406,16 @@ window.announceBatteryWarning = (text) => {
   if (isBatteryVoiceCurrentlyMuted() || (Date.now() - lastBatterySpokenMs < intervalMs)) return;
   lastBatterySpokenMs = Date.now();
   const battVol = Math.min(100, Math.max(20, Number(settings.batteryVoiceVolume) || 85));
-  speakMsg(text, true, battVol / 100);
+
+  // Wake screen brightness so Nana sees the red plug-in banner clearly
+  window.wakeScreenAndResetDimTimer?.();
+
+  // Play attention chime + speak warning aloud
+  playBatteryAttentionChime(battVol / 100);
+  setTimeout(() => {
+    try { window.speechSynthesis?.cancel(); } catch (_) {}
+    speakMsg(text, true, battVol / 100);
+  }, 900);
 };
 
 // --- 4. SUPERVISOR PIN, ANDROID ADMIN & PHONE GUIDE MODALS ---
@@ -588,7 +616,7 @@ export function refreshSettingsUI() {
 
   const sCall = Math.min(1.0, Math.max(0.2, callVol / 100)), sRad = Math.min(1.0, Math.max(0.15, radVol / 100));
   if ($('remote-audio') && role === 'nana') $('remote-audio').volume = sCall;
-  if ($('remote-video') && role === 'nana') $('remote-video').volume = sCall;
+  if ($('remote-video') && role === 'nana') $('remote-video').volume = 0;
   if ($('nana-radio-stream') && role === 'nana') $('nana-radio-stream').volume = sRad;
 
   document.querySelectorAll('[data-skey]').forEach(btn => {
