@@ -361,10 +361,11 @@ function syncUnpluggedBannerAndVoice(level, isCharging) {
   if (role !== 'nana') return;
   const banner = ensureUnpluggedWarningBanner();
   const txtEl = $('nana-unplugged-warning-text');
-  const battThresh = Number(settings.batteryVoiceThresholdPct ?? 100);
+  const rawThresh = Number(settings.batteryVoiceThresholdPct ?? 30);
+  const battThresh = rawThresh >= 95 ? 30 : rawThresh;
   const inCall = !!state.currentState && state.currentState !== 'idle';
 
-  if (isCharging !== false || level === null || level > battThresh || inCall) {
+  if (battThresh <= 0 || isCharging !== false || level === null || level >= 90 || level > battThresh || inCall) {
     banner.style.display = 'none';
     return;
   }
