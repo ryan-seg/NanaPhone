@@ -1,4 +1,4 @@
-# NanaPhone architecture (v2.9.4)
+# NanaPhone architecture (v2.9.5)
 
 Static site (GitHub Pages) + Firebase Realtime DB + Daily.co video + Google Apps Script (Telegram gateway).
 One `index.html`, loaded as ES modules. Same code runs as **Nana's tablet** (`?role=nana`) or a **family phone** (`?role=family&id=<member>`). `&test=1` uses a separate sandbox DB node.

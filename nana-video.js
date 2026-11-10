@@ -1,4 +1,4 @@
-import { $, NanaCore, esc, askNana, update, onValue } from "./nana-core.js?v=2.9.4";
+import { $, NanaCore, esc, askNana, update, onValue } from "./nana-core.js?v=2.9.5";
 
 const { role, isAdminFamilyMember, senderName, refs, settings, state, hooks, showScreen } = NanaCore;
 // Strictly limit queue editing/adding/deleting/sorting to Admin (Ryan); other family members can only Play, Pause & Make Active
@@ -450,7 +450,7 @@ async function handleVideoEndedOnNana() {
 }
 
 if (videoEl) {
-  videoEl.addEventListener('timeupdate', () => { saveCurrentVideoTime(false); keepScreenAwakeIfPlayingVideo(); });
+  videoEl.addEventListener('timeupdate', () => { saveCurrentVideoTime(false); });
   videoEl.addEventListener('playing', () => { isHandlingVideoEnd = false; syncVideoUI(); hooks.broadcastScreen?.(); });
   videoEl.addEventListener('pause', () => {
     if (!isHandlingVideoEnd && !videoEl.ended) saveCurrentVideoTime(true);

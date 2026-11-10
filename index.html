@@ -7,10 +7,10 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="nanaphone-page-version" content="2.9.4">
+  <meta name="nanaphone-page-version" content="2.9.5">
   <link rel="icon" href="data:,">
   <script>
-    window.__NANA_PAGE_VERSION = "2.9.4";
+    window.__NANA_PAGE_VERSION = "2.9.5";
     (function () {
       function ok() {
         var sv = (getComputedStyle(document.documentElement).getPropertyValue('--nana-styles-version') || '').replace(/["'\s]/g, '');
@@ -28,7 +28,7 @@
   </script>
   <title>NanaPhone Portal</title>
   <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
-  <link rel="stylesheet" href="styles.css?v=2.9.4">
+  <link rel="stylesheet" href="styles.css?v=2.9.5">
 </head>
 <body>
   <!-- Top 62px No-Touch Orientation Banner (Day, Time of Day, Date & Clock) -->
@@ -172,7 +172,8 @@
         <button class="nav-pill-btn chat-pill-x" style="flex:1;" onclick="switchNanaMainTab('chat')">✈️ Family Chat <span id="chat-unread-badge" class="chat-unread-badge">NEW</span></button>
         <button class="nav-pill-btn radio-pill-x" style="flex:1;" onclick="switchNanaMainTab('radio')">🎻 Classic FM</button>
         <button class="nav-pill-btn video-pill-x" style="flex:1;" onclick="switchNanaMainTab('video')">🎬 Video</button>
-        <div class="gear-pill" onclick="openAdminPinModal()" title="Supervisor Controls">⚙️ v2.9.4</div>
+        <button id="nana-corner-staff-btn" class="staff-pill" type="button" onclick="openCareHomeStaffGate()" title="Care Home Staff Controls">🏥 Staff</button>
+        <div class="gear-pill" onclick="openAdminPinModal()" title="Supervisor Controls">⚙️ v2.9.5</div>
       </div>
     </div>
 
@@ -464,12 +465,12 @@
     </div>
   </div>
 
-  <script type="module" src="nana-core.js?v=2.9.4"></script>
-  <script type="module" src="nana-settings.js?v=2.9.4"></script>
-  <script type="module" src="nana-chat.js?v=2.9.4"></script>
-  <script type="module" src="nana-video.js?v=2.9.4"></script>
-  <script type="module" src="nana-popups.js?v=2.9.4"></script>
-  <script type="module" src="nana-telemetry.js?v=2.9.4"></script>
-  <script type="module" src="app.js?v=2.9.4"></script>
+  <script type="module" src="nana-core.js?v=2.9.5"></script>
+  <script type="module" src="nana-settings.js?v=2.9.5"></script>
+  <script type="module" src="nana-chat.js?v=2.9.5"></script>
+  <script type="module" src="nana-video.js?v=2.9.5"></script>
+  <script type="module" src="nana-popups.js?v=2.9.5"></script>
+  <script type="module" src="nana-telemetry.js?v=2.9.5"></script>
+  <script type="module" src="app.js?v=2.9.5"></script>
 </body>
 </html>

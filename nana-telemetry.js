@@ -1,6 +1,6 @@
 import {
   $, NanaCore, esc, update, onValue, onDisconnect, query, limitToLast
-} from "./nana-core.js?v=2.9.4";
+} from "./nana-core.js?v=2.9.5";
 
 const {
   role, activeFamilyMember, FAMILY_NAMES, refs, settings, state, hooks, isBatteryVoiceCurrentlyMuted
@@ -35,27 +35,51 @@ if (role === 'nana') {
   setInterval(updateTopOrientationBanner, 10000);
 }
 
-// Small discreet "🏥 Staff" button in the top-left corner of the 62px margin so staff can access Settings/Mute anytime
+// Discreet "🏥 Staff" button placed inside the tappable header bar (below the top 52px/62px kiosk touch-blocker)
 function ensureCornerStaffAccessBtn() {
-  if (role !== 'nana' || $('nana-corner-staff-btn')) return;
-  const btn = document.createElement('button');
-  btn.id = 'nana-corner-staff-btn';
-  btn.type = 'button';
-  btn.textContent = '🏥 Staff';
-  btn.style.cssText = [
-    'position:fixed', 'top:10px', 'left:12px', 'z-index:9994',
-    'background:rgba(30,41,59,0.85)', 'color:#cbd5e1', 'border:2px solid #475569',
-    'border-radius:12px', 'padding:6px 12px', 'font-size:0.95rem', 'font-weight:800',
-    'cursor:pointer', 'box-shadow:0 2px 8px rgba(0,0,0,0.5)'
-  ].join(';');
-  btn.onclick = (ev) => {
-    ev.stopPropagation();
-    window.openCareHomeStaffGate();
-  };
-  document.body.appendChild(btn);
+  if (role !== 'nana') return;
+
+  // Remove any legacy fixed button that was inside the top 0..52px untappable blocker
+  const existing = $('nana-corner-staff-btn');
+  if (existing && existing.parentElement === document.body) {
+    existing.remove();
+  }
+
+  const headerPills = document.querySelector('#grid-screen .header-pills');
+  if (headerPills && !$('nana-corner-staff-btn')) {
+    const btn = document.createElement('button');
+    btn.id = 'nana-corner-staff-btn';
+    btn.type = 'button';
+    btn.className = 'staff-pill';
+    btn.textContent = '🏥 Staff';
+    btn.title = 'Care Home Staff Controls';
+    btn.onclick = (ev) => {
+      ev.stopPropagation();
+      window.openCareHomeStaffGate();
+    };
+    const gear = headerPills.querySelector('.gear-pill');
+    headerPills.insertBefore(btn, gear || null);
+  }
+
+  // Also ensure a tappable "🏥 Staff" pill is available on Radio, Video, and Family Chat headers (all >= 68px from top)
+  ['#radio-screen .nana-top-nav', '#video-screen .nana-top-nav', '#bulletin-modal .tg-header'].forEach(sel => {
+    const nav = document.querySelector(sel);
+    if (nav && !nav.querySelector('.staff-pill')) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'staff-pill';
+      b.textContent = '🏥 Staff';
+      b.title = 'Care Home Staff Controls';
+      b.onclick = (ev) => {
+        ev.stopPropagation();
+        window.openCareHomeStaffGate();
+      };
+      nav.appendChild(b);
+    }
+  });
 }
 
-// --- 2. TOP MARGIN "PLEASE PLUG IN" BANNER & CARE HOME STAFF ("CANFORD") GATE ---
+// --- 2. TAPPABLE "PLEASE PLUG IN" BANNER (BELOW TOP 62PX BLOCKER) & CARE HOME ("CANFORD") GATE ---
 function ensureUnpluggedWarningBanner() {
   let banner = $('nana-unplugged-warning-banner');
   if (banner) return banner;
@@ -64,16 +88,16 @@ function ensureUnpluggedWarningBanner() {
   banner.id = 'nana-unplugged-warning-banner';
   banner.style.cssText = [
     'position:fixed',
-    'top:2px',
+    'top:64px',
     'left:50%',
     'transform:translateX(-50%)',
-    'height:54px',
+    'min-height:54px',
     'z-index:9995',
     'background:#991b1b',
     'color:#fef08a',
     'border:3px solid #fde047',
     'border-radius:16px',
-    'padding:0 16px 0 20px',
+    'padding:6px 16px 6px 20px',
     'font-size:1.35rem',
     'font-weight:900',
     'box-shadow:0 6px 20px rgba(0,0,0,0.85)',
@@ -85,12 +109,12 @@ function ensureUnpluggedWarningBanner() {
     'width:auto',
     'max-width:96vw',
     'white-space:nowrap',
-    'pointer-events:none'
+    'pointer-events:auto'
   ].join(';');
   banner.innerHTML = `
     <span style="font-size:1.7rem;line-height:1;">🔌</span>
     <span id="nana-unplugged-warning-text">PLEASE PLUG IN THE TABLET CHARGER</span>
-    <button id="nana-banner-staff-btn" type="button" style="pointer-events:auto;background:#1e293b;color:#fff;border:2px solid #fde047;border-radius:11px;padding:6px 12px;font-size:0.98rem;font-weight:900;cursor:pointer;margin-left:4px;">
+    <button id="nana-banner-staff-btn" type="button" style="pointer-events:auto;background:#1e293b;color:#fff;border:2px solid #fde047;border-radius:11px;padding:8px 14px;font-size:1.05rem;font-weight:900;cursor:pointer;margin-left:4px;">
       🏥 Care Home
     </button>
   `;

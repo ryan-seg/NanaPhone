@@ -1,7 +1,7 @@
 import {
   $, NanaCore, EXPECTED_PIN_HASH, sha256Hex,
   ref, set, update, onValue, remove
-} from "./nana-core.js?v=2.9.4";
+} from "./nana-core.js?v=2.9.5";
 
 const {
   CONFIG, SERVICE_TOKEN, role, callerId, activeFamilyMember, isAdminFamilyMember,
@@ -199,14 +199,27 @@ const fmtDelay = (sec) => {
 })();
 
 // --- 2. BRIGHTNESS, NIGHT MODE & CLOCK ---
+let lastAppliedBrightnessPct = null;
+let lastAppliedInCallState = null;
+
 export function applyScreenBrightness(targetPercent) {
   if (role !== 'nana') return;
-  const inCallOrRinging = state.currentState && state.currentState !== 'idle';
+  const inCallOrRinging = !!(state.currentState && state.currentState !== 'idle');
   const pct = inCallOrRinging ? 100 : Math.max(5, Math.min(100, Number(targetPercent) || 85));
   const overlay = $('brightness-overlay');
   if (overlay) {
     overlay.style.opacity = inCallOrRinging ? '0' : Math.max(0, Math.min(0.88, (100 - pct) / 105)).toFixed(2);
     overlay.style.pointerEvents = (!inCallOrRinging && pct < (settings.awakeBrightness ?? 85)) ? 'auto' : 'none';
+  }
+  if (pct !== lastAppliedBrightnessPct || inCallOrRinging !== lastAppliedInCallState) {
+    lastAppliedBrightnessPct = pct;
+    lastAppliedInCallState = inCallOrRinging;
+    window.AndroidBridge?.updateTabletHardwareSettings?.(
+      pct,
+      100,
+      Number(settings.dimDelaySec ?? 120),
+      Number(settings.speechRate ?? 0.9)
+    );
   }
 }
 
@@ -214,9 +227,7 @@ window.wakeScreenAndResetDimTimer = function () {
   if (role !== 'nana') return;
   if (state.currentState === 'ringing_nana') {
     applyScreenBrightness(100);
-    if ($('ringing-screen')?.classList.contains('active')) {
-      window.answerCallAsNana?.();
-    }
+    clearTimeout(idleDimTimer);
     return;
   }
   applyScreenBrightness(settings.awakeBrightness ?? 85);

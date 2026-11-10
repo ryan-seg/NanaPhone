@@ -1,7 +1,7 @@
 import { getApps, getApp, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, update, push, onValue, remove, runTransaction, onDisconnect, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-export const APP_VERSION = "2.9.4";
+export const APP_VERSION = "2.9.5";
 export const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export { ref, set, update, push, onValue, remove, runTransaction, onDisconnect, query, limitToLast };
@@ -87,7 +87,16 @@ export const CONFIG = {
   telegramBotUsername: "Nanaphone_Bot",
   googleScriptUrl: "https://script.google.com/macros/s/AKfycbwsFHE8oyj1RBGxLJT79bbPsvJ2hTkVrF9dCoj369ApEREXyrdQKE_vA0QrobBOeLE2/exec",
   classicFmStream: "https://media-ice.musicradio.com/ClassicFMMP3",
-  silentWav: "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA",
+  // Clean 100ms 8kHz 16-bit mono all-zero PCM WAV (prevents 1-sample buffer-underrun clicking/popping)
+  silentWav: (() => {
+    const sr = 8000, samples = 800, buf = new ArrayBuffer(44 + samples * 2), v = new DataView(buf);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + samples * 2, true); w(8, 'WAVE');
+    w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    w(36, 'data'); v.setUint32(40, samples * 2, true);
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  })(),
   firebase: { databaseURL: "https://nanaphone-f644b-default-rtdb.europe-west1.firebasedatabase.app" },
   familyMembers: [
     mkMember("phil", "Phil", "Phil", "Phil", "1d4ed8"),

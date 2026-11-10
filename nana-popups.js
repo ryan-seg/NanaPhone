@@ -1,4 +1,4 @@
-import { $, NanaCore, esc, askNana, ref, set, update, push, onValue, query, limitToLast } from "./nana-core.js?v=2.9.4";
+import { $, NanaCore, esc, askNana, ref, set, update, push, onValue, query, limitToLast } from "./nana-core.js?v=2.9.5";
 
 const {
   SERVICE_TOKEN, PORTAL_NODE_ID, GOOGLE_SCRIPT_URL,
