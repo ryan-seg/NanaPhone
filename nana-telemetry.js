@@ -386,10 +386,10 @@ function syncUnpluggedBannerAndVoice(level, isCharging) {
   const banner = ensureUnpluggedWarningBanner();
   const txtEl = $('nana-unplugged-warning-text');
   const rawThresh = Number(settings.batteryVoiceThresholdPct ?? 30);
-  const battThresh = rawThresh >= 95 ? 30 : rawThresh;
+  const battThresh = rawThresh >= 100 ? 30 : rawThresh;
   const inCall = !!state.currentState && state.currentState !== 'idle';
 
-  if (battThresh <= 0 || isCharging !== false || level === null || level >= 90 || level > battThresh || inCall) {
+  if (isCharging !== false || level === null || inCall) {
     banner.style.display = 'none';
     return;
   }
@@ -397,12 +397,13 @@ function syncUnpluggedBannerAndVoice(level, isCharging) {
   const muted = isBatteryVoiceCurrentlyMuted();
   if (txtEl) {
     txtEl.textContent = muted
-      ? `PLEASE PLUG IN CHARGER (${level}% • 🔇 MUTED)`
-      : `PLEASE PLUG IN THE TABLET CHARGER (${level}%)`;
+      ? `UNPLUGGED • ${level}% • 🔇 MUTED`
+      : `UNPLUGGED • PLEASE PLUG IN CHARGER (${level}%)`;
   }
   banner.style.display = 'flex';
 
-  if (!muted && !NanaCore.isCurrentlyInNightWindow?.()) {
+  const shouldSpeak = battThresh > 0 && level <= battThresh && !muted && !NanaCore.isCurrentlyInNightWindow?.();
+  if (shouldSpeak) {
     window.announceBatteryWarning?.(level);
   }
 }
