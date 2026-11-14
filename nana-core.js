@@ -163,7 +163,7 @@ export const settings = {
   ringDurationSec: 60, ringtone: 'uk-phone', voicePrompts: true, autoAnswer: false,
   speechRate: 0.9, awakeBrightness: 85, dimBrightness: 15, dimDelaySec: 120,
   nightModeEnabled: true, nightStartHour: 21, nightEndHour: 8, nightBlockCalls: false,
-  batteryVoiceMutedUntil: 0, batteryVoiceIntervalMin: 5, batteryVoiceVolume: 85, batteryVoiceThresholdPct: 30,
+  batteryVoiceMutedUntil: 0, batteryVoiceIntervalMin: 0, batteryVoiceVolume: 85, batteryVoiceThresholdPct: 30,
   showBulletinBar: true, showReadAloud: false, colorTheme: 'classic-dark',
   keyboardLayout: 'qwerty', keyboardTimeoutSec: 60, keyGuardMs: 350, bulletinClearedAt: 0,
   callingEnabled: TEST_MODE,
