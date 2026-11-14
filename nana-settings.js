@@ -124,10 +124,12 @@ const fmtDelay = (sec) => {
       <div class="opt-row">${optBtns('ringVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
     </div>
     <div class="settings-card">
-      <div class="settings-label"><span>🔋 Battery Unplugged Voice Alert & Mute</span><span class="lbl-battery-summary" style="color:#38bdf8;font-size:0.92rem;"></span></div>
-      <div class="settings-sub lbl-battery-mute">Battery Voice Status: Active</div>
-      <div class="settings-sub" style="margin-bottom:4px;">🔌 Show Warning & Speak When Unplugged At or Below:</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceThresholdPct', [[0,'Off'],[15,'15%'],[25,'25%'],[30,'30%'],[50,'50%'],[80,'80%']])}</div>
+      <div class="settings-label"><span>🔋 Battery Unplugged Banner & Voice Alerts</span><span class="lbl-battery-summary" style="color:#38bdf8;font-size:0.92rem;"></span></div>
+      <div class="settings-sub lbl-battery-mute">Top banner always shows when unplugged. Voice alerts stay silent during Night Mode.</div>
+      <div class="settings-sub" style="margin-bottom:4px;">🗣️ Speak Voice Alert When Unplugged At or Below:</div>
+      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceThresholdPct', [[0,'Off'],[15,'15%'],[25,'25%'],[30,'30%'],[50,'50%'],[80,'80%'],[99,'Whenever Unplugged']])}</div>
+      <div class="settings-sub" style="margin-bottom:4px;">⏱️ Voice Alert Frequency (Dynamic speeds up as battery drops: >50%=20m, 31-50%=10m, 16-30%=5m, ≤15%=2m):</div>
+      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceIntervalMin', [[0,'⚡ Dynamic'],[3,'3m'],[5,'5m'],[10,'10m'],[15,'15m'],[30,'30m']])}</div>
       <div class="settings-sub" style="margin-bottom:4px;">🔊 Unplugged Voice Alert Volume:</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
       <div class="opt-row" style="margin-bottom:8px;">
@@ -271,30 +273,24 @@ window.wakeFromNightMode = () => {
   window.wakeScreenAndResetDimTimer();
 };
 
-// --- 3. BATTERY VOICE WARNINGS & MUTE (NO SYNTHESIZED BEEP CHIMES) ---
+// --- 3. BATTERY VOICE WARNINGS & MUTE (DYNAMIC OR FIXED INTERVAL, QUIET HOURS RESPECTED, NO SCREEN WAKE) ---
 function getDynamicBatteryAlertPlan(levelPct) {
   const lvl = (typeof levelPct === 'number' && !Number.isNaN(levelPct)) ? Math.round(levelPct) : 30;
   const baseVol = Math.min(100, Math.max(25, Number(settings.batteryVoiceVolume) || 85));
+  const fixedMin = Number(settings.batteryVoiceIntervalMin ?? 0);
 
-  if (lvl <= 15) {
-    return {
-      intervalMin: 2,
-      volumePct: 100,
-      message: `The tablet battery is low at ${lvl} percent. Please plug in the tablet charger.`
-    };
-  }
-  if (lvl <= 30) {
-    return {
-      intervalMin: 5,
-      volumePct: Math.max(baseVol, 85),
-      message: `Please plug in the tablet charger. The battery is at ${lvl} percent.`
-    };
-  }
-  return {
-    intervalMin: 15,
-    volumePct: baseVol,
-    message: `Please plug in the tablet charger when you can.`
-  };
+  let dynamicMin = 20;
+  if (lvl <= 15) dynamicMin = 2;
+  else if (lvl <= 30) dynamicMin = 5;
+  else if (lvl <= 50) dynamicMin = 10;
+
+  const intervalMin = fixedMin > 0 ? fixedMin : dynamicMin;
+  const volumePct = lvl <= 15 ? 100 : (lvl <= 30 ? Math.max(baseVol, 85) : baseVol);
+  const message = lvl <= 30
+    ? `Please plug in the tablet charger. The battery is at ${lvl} percent.`
+    : `Please plug in the tablet charger when you can. The battery is at ${lvl} percent.`;
+
+  return { intervalMin, volumePct, message };
 }
 
 window.muteBatteryVoiceForHours = async (hours) => {
@@ -308,7 +304,7 @@ window.muteBatteryVoiceForHours = async (hours) => {
 };
 
 window.announceBatteryWarning = (levelOrText) => {
-  if (isBatteryVoiceCurrentlyMuted()) return;
+  if (isBatteryVoiceCurrentlyMuted() || isCurrentlyInNightWindow()) return;
 
   const isNumericLevel = typeof levelOrText === 'number' && !Number.isNaN(levelOrText);
   const plan = getDynamicBatteryAlertPlan(isNumericLevel ? levelOrText : 30);
@@ -320,7 +316,7 @@ window.announceBatteryWarning = (levelOrText) => {
   const spokenText = isNumericLevel ? plan.message : String(levelOrText || plan.message);
   const volNorm = plan.volumePct / 100;
 
-  window.wakeScreenAndResetDimTimer?.();
+  // Do NOT wake the screen here so battery is preserved while dimmed/asleep
   try { window.speechSynthesis?.cancel(); } catch (_) {}
   speakMsg(spokenText, true, volNorm);
 };
@@ -484,6 +480,9 @@ export function refreshSettingsUI() {
   const kbLayout = settings.keyboardLayout || 'qwerty', kbHideSec = Number(settings.keyboardTimeoutSec ?? 60);
   const battVol = Number(settings.batteryVoiceVolume ?? 85);
   const battThresh = Number(settings.batteryVoiceThresholdPct ?? 30);
+  const battInterval = Number(settings.batteryVoiceIntervalMin ?? 0);
+  const battThreshLabel = battThresh >= 99 ? 'Always' : `≤${battThresh}%`;
+  const battFreqLabel = battInterval > 0 ? `Every ${battInterval}m` : '⚡ Dynamic';
 
   if ($('in-call-vol-label')) $('in-call-vol-label').innerText = `${callVol}%`;
   if ($('nana-vol-display')) $('nana-vol-display').innerText = `${radVol}%`;
@@ -494,7 +493,7 @@ export function refreshSettingsUI() {
     e.innerText = `Call ${callVol}% • Radio ${radVol}% • Ring ${ringVol}%`;
   });
   document.querySelectorAll('.lbl-battery-summary').forEach(e => {
-    e.innerText = battThresh <= 0 ? 'Off' : `≤${battThresh}% • Vol ${battVol}%`;
+    e.innerText = battThresh <= 0 ? 'Off' : `${battThreshLabel} • ${battFreqLabel} • Vol ${battVol}%`;
   });
   document.querySelectorAll('.lbl-night-window').forEach(e => {
     e.innerText = settings.nightModeEnabled ? `${String(nStart).padStart(2,'0')}:00 – ${String(nEnd).padStart(2,'0')}:00` : "Disabled";
@@ -503,7 +502,7 @@ export function refreshSettingsUI() {
   const mutedUntil = Number(settings.batteryVoiceMutedUntil) || 0;
   const muteTxt = mutedUntil > Date.now()
     ? `🔇 Muted until ${new Date(mutedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    : (battThresh <= 0 ? '🔕 Unplugged voice alerts switched OFF' : `🔊 Alerts when unplugged at ≤${battThresh}%`);
+    : (battThresh <= 0 ? '🔕 Unplugged voice alerts switched OFF' : `🔊 Alerts ${battThresh >= 99 ? 'whenever unplugged' : `when unplugged at ≤${battThresh}%`} (${battFreqLabel})`);
   document.querySelectorAll('.lbl-battery-mute').forEach(e => { e.innerText = muteTxt; });
 
   const sCall = Math.min(1.0, Math.max(0.2, callVol / 100)), sRad = Math.min(1.0, Math.max(0.15, radVol / 100));
@@ -544,8 +543,8 @@ onValue(refs.settings, snap => {
   const remote = snap.val();
   if (remote) {
     Object.assign(settings, remote);
-    // Migrate legacy 100% battery threshold to 30% so trickle-charge cycling at 99-100% never nags
-    if (Number(remote.batteryVoiceThresholdPct) >= 95) {
+    // Migrate legacy 100% battery threshold to 30% while preserving 99% ("Whenever Unplugged")
+    if (Number(remote.batteryVoiceThresholdPct) >= 100) {
       settings.batteryVoiceThresholdPct = 30;
     }
     if (remote.radioPromptHours !== undefined) settings.radioPromptHours = parseHoursArray(remote.radioPromptHours, [10, 15]);
