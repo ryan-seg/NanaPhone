@@ -455,7 +455,16 @@ export function recordTouchActivity(customActivity = null) {
   if (!customActivity && (now - lastTouchWriteMs < 15000)) return;
   lastTouchWriteMs = now;
   const { batteryLevel, isCharging } = readTabletBatteryStatus();
-  const payload = { online: true, lastTouched: now, lastActive: now, lastPing: now, batteryLevel, isCharging };
+  const payload = {
+    online: true,
+    appState: 'foreground',
+    lastExitHint: 'active_in_app',
+    lastTouched: now,
+    lastActive: now,
+    lastPing: now,
+    batteryLevel,
+    isCharging
+  };
   if (customActivity) payload.lastActivity = customActivity;
   update(refs.presence, payload).catch(() => {});
 }
@@ -464,7 +473,16 @@ NanaCore.recordTouchActivity = recordTouchActivity;
 function recordBackgroundHeartbeat() {
   if (role !== 'nana') return;
   const { batteryLevel, isCharging } = readTabletBatteryStatus();
-  update(refs.presence, { online: true, lastPing: Date.now(), batteryLevel, isCharging }).catch(() => {});
+  const isHidden = document.visibilityState === 'hidden';
+  const payload = {
+    online: true,
+    appState: isHidden ? 'backgrounded' : 'foreground',
+    lastPing: Date.now(),
+    batteryLevel,
+    isCharging
+  };
+  if (!isHidden) payload.lastExitHint = 'active_in_app';
+  update(refs.presence, payload).catch(() => {});
 }
 
 window.resetIdleTimer = () => {
@@ -499,11 +517,13 @@ export function broadcastNanaCurrentScreen() {
   if (sig === lastBroadcastScreenState) return;
   lastBroadcastScreenState = sig;
 
-  update(refs.presence, {
+  const payload = {
     online: true,
     currentScreen: screenState,
     appState
-  }).catch(() => {});
+  };
+  if (appState === 'foreground') payload.lastExitHint = 'active_in_app';
+  update(refs.presence, payload).catch(() => {});
 }
 hooks.broadcastScreen = broadcastNanaCurrentScreen;
 
@@ -511,12 +531,15 @@ if (role === 'nana') {
   onValue(refs.connectedInfo, snap => {
     if (snap.val() === true) {
       onDisconnect(refs.presence).update({ online: false, disconnectedAt: Date.now() }).catch(() => {});
-      update(refs.presence, {
+      const appState = document.visibilityState === 'hidden' ? 'backgrounded' : 'foreground';
+      const payload = {
         online: true,
-        appState: document.visibilityState === 'hidden' ? 'backgrounded' : 'foreground',
+        appState,
         networkOnline: navigator.onLine !== false,
         lastConnectedAt: Date.now()
-      }).catch(() => {});
+      };
+      if (appState === 'foreground') payload.lastExitHint = 'active_in_app';
+      update(refs.presence, payload).catch(() => {});
     }
   });
 
