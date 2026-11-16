@@ -167,6 +167,7 @@ export const settings = {
   nightModeEnabled: true, nightStartHour: 21, nightEndHour: 8, nightBlockCalls: false,
   batteryVoiceMutedUntil: 0, batteryVoiceIntervalMin: 0, batteryVoiceVolume: 85, batteryVoiceThresholdPct: 30,
   showBulletinBar: true, showReadAloud: false, colorTheme: 'classic-dark',
+  voiceMessagingEnabled: true, voiceMessageMaxSec: 30,
   keyboardLayout: 'qwerty', keyboardTimeoutSec: 60, keyGuardMs: 350, bulletinClearedAt: 0,
   callingEnabled: TEST_MODE,
   showTodaysCallsBanner: true, periodicPopupsEnabled: true, unreadChatPopupMin: 30,
