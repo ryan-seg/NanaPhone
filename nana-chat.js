@@ -706,6 +706,7 @@ window.openFamilyBulletin = () => {
 window.closeFamilyBulletin = () => {
   if (chatIntersectionObserver) chatIntersectionObserver.disconnect();
   pauseActiveChatVoiceMessage?.();
+  cancelNanaVoiceRecording?.(true);
   window.closeChatVideoOverlay?.();
   window.closeReplyChooser?.();
   $('bulletin-modal').style.display = 'none';
@@ -1424,7 +1425,7 @@ window.startNanaVoiceRecording = async () => {
     return;
   }
 
-  const mimeCandidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+  const mimeCandidates = ['audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'];
   const chosenMime = mimeCandidates.find(m => window.MediaRecorder?.isTypeSupported?.(m)) || '';
   activeRecChunks = [];
   recCancelled = false;
@@ -1438,8 +1439,6 @@ window.startNanaVoiceRecording = async () => {
   }
 
   const maxSec = Math.max(10, Number(settings.voiceMessageMaxSec) || 30);
-  recStartedAtMs = Date.now();
-  recDeadlineMs = recStartedAtMs + maxSec * 1000;
 
   const ov = ensureVoiceRecordOverlay();
   ov.style.display = 'flex';
@@ -1453,6 +1452,11 @@ window.startNanaVoiceRecording = async () => {
   }, VOICE_TAP_GUARD_MS);
 
   playVoiceChime();
+  await new Promise(r => setTimeout(r, 360));
+  if (recCancelled || !activeRecStream) return;
+
+  recStartedAtMs = Date.now();
+  recDeadlineMs = recStartedAtMs + maxSec * 1000;
 
   activeRecorder.ondataavailable = (e) => {
     if (e.data && e.data.size > 0) activeRecChunks.push(e.data);
@@ -1486,17 +1490,8 @@ window.startNanaVoiceRecording = async () => {
       });
       const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
 
-      await push(refs.bulletin, {
-        author: 'Nana',
-        fromNana: true,
-        type: 'voice',
-        voiceDurationSec: elapsedSec,
-        text: `🎙️ Voice Message (${elapsedSec}s)`,
-        timestamp: Date.now()
-      });
-
       if (CONFIG?.googleScriptUrl && SERVICE_TOKEN) {
-        await fetch(CONFIG.googleScriptUrl, {
+        const res = await fetch(CONFIG.googleScriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({
@@ -1509,7 +1504,21 @@ window.startNanaVoiceRecording = async () => {
             durationSec: elapsedSec
           })
         });
+        const resJson = await res.json().catch(() => null);
+        if (!res.ok || (resJson && resJson.ok === false)) {
+          throw new Error(resJson?.error || `HTTP ${res.status}`);
+        }
       }
+
+      await push(refs.bulletin, {
+        author: 'Nana',
+        fromNana: true,
+        type: 'voice',
+        voiceDurationSec: elapsedSec,
+        text: `🎙️ Voice Message (${elapsedSec}s)`,
+        timestamp: Date.now()
+      });
+
       if ($('tg-send-status')) {
         $('tg-send-status').innerText = '✅ Voice message sent!';
         setTimeout(() => { if ($('tg-send-status')) $('tg-send-status').innerText = '🟢 Connected to Family Group'; }, 3000);
