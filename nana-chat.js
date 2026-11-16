@@ -707,6 +707,7 @@ window.closeFamilyBulletin = () => {
   if (chatIntersectionObserver) chatIntersectionObserver.disconnect();
   pauseActiveChatVoiceMessage?.();
   window.closeChatVideoOverlay?.();
+  window.closeReplyChooser?.();
   $('bulletin-modal').style.display = 'none';
   window.closeSeniorKeyboard(false);
   window.speechSynthesis?.cancel();
@@ -715,7 +716,8 @@ window.closeFamilyBulletin = () => {
   hooks.broadcastScreen?.();
 };
 
-window.openSeniorKeyboard = () => {
+window.openActualSeniorKeyboard = () => {
+  window.closeReplyChooser?.();
   const modal = $('bulletin-modal');
   const input = $('nana-chat-input');
   if (modal?.classList.contains('kb-fullscreen') && input?.value?.trim()) {
@@ -736,8 +738,23 @@ window.openSeniorKeyboard = () => {
   hooks.broadcastScreen?.();
 };
 
+window.openSeniorKeyboard = () => {
+  const modal = $('bulletin-modal');
+  const input = $('nana-chat-input');
+  if (modal?.classList.contains('kb-fullscreen')) {
+    if (input?.value?.trim()) window.speakNote?.(input.value.trim());
+    return;
+  }
+  if (role === 'nana' && settings.voiceMessagingEnabled !== false && !(input?.value || '').trim()) {
+    window.openReplyChooser?.();
+    return;
+  }
+  window.openActualSeniorKeyboard();
+};
+
 window.closeSeniorKeyboard = (restoreScroll = true) => {
   clearTimeout(keyboardHideTimer);
+  window.closeReplyChooser?.();
   const modal = $('bulletin-modal');
   const wasFullscreen = modal?.classList.contains('kb-fullscreen');
   if ($('senior-onscreen-keyboard')) $('senior-onscreen-keyboard').style.display = 'none';
@@ -1523,25 +1540,56 @@ window.startNanaVoiceRecording = async () => {
   }, 500);
 };
 
+function ensureReplyChooserOverlay() {
+  if ($('nana-reply-chooser-overlay')) return $('nana-reply-chooser-overlay');
+  const ov = document.createElement('div');
+  ov.id = 'nana-reply-chooser-overlay';
+  ov.style.cssText = 'display:none;position:fixed;inset:0;z-index:9997;background:rgba(2,6,23,0.94);flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;gap:18px;';
+  ov.innerHTML = `
+    <div style="font-size:clamp(1.6rem,4vw,2.2rem);font-weight:900;color:#fef08a;">💬 How would you like to reply?</div>
+    <button type="button" id="nana-chooser-speak-btn" style="width:min(540px,92vw);padding:32px 20px;border-radius:22px;border:4px solid #fef08a;background:linear-gradient(135deg,#065f46,#059669);color:#fff;font-size:clamp(1.7rem,4.5vw,2.3rem);font-weight:900;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.45);">
+      🎙️ SPEAK A MESSAGE
+      <span style="display:block;font-size:1.05rem;font-weight:700;color:#d1fae5;margin-top:6px;">Just talk — no typing needed</span>
+    </button>
+    <button type="button" id="nana-chooser-type-btn" style="width:min(540px,92vw);padding:20px;border-radius:18px;border:2px solid #64748b;background:#1e293b;color:#e2e8f0;font-size:1.35rem;font-weight:800;cursor:pointer;">
+      ⌨️ Type a Message
+    </button>
+    <button type="button" id="nana-chooser-back-btn" style="width:min(540px,92vw);padding:16px;border-radius:16px;border:2px solid #475569;background:#0f172a;color:#cbd5e1;font-size:1.2rem;font-weight:800;cursor:pointer;">
+      ⬅️ Back to Messages
+    </button>
+  `;
+  document.body.appendChild(ov);
+
+  $('nana-chooser-speak-btn').onclick = () => {
+    window.closeReplyChooser();
+    window.startNanaVoiceRecording();
+  };
+  $('nana-chooser-type-btn').onclick = () => {
+    window.openActualSeniorKeyboard();
+  };
+  $('nana-chooser-back-btn').onclick = () => {
+    window.closeReplyChooser();
+  };
+  return ov;
+}
+
+window.openReplyChooser = () => {
+  if (role !== 'nana' || settings.voiceMessagingEnabled === false) return;
+  const ov = ensureReplyChooserOverlay();
+  ov.style.display = 'flex';
+  window.wakeScreenAndResetDimTimer?.();
+};
+
+window.closeReplyChooser = () => {
+  const ov = $('nana-reply-chooser-overlay');
+  if (ov) ov.style.display = 'none';
+};
+
 function ensureVoiceMessagingUI() {
   if (role !== 'nana') return;
-  const enabled = settings.voiceMessagingEnabled !== false;
   $('nana-voice-coax-banner')?.remove();
-
-  const kb = $('senior-onscreen-keyboard');
-  if (kb) {
-    let kbBtn = $('nana-kb-voice-coax-btn');
-    if (!kbBtn) {
-      kbBtn = document.createElement('button');
-      kbBtn.id = 'nana-kb-voice-coax-btn';
-      kbBtn.type = 'button';
-      kbBtn.style.cssText = 'width:100%;padding:12px;margin-bottom:6px;border-radius:12px;border:2px solid #fef08a;background:#047857;color:#fff;font-size:1.15rem;font-weight:900;cursor:pointer;';
-      kbBtn.textContent = '🎙️ Easier: Tap Here to Speak Instead of Typing!';
-      kbBtn.onclick = () => window.startNanaVoiceRecording();
-      kb.prepend(kbBtn);
-    }
-    kbBtn.style.display = enabled ? 'block' : 'none';
-  }
+  $('nana-kb-voice-coax-btn')?.remove();
+  if (settings.voiceMessagingEnabled === false) window.closeReplyChooser?.();
 }
 
 if (role === 'nana') {
