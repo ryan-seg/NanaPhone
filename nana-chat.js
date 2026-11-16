@@ -1526,21 +1526,7 @@ window.startNanaVoiceRecording = async () => {
 function ensureVoiceMessagingUI() {
   if (role !== 'nana') return;
   const enabled = settings.voiceMessagingEnabled !== false;
-
-  const composer = document.querySelector('#bulletin-modal .tg-composer-area');
-  if (composer) {
-    let banner = $('nana-voice-coax-banner');
-    if (!banner) {
-      banner = document.createElement('button');
-      banner.id = 'nana-voice-coax-banner';
-      banner.type = 'button';
-      banner.style.cssText = 'width:100%;padding:16px 14px;margin-bottom:10px;border-radius:16px;border:3px solid #fef08a;background:linear-gradient(135deg,#065f46,#047857);color:#fff;font-size:1.35rem;font-weight:900;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.35);';
-      banner.innerHTML = '🎙️ TAP HERE TO SEND A VOICE MESSAGE <span style="display:block;font-size:0.95rem;font-weight:700;color:#fef08a;margin-top:2px;">Easier than typing!</span>';
-      banner.onclick = () => window.startNanaVoiceRecording();
-      composer.prepend(banner);
-    }
-    banner.style.display = enabled ? 'block' : 'none';
-  }
+  $('nana-voice-coax-banner')?.remove();
 
   const kb = $('senior-onscreen-keyboard');
   if (kb) {
