@@ -1,9 +1,9 @@
 import {
-  $, NanaCore, esc, update, onValue, onDisconnect, query, limitToLast
+  $, NanaCore, esc, update, remove, onValue, runTransaction, onDisconnect, query, limitToLast
 } from "./nana-core.js?v=2.9.5";
 
 const {
-  role, activeFamilyMember, FAMILY_NAMES, refs, settings, state, hooks, isBatteryVoiceCurrentlyMuted
+  role, activeFamilyMember, isAdminFamilyMember, FAMILY_NAMES, refs, settings, state, hooks, isBatteryVoiceCurrentlyMuted
 } = NanaCore;
 
 let lastTouchWriteMs = 0;
@@ -774,10 +774,183 @@ export function updateFamilyPresenceBanner() {
 }
 hooks.refreshFamilyPresence = updateFamilyPresenceBanner;
 
+function getUsageDateKey() {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: settings.tabletTimezone || 'Europe/London',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date());
+  } catch (_) {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+function formatMediaDurationNearest5m(totalSec) {
+  const s = Math.max(0, Number(totalSec) || 0);
+  const mins = Math.round(s / 300) * 5;
+  if (mins <= 0) return '0m';
+  const hrs = Math.floor(mins / 60);
+  const remM = mins % 60;
+  return hrs > 0 ? `${hrs}h ${remM}m` : `${mins}m`;
+}
+
+function renderRyanControlsInsights() {
+  if (role !== 'family' || !isAdminFamilyMember) return;
+  const mount = $('family-settings-mount');
+  if (!mount) return;
+
+  let card = $('ryan-media-insights-card');
+  if (!card) {
+    card = document.createElement('div');
+    card.id = 'ryan-media-insights-card';
+    card.className = 'admin-card';
+    card.style.marginBottom = '10px';
+    mount.prepend(card);
+  }
+
+  const usage = state.dailyUsageSnap || {};
+  const todayKey = getUsageDateKey();
+  const todayRec = usage[todayKey] || { videoSec: 0, radioSec: 0 };
+  const dayKeys = Object.keys(usage).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort().reverse().slice(0, 14);
+  const historyRows = dayKeys.length
+    ? dayKeys.map(k => {
+        const d = usage[k] || {};
+        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px solid rgba(148,163,184,0.15);"><span>${esc(k)}</span><span>🎬 ${formatMediaDurationNearest5m(d.videoSec)} &nbsp;|&nbsp; 🎻 ${formatMediaDurationNearest5m(d.radioSec)}</span></div>`;
+      }).join('')
+    : `<div style="color:#94a3b8;">No daily stats recorded yet.</div>`;
+
+  const issuesObj = state.videoIssuesSnap || {};
+  const issueList = Object.entries(issuesObj)
+    .map(([id, v]) => ({ id, ...(v || {}) }))
+    .sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0))
+    .slice(0, 15);
+  const issuesHtml = issueList.length
+    ? issueList.map(it => {
+        const when = it.timestamp ? new Date(it.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        return `<div style="padding:4px 0;border-bottom:1px solid rgba(148,163,184,0.15);font-size:0.8rem;">
+          <div style="color:#fca5a5;font-weight:700;">⚠️ ${esc(it.title || 'Unknown video')}</div>
+          <div style="color:#94a3b8;">${esc(it.reason || 'failed')} ${when ? `• ${esc(when)}` : ''}</div>
+          ${it.url ? `<div style="color:#64748b;word-break:break-all;font-size:0.75rem;">${esc(it.url)}</div>` : ''}
+        </div>`;
+      }).join('')
+    : `<div style="color:#4ade80;font-size:0.82rem;">✅ No broken video alerts</div>`;
+
+  card.innerHTML = `
+    <div style="font-weight:900;color:#fef08a;margin-bottom:6px;">📊 Nana's Daily Video &amp; Radio Use (nearest 5m)</div>
+    <div style="font-size:0.9rem;color:#bae6fd;font-weight:800;margin-bottom:6px;">
+      Today: 🎬 ${formatMediaDurationNearest5m(todayRec.videoSec)} &nbsp;•&nbsp; 🎻 ${formatMediaDurationNearest5m(todayRec.radioSec)}
+    </div>
+    <details style="margin-bottom:10px;font-size:0.82rem;color:#cbd5e1;">
+      <summary style="cursor:pointer;color:#93c5fd;font-weight:700;">📅 Daily History (${dayKeys.length}d)</summary>
+      <div style="margin-top:4px;background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:8px;padding:6px 8px;max-height:150px;overflow-y:auto;">${historyRows}</div>
+    </details>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <span style="font-weight:900;color:#fca5a5;font-size:0.9rem;">⚠️ Broken Video Alerts (${issueList.length})</span>
+      ${issueList.length ? `<button type="button" id="btn-clear-video-issues" class="tone-btn" style="padding:3px 10px;font-size:0.75rem;background:#334155;">Clear</button>` : ''}
+    </div>
+    <div style="background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:8px;padding:6px 8px;max-height:150px;overflow-y:auto;">${issuesHtml}</div>
+  `;
+
+  const clearBtn = $('btn-clear-video-issues');
+  if (clearBtn) {
+    clearBtn.onclick = () => remove(refs.videoIssues).catch(() => {});
+  }
+}
+
+if (role === 'nana') {
+  let pendingVideoSec = 0;
+  let pendingRadioSec = 0;
+  let lastUsageTickMs = Date.now();
+  let lastTrackedVideoTime = -1;
+  let lastFlushMs = Date.now();
+
+  const flushDailyUsage = () => {
+    const addV = Math.floor(pendingVideoSec);
+    const addR = Math.floor(pendingRadioSec);
+    if (addV <= 0 && addR <= 0) return;
+    pendingVideoSec -= addV;
+    pendingRadioSec -= addR;
+    const dayKey = getUsageDateKey();
+    runTransaction(refs.dailyUsage, current => {
+      const next = (current && typeof current === 'object') ? { ...current } : {};
+      const curDay = (next[dayKey] && typeof next[dayKey] === 'object') ? next[dayKey] : {};
+      next[dayKey] = {
+        videoSec: (Number(curDay.videoSec) || 0) + addV,
+        radioSec: (Number(curDay.radioSec) || 0) + addR,
+        updatedAt: Date.now()
+      };
+      // Keep most recent 30 days
+      const keys = Object.keys(next).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+      while (keys.length > 30) {
+        delete next[keys.shift()];
+      }
+      return next;
+    }).catch(() => {
+      pendingVideoSec += addV;
+      pendingRadioSec += addR;
+    });
+  };
+
+  setInterval(() => {
+    const now = Date.now();
+    const dtSec = Math.min(5, Math.max(0, (now - lastUsageTickMs) / 1000));
+    lastUsageTickMs = now;
+    const inCall = !!(state.currentState && state.currentState !== 'idle');
+
+    const videoEl = $('nana-video-el');
+    const videoPlaying = !!(
+      !inCall &&
+      $('video-screen')?.classList.contains('active') &&
+      videoEl && !videoEl.paused && !videoEl.ended && videoEl.readyState >= 2
+    );
+    if (videoPlaying) {
+      const vt = Number(videoEl.currentTime) || 0;
+      if (lastTrackedVideoTime >= 0 && vt > lastTrackedVideoTime + 0.1) {
+        pendingVideoSec += dtSec;
+      }
+      lastTrackedVideoTime = vt;
+    } else {
+      lastTrackedVideoTime = -1;
+    }
+
+    const radioEl = $('nana-radio-stream');
+    const radioPlaying = !!(
+      !inCall &&
+      radioEl && !radioEl.paused && !radioEl.ended && radioEl.readyState >= 2
+    );
+    if (radioPlaying) {
+      pendingRadioSec += dtSec;
+    }
+
+    if (now - lastFlushMs >= 30000) {
+      lastFlushMs = now;
+      flushDailyUsage();
+    }
+  }, 2000);
+
+  window.addEventListener('pagehide', flushDailyUsage);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushDailyUsage();
+  });
+}
+
 if (role === 'family') {
   onValue(refs.presence, snap => {
     state.presenceSnap = snap.val() || {};
     updateFamilyPresenceBanner();
   });
+  if (isAdminFamilyMember) {
+    hooks.onSettingsChanged.push(renderRyanControlsInsights);
+    onValue(refs.dailyUsage, snap => {
+      state.dailyUsageSnap = snap.val() || {};
+      renderRyanControlsInsights();
+    });
+    onValue(refs.videoIssues, snap => {
+      state.videoIssuesSnap = snap.val() || {};
+      renderRyanControlsInsights();
+    });
+  }
   setInterval(updateFamilyPresenceBanner, 15000);
 }
