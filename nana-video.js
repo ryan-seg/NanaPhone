@@ -1,6 +1,6 @@
-import { $, NanaCore, esc, askNana, update, onValue } from "./nana-core.js?v=2.9.5";
+import { $, NanaCore, esc, askNana, update, push, onValue } from "./nana-core.js?v=2.9.5";
 
-const { role, isAdminFamilyMember, senderName, refs, settings, state, hooks, showScreen } = NanaCore;
+const { role, isAdminFamilyMember, senderName, refs, settings, state, hooks, showScreen, CONFIG, SERVICE_TOKEN, PORTAL_NODE_ID } = NanaCore;
 // Strictly limit queue editing/adding/deleting/sorting to Admin (Ryan); other family members can only Play, Pause & Make Active
 const canEditQueue = isAdminFamilyMember;
 const videoEl = $('nana-video-el');
@@ -19,6 +19,11 @@ let activeSubBlobUrl = null;
 let lastSavedTimeSec = 0;
 let isHandlingVideoEnd = false;
 let screenWakeLock = null;
+let lastObservedVideoTime = -1;
+let lastVideoProgressMs = 0;
+let lastWorkingProgressStartMs = 0;
+const failedVideoIdsInRun = new Set();
+const notifiedBrokenVideoIds = new Set();
 
 // --- 1. WAKE LOCK & ACTIVE PLAYBACK HELPERS ---
 export function isNanaVideoActivelyPlaying() {
@@ -449,18 +454,142 @@ async function handleVideoEndedOnNana() {
   });
 }
 
+function notifyRyanBrokenVideo(item, index, reason = 'not playing') {
+  if (!item || notifiedBrokenVideoIds.has(item.id)) return;
+  notifiedBrokenVideoIds.add(item.id);
+  const title = item.title || `Video ${index + 1}`;
+  push(refs.videoIssues, {
+    videoId: item.id || '',
+    title,
+    url: item.url || '',
+    reason,
+    timestamp: Date.now()
+  }).catch(() => {});
+}
+
+async function handleBrokenOrStalledVideo(reason = 'view time not advancing') {
+  if (role !== 'nana' || isHandlingVideoEnd) return;
+  const curItem = getCurrentQueueItem();
+  if (!curItem || state.streamData.state !== 'playing') return;
+  if (state.currentState && state.currentState !== 'idle') return;
+
+  isHandlingVideoEnd = true;
+  failedVideoIdsInRun.add(curItem.item.id);
+  notifyRyanBrokenVideo(curItem.item, curItem.index, reason);
+
+  lastObservedVideoTime = -1;
+  lastVideoProgressMs = Date.now();
+  lastWorkingProgressStartMs = 0;
+
+  if (curItem.total <= 1 || failedVideoIdsInRun.size >= curItem.total) {
+    state.streamData.state = 'paused';
+    await update(refs.videoStream, {
+      state: 'paused',
+      pauseReason: 'video_failed',
+      updatedBy: 'Video Watchdog',
+      updatedAt: Date.now()
+    }).catch(() => {});
+    syncVideoUI('⚠️ Video unavailable — Ryan has been notified');
+    startNormalDimCountdownOnPause();
+    hooks.broadcastScreen?.();
+    isHandlingVideoEnd = false;
+    return;
+  }
+
+  let nextIndex = (curItem.index + 1) % curItem.total;
+  const q = state.streamData.queue || [];
+  for (let step = 1; step <= curItem.total; step++) {
+    const idx = (curItem.index + step) % curItem.total;
+    if (q[idx] && !failedVideoIdsInRun.has(q[idx].id)) {
+      nextIndex = idx;
+      break;
+    }
+  }
+
+  syncVideoUI(`⚠️ Skipping broken video → "${q[nextIndex]?.title || `Video ${nextIndex + 1}`}"...`);
+  await update(refs.videoStream, {
+    currentIndex: nextIndex,
+    state: 'playing',
+    updatedBy: 'Video Watchdog',
+    updatedAt: Date.now()
+  }).catch(() => {});
+  isHandlingVideoEnd = false;
+}
+
+if (role === 'nana' && videoEl) {
+  setInterval(() => {
+    const curItem = getCurrentQueueItem();
+    const shouldBePlaying = !!(
+      curItem &&
+      state.streamData.state === 'playing' &&
+      $('video-screen')?.classList.contains('active') &&
+      (!state.currentState || state.currentState === 'idle') &&
+      !isHandlingVideoEnd
+    );
+    if (!shouldBePlaying) {
+      lastObservedVideoTime = -1;
+      lastVideoProgressMs = Date.now();
+      lastWorkingProgressStartMs = 0;
+      return;
+    }
+
+    const curT = Number(videoEl.currentTime) || 0;
+    const now = Date.now();
+    if (lastObservedVideoTime < 0) {
+      lastObservedVideoTime = curT;
+      lastVideoProgressMs = now;
+      lastWorkingProgressStartMs = 0;
+      return;
+    }
+
+    if (curT > lastObservedVideoTime + 0.4) {
+      lastObservedVideoTime = curT;
+      lastVideoProgressMs = now;
+      if (!lastWorkingProgressStartMs) lastWorkingProgressStartMs = now;
+      else if (now - lastWorkingProgressStartMs >= 3000) failedVideoIdsInRun.clear();
+    } else if (now - lastVideoProgressMs >= 15000) {
+      handleBrokenOrStalledVideo('playback stalled / view time not increasing');
+    }
+  }, 3000);
+}
+
 if (videoEl) {
-  videoEl.addEventListener('timeupdate', () => { saveCurrentVideoTime(false); });
-  videoEl.addEventListener('playing', () => { isHandlingVideoEnd = false; syncVideoUI(); hooks.broadcastScreen?.(); });
+  videoEl.addEventListener('timeupdate', () => {
+    const curT = Number(videoEl.currentTime) || 0;
+    if (curT > lastObservedVideoTime + 0.4) {
+      lastObservedVideoTime = curT;
+      lastVideoProgressMs = Date.now();
+      if (!lastWorkingProgressStartMs) lastWorkingProgressStartMs = lastVideoProgressMs;
+    }
+    saveCurrentVideoTime(false);
+  });
+  videoEl.addEventListener('playing', () => {
+    isHandlingVideoEnd = false;
+    lastVideoProgressMs = Date.now();
+    syncVideoUI();
+    hooks.broadcastScreen?.();
+  });
   videoEl.addEventListener('pause', () => {
     if (!isHandlingVideoEnd && !videoEl.ended) saveCurrentVideoTime(true);
     syncVideoUI();
     startNormalDimCountdownOnPause();
     hooks.broadcastScreen?.();
   });
-  videoEl.addEventListener('play', () => { isHandlingVideoEnd = false; requestVideoWakeLock(); keepScreenAwakeIfPlayingVideo(); syncVideoUI(); hooks.broadcastScreen?.(); });
+  videoEl.addEventListener('play', () => {
+    isHandlingVideoEnd = false;
+    lastVideoProgressMs = Date.now();
+    requestVideoWakeLock();
+    keepScreenAwakeIfPlayingVideo();
+    syncVideoUI();
+    hooks.broadcastScreen?.();
+  });
   videoEl.addEventListener('ended', () => { if (role === 'nana') handleVideoEndedOnNana(); });
-  videoEl.addEventListener('error', () => syncVideoUI('⚠️ Could not load video file — check video URL or format'));
+  videoEl.addEventListener('error', () => {
+    syncVideoUI('⚠️ Could not load video file — check video URL or format');
+    if (role === 'nana' && state.streamData.state === 'playing') {
+      handleBrokenOrStalledVideo('media load error');
+    }
+  });
 }
 
 // --- 4. FAMILY ADMIN DRAWER (RYAN ONLY) & FAMILY QUEUE SELECTION ---
