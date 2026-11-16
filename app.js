@@ -852,7 +852,8 @@ async function joinDailyRoom() {
           url: CONFIG.dailyRoomUrl,
           userName: role === 'nana' ? (isRealAndroidTablet ? 'Nana_Tablet' : 'Nana_Browser') : `Family_${activeFamilyMember.id}`,
           startVideoOff: false,
-          startAudioOff: false
+          startAudioOff: false,
+          sendSettings: { video: 'bandwidth-optimized' }
         });
         joined = true;
         break;
