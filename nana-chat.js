@@ -578,7 +578,8 @@ function setupNanaChatReadObserver() {
 
   feed.querySelectorAll('.tg-bubble[data-msg-key]').forEach(el => {
     const key = el.dataset.msgKey;
-    if (key && isMessageUnreadByNana(state.bulletinSnap[key])) {
+    const msg = key ? state.bulletinSnap[key] : null;
+    if (key && msg && !isVoiceMessageItem(msg) && !isVideoChatItem(msg) && isMessageUnreadByNana(msg)) {
       chatIntersectionObserver.observe(el);
     }
   });
@@ -704,6 +705,8 @@ window.openFamilyBulletin = () => {
 
 window.closeFamilyBulletin = () => {
   if (chatIntersectionObserver) chatIntersectionObserver.disconnect();
+  pauseActiveChatVoiceMessage?.();
+  document.querySelectorAll('#bulletin-posts-container video').forEach(v => { try { v.pause(); } catch (_) {} });
   $('bulletin-modal').style.display = 'none';
   window.closeSeniorKeyboard(false);
   window.speechSynthesis?.cancel();
@@ -944,10 +947,11 @@ export function renderBulletinFeed(forceInitialScroll = false) {
   if (keys.length) {
     const newest = state.bulletinSnap[keys[keys.length - 1]];
     if ($('ticker-preview-text')) {
-      $('ticker-preview-text').innerText = `💬 ${newest.author || 'Family'}: "${newest.text || 'Sent a photo 📷'}"`;
+      const previewTxt = newest.text || (isVoiceMessageItem(newest) ? '🎙️ Sent a voice message' : (isVideoChatItem(newest) ? '📹 Sent a video' : 'Sent a photo 📷'));
+      $('ticker-preview-text').innerText = `💬 ${newest.author || 'Family'}: "${previewTxt}"`;
     }
   } else {
-    container.innerHTML = `<div style="margin:auto;color:var(--text-muted);font-size:1.5rem;font-weight:700;padding:30px;">No messages yet. Tap the box below to open the keyboard and say hello!</div>`;
+    container.innerHTML = `<div style="margin:auto;color:var(--text-muted);font-size:1.5rem;font-weight:700;padding:30px;">No messages yet. Tap below to send a voice message or open the keyboard!</div>`;
   }
   updateBulletinTickerVisibility();
   let insertedDivider = false;
@@ -956,6 +960,8 @@ export function renderBulletinFeed(forceInitialScroll = false) {
     const item = state.bulletinSnap[k];
     const isOut = !!item.fromNana || item.author?.toLowerCase() === 'nana';
     const isUnread = isMessageUnreadByNana(item);
+    const hasVoice = isVoiceMessageItem(item);
+    const hasVideo = isVideoChatItem(item);
 
     if (isUnread && !insertedDivider) {
       insertedDivider = true;
@@ -1008,6 +1014,18 @@ export function renderBulletinFeed(forceInitialScroll = false) {
       b.appendChild(img);
     }
 
+    if (hasVoice && !isOut && settings.voiceMessagingEnabled !== false) {
+      const voiceWrap = document.createElement('div');
+      voiceWrap.innerHTML = buildVoiceMessageCardHtml(k, item);
+      b.appendChild(voiceWrap);
+    }
+
+    if (hasVideo && !isOut) {
+      const vidWrap = document.createElement('div');
+      vidWrap.innerHTML = buildChatVideoCardHtml(k, item);
+      b.appendChild(vidWrap);
+    }
+
     if (item.text) {
       const p = document.createElement('div');
       p.className = 'tg-msg-text';
@@ -1017,7 +1035,25 @@ export function renderBulletinFeed(forceInitialScroll = false) {
 
     if (role === 'family' && !isOut) {
       const rc = document.createElement('div');
-      if (!isUnread) {
+      if (hasVoice) {
+        if (item.listenedByNanaAt) {
+          const lt = new Date(item.listenedByNanaAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          rc.className = 'tg-read-receipt read';
+          rc.textContent = `🎧 Listened by Nana (${lt})`;
+        } else {
+          rc.className = 'tg-read-receipt unread';
+          rc.textContent = '⏳ Not listened by Nana yet';
+        }
+      } else if (hasVideo) {
+        if (item.watchedByNanaAt) {
+          const wt = new Date(item.watchedByNanaAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          rc.className = 'tg-read-receipt read';
+          rc.textContent = `🎬 Watched by Nana (${wt})`;
+        } else {
+          rc.className = 'tg-read-receipt unread';
+          rc.textContent = '⏳ Not watched by Nana yet';
+        }
+      } else if (!isUnread) {
         const readTime = item.readByNanaAt ? new Date(item.readByNanaAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
         rc.className = 'tg-read-receipt read';
         rc.textContent = `✓✓ Read by Nana${readTime ? ' (' + readTime + ')' : ''}`;
@@ -1028,7 +1064,7 @@ export function renderBulletinFeed(forceInitialScroll = false) {
       b.appendChild(rc);
     }
 
-    if (item.text && settings.showReadAloud) {
+    if (item.text && settings.showReadAloud && !hasVoice && !hasVideo) {
       const btn = document.createElement('button');
       btn.className = 'tg-speak-chip';
       btn.textContent = '🔊 Read Aloud';
@@ -1048,14 +1084,23 @@ export function renderBulletinFeed(forceInitialScroll = false) {
 }
 hooks.renderBulletinFeed = renderBulletinFeed;
 
+let lastRenderedVoiceEnabled = !!settings.voiceMessagingEnabled;
 hooks.onSettingsChanged.push((s) => {
   if (lastRenderedKbLayout !== (s.keyboardLayout || 'qwerty')) renderSeniorKeyboardLayout();
-  if (lastRenderedReadAloud !== !!s.showReadAloud) renderBulletinFeed(false);
+  if (lastRenderedReadAloud !== !!s.showReadAloud || lastRenderedVoiceEnabled !== (s.voiceMessagingEnabled !== false)) {
+    lastRenderedVoiceEnabled = s.voiceMessagingEnabled !== false;
+    if (!lastRenderedVoiceEnabled) {
+      pauseActiveChatVoiceMessage();
+      cancelNanaVoiceRecording(true);
+    }
+    ensureVoiceMessagingUI();
+    renderBulletinFeed(false);
+  }
 });
 
 let lastBulletinContentSig = null;
 const bulletinContentSig = (snapObj) => Object.entries(snapObj)
-  .map(([k, v]) => `${k}|${v?.author || ''}|${v?.text || ''}|${v?.timestamp || ''}|${v?.fileId || v?.imageUrl || v?.photoUrl || v?.image || v?.photo || v?.mediaUrl || ''}`)
+  .map(([k, v]) => `${k}|${v?.author || ''}|${v?.text || ''}|${v?.timestamp || ''}|${v?.fileId || v?.imageUrl || v?.photoUrl || v?.image || v?.photo || v?.mediaUrl || ''}|${v?.voiceFileId || v?.audioUrl || v?.voiceUrl || ''}|${v?.listenedByNanaAt || ''}|${v?.videoFileId || ''}|${v?.watchedByNanaAt || ''}`)
   .join('\n');
 
 function syncUnreadMarkersInPlace() {
@@ -1079,4 +1124,540 @@ onValue(query(refs.bulletin, limitToLast(25)), snap => {
   renderBulletinFeed(false);
 });
 
-if (role === 'nana') renderSeniorKeyboardLayout();
+// --- 5. TWO-WAY VOICE MESSAGING (LISTEN WITH -5s RESUME + SINGLE-TOUCH SPEAK NOW) ---
+const VOICE_TAP_GUARD_MS = 1500;
+let lastVoiceTapAt = 0;
+let activeVoiceMsgKey = null;
+let activeVoiceAudio = null;
+const voicePausedPositions = new Map();
+const voiceBlobUrlCache = new Map();
+
+function isVoiceMessageItem(item) {
+  return !!(item && (item.voiceFileId || item.audioUrl || item.voiceUrl || item.audioData || item.type === 'voice'));
+}
+
+function fmtVoiceDur(sec) {
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  if (!s) return '';
+  const m = Math.floor(s / 60), r = s % 60;
+  return m > 0 ? `${m}:${String(r).padStart(2, '0')}` : `${r}s`;
+}
+
+function buildVoiceMessageCardHtml(msgKey, item) {
+  const isPlayingThis = !!(activeVoiceMsgKey === msgKey && activeVoiceAudio && !activeVoiceAudio.paused);
+  const pausedAt = voicePausedPositions.get(msgKey) || 0;
+  const durLabel = fmtVoiceDur(item.voiceDurationSec);
+  const listened = !!item.listenedByNanaAt;
+  const btnText = isPlayingThis
+    ? '⏸️ PAUSE VOICE MESSAGE'
+    : (pausedAt > 0 ? '▶️ RESUME (5s BACK)' : (listened ? '▶️ PLAY AGAIN' : '▶️ PLAY VOICE MESSAGE'));
+  const btnBg = isPlayingThis ? '#b45309' : (listened ? '#334155' : '#059669');
+  const restartBtn = (pausedAt > 0 && !isPlayingThis)
+    ? `<button type="button" onclick="restartChatVoiceMessage('${esc(msgKey)}')" style="margin-top:6px;width:100%;padding:10px;border-radius:12px;border:2px solid #94a3b8;background:#1e293b;color:#e2e8f0;font-size:1.1rem;font-weight:800;cursor:pointer;">↺ Restart from Beginning</button>`
+    : '';
+  return `<div class="nana-voice-card" data-voice-key="${esc(msgKey)}" style="margin:8px 0;">
+    <button type="button" class="nana-voice-play-btn" onclick="toggleChatVoiceMessage('${esc(msgKey)}')" style="width:100%;padding:16px 14px;border-radius:16px;border:3px solid #fef08a;background:${btnBg};color:#fff;font-size:1.35rem;font-weight:900;cursor:pointer;">
+      ${btnText}${durLabel ? ` (${esc(durLabel)})` : ''}
+    </button>
+    ${restartBtn}
+    <div class="nana-voice-status" style="margin-top:4px;font-size:0.95rem;color:#cbd5e1;font-weight:700;"></div>
+  </div>`;
+}
+
+function refreshVoiceCardUI(msgKey, statusMsg = '') {
+  const card = document.querySelector(`.nana-voice-card[data-voice-key="${msgKey}"]`);
+  const item = state.bulletinSnap[msgKey];
+  if (!card || !item) return;
+  card.outerHTML = buildVoiceMessageCardHtml(msgKey, item);
+  if (statusMsg) {
+    const newCard = document.querySelector(`.nana-voice-card[data-voice-key="${msgKey}"]`);
+    const st = newCard?.querySelector('.nana-voice-status');
+    if (st) st.textContent = statusMsg;
+  }
+}
+
+function pauseActiveChatVoiceMessage() {
+  if (!activeVoiceAudio || !activeVoiceMsgKey) return;
+  const k = activeVoiceMsgKey;
+  if (!activeVoiceAudio.paused && !activeVoiceAudio.ended) {
+    voicePausedPositions.set(k, activeVoiceAudio.currentTime || 0);
+    activeVoiceAudio.pause();
+  }
+  refreshVoiceCardUI(k);
+}
+
+async function resolveVoiceAudioUrl(item) {
+  const direct = item.audioUrl || item.voiceUrl || item.audioData;
+  if (direct) return direct;
+  const fid = item.voiceFileId;
+  if (!fid) return null;
+  if (voiceBlobUrlCache.has(fid)) return voiceBlobUrlCache.get(fid);
+  const proxyUrl = `${CONFIG.googleScriptUrl}?action=get_audio&fileId=${encodeURIComponent(fid)}&secret=${encodeURIComponent(SERVICE_TOKEN)}`;
+  const res = await fetch(proxyUrl);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const ct = (res.headers.get('content-type') || '').toLowerCase();
+  if (ct.includes('application/json')) {
+    const data = await res.json();
+    const url = data.dataUrl || (data.base64 ? `data:${data.mimeType || 'audio/ogg'};base64,${data.base64}` : null);
+    if (!url) throw new Error(data.error || 'No audio data');
+    voiceBlobUrlCache.set(fid, url);
+    return url;
+  }
+  const blob = await res.blob();
+  const objUrl = URL.createObjectURL(blob);
+  voiceBlobUrlCache.set(fid, objUrl);
+  return objUrl;
+}
+
+async function markVoiceListenedByNana(msgKey) {
+  if (role !== 'nana' || !msgKey) return;
+  const item = state.bulletinSnap[msgKey];
+  if (!item || item.listenedByNanaAt) return;
+  const now = Date.now();
+  item.listenedByNanaAt = now;
+  item.readByNanaAt = item.readByNanaAt || now;
+  syncUnreadMarkersInPlace();
+  update(ref(db, `${basePath}/bulletin/${msgKey}`), {
+    listenedByNanaAt: now,
+    readByNanaAt: item.readByNanaAt
+  }).catch(() => {});
+}
+
+window.toggleChatVoiceMessage = async (msgKey) => {
+  if (settings.voiceMessagingEnabled === false) return;
+  const now = Date.now();
+  if (now - lastVoiceTapAt < VOICE_TAP_GUARD_MS) return; // Shaky-finger debounce
+  lastVoiceTapAt = now;
+
+  const item = state.bulletinSnap[msgKey];
+  if (!item) return;
+
+  if (activeVoiceMsgKey === msgKey && activeVoiceAudio && !activeVoiceAudio.paused) {
+    voicePausedPositions.set(msgKey, activeVoiceAudio.currentTime || 0);
+    activeVoiceAudio.pause();
+    refreshVoiceCardUI(msgKey, '⏸️ Paused — tap Resume to hear from 5s earlier');
+    return;
+  }
+
+  if (activeVoiceMsgKey && activeVoiceMsgKey !== msgKey) {
+    pauseActiveChatVoiceMessage();
+  }
+
+  window.stopRadioAndSync?.(false);
+  hooks.pauseVideo?.('voice_message');
+  window.wakeScreenAndResetDimTimer?.();
+
+  try {
+    refreshVoiceCardUI(msgKey, '⏳ Loading voice message...');
+    if (!activeVoiceAudio || activeVoiceMsgKey !== msgKey) {
+      const src = await resolveVoiceAudioUrl(item);
+      if (!src) throw new Error('Audio unavailable');
+      activeVoiceAudio = new Audio(src);
+      activeVoiceMsgKey = msgKey;
+      activeVoiceAudio.ontimeupdate = () => {
+        if (!activeVoiceAudio || activeVoiceMsgKey !== msgKey) return;
+        const dur = Number(activeVoiceAudio.duration) || Number(item.voiceDurationSec) || 0;
+        const cur = Number(activeVoiceAudio.currentTime) || 0;
+        if ((dur > 0 && cur / dur >= 0.8) || (dur === 0 && cur >= 3)) {
+          markVoiceListenedByNana(msgKey);
+        }
+      };
+      activeVoiceAudio.onended = () => {
+        voicePausedPositions.delete(msgKey);
+        markVoiceListenedByNana(msgKey);
+        activeVoiceMsgKey = null;
+        refreshVoiceCardUI(msgKey, '✅ Finished');
+      };
+      activeVoiceAudio.onerror = () => {
+        activeVoiceMsgKey = null;
+        refreshVoiceCardUI(msgKey, '⚠️ Could not play this voice message');
+      };
+    }
+
+    const pausedAt = voicePausedPositions.get(msgKey) || 0;
+    if (pausedAt > 0) {
+      try { activeVoiceAudio.currentTime = Math.max(0, pausedAt - 5); } catch (_) {}
+    }
+    await activeVoiceAudio.play();
+    refreshVoiceCardUI(msgKey, '🔊 Playing...');
+  } catch (err) {
+    console.warn('Voice playback failed:', err);
+    activeVoiceMsgKey = null;
+    refreshVoiceCardUI(msgKey, '⚠️ Could not load voice message');
+  }
+};
+
+window.restartChatVoiceMessage = async (msgKey) => {
+  const now = Date.now();
+  if (now - lastVoiceTapAt < VOICE_TAP_GUARD_MS) return;
+  lastVoiceTapAt = now;
+  voicePausedPositions.delete(msgKey);
+  if (activeVoiceMsgKey === msgKey && activeVoiceAudio) {
+    try { activeVoiceAudio.currentTime = 0; } catch (_) {}
+  }
+  lastVoiceTapAt = 0; // Allow immediate play via toggleChatVoiceMessage
+  return window.toggleChatVoiceMessage(msgKey);
+};
+
+// --- Single-Touch Voice Recording ("SPEAK NOW") ---
+let activeRecorder = null;
+let activeRecStream = null;
+let activeRecChunks = [];
+let recTimerInterval = null;
+let recCallWatchInterval = null;
+let recStartedAtMs = 0;
+let recDeadlineMs = 0;
+let recCancelled = false;
+
+function playVoiceChime() {
+  try {
+    const ctx = NanaCore.audioCtx;
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(660, ctx.currentTime);
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.32);
+  } catch (_) {}
+}
+
+function stopRecStreams() {
+  clearInterval(recTimerInterval);
+  clearInterval(recCallWatchInterval);
+  recTimerInterval = null;
+  recCallWatchInterval = null;
+  if (activeRecStream) {
+    try { activeRecStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+    activeRecStream = null;
+  }
+}
+
+function cancelNanaVoiceRecording(silent = false) {
+  recCancelled = true;
+  if (activeRecorder && activeRecorder.state !== 'inactive') {
+    try { activeRecorder.stop(); } catch (_) {}
+  }
+  stopRecStreams();
+  const ov = $('nana-voice-record-overlay');
+  if (ov) ov.style.display = 'none';
+  if (!silent && $('tg-send-status')) {
+    $('tg-send-status').innerText = 'Voice message cancelled';
+    setTimeout(() => { if ($('tg-send-status')) $('tg-send-status').innerText = '🟢 Connected to Family Group'; }, 2500);
+  }
+}
+
+function ensureVoiceRecordOverlay() {
+  if ($('nana-voice-record-overlay')) return $('nana-voice-record-overlay');
+  const ov = document.createElement('div');
+  ov.id = 'nana-voice-record-overlay';
+  ov.style.cssText = 'display:none;position:fixed;inset:0;z-index:9999;background:rgba(2,6,23,0.96);flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;';
+  ov.innerHTML = `
+    <div style="font-size:clamp(2.4rem,6vw,3.8rem);font-weight:900;color:#4ade80;letter-spacing:2px;margin-bottom:10px;">🎙️ SPEAK NOW</div>
+    <div id="nana-rec-countdown" style="font-size:clamp(1.8rem,4.5vw,2.6rem);font-weight:900;color:#fef08a;margin-bottom:14px;">30s left</div>
+    <div style="width:min(520px,88vw);height:18px;background:#1e293b;border-radius:999px;overflow:hidden;border:2px solid #475569;margin-bottom:26px;">
+      <div id="nana-rec-progress" style="width:100%;height:100%;background:#22c55e;transition:width 0.25s linear;"></div>
+    </div>
+    <button type="button" id="nana-rec-done-btn" style="width:min(520px,90vw);padding:22px 18px;border-radius:18px;border:3px solid #fff;background:#16a34a;color:#fff;font-size:1.6rem;font-weight:900;margin-bottom:14px;cursor:pointer;">✅ DONE — SEND NOW</button>
+    <div style="display:flex;gap:12px;width:min(520px,90vw);">
+      <button type="button" id="nana-rec-more-btn" style="flex:1;padding:16px;border-radius:14px;border:2px solid #38bdf8;background:#0f172a;color:#bae6fd;font-size:1.25rem;font-weight:800;cursor:pointer;">➕ +15s</button>
+      <button type="button" id="nana-rec-cancel-btn" style="flex:1;padding:16px;border-radius:14px;border:2px solid #f87171;background:#7f1d1d;color:#fee2e2;font-size:1.25rem;font-weight:800;cursor:pointer;">🗑️ Cancel</button>
+    </div>
+  `;
+  document.body.appendChild(ov);
+
+  $('nana-rec-done-btn').onclick = () => {
+    if (Date.now() - recStartedAtMs < VOICE_TAP_GUARD_MS) return;
+    if (activeRecorder && activeRecorder.state === 'recording') {
+      try { activeRecorder.stop(); } catch (_) {}
+    }
+  };
+  $('nana-rec-more-btn').onclick = () => {
+    recDeadlineMs += 15000;
+  };
+  $('nana-rec-cancel-btn').onclick = () => {
+    if (Date.now() - recStartedAtMs < VOICE_TAP_GUARD_MS) return;
+    cancelNanaVoiceRecording(false);
+  };
+  return ov;
+}
+
+window.startNanaVoiceRecording = async () => {
+  if (role !== 'nana' || settings.voiceMessagingEnabled === false) return;
+  if (state.currentState && state.currentState !== 'idle') return;
+  if (activeRecorder && activeRecorder.state === 'recording') return;
+
+  window.closeSeniorKeyboard?.(false);
+  pauseActiveChatVoiceMessage();
+  window.stopRadioAndSync?.(false);
+  hooks.pauseVideo?.('voice_recording');
+  window.wakeScreenAndResetDimTimer?.();
+
+  try {
+    activeRecStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    console.warn('Mic access denied:', err);
+    if ($('tg-send-status')) $('tg-send-status').innerText = '⚠️ Microphone unavailable';
+    return;
+  }
+
+  const mimeCandidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+  const chosenMime = mimeCandidates.find(m => window.MediaRecorder?.isTypeSupported?.(m)) || '';
+  activeRecChunks = [];
+  recCancelled = false;
+
+  try {
+    activeRecorder = chosenMime
+      ? new MediaRecorder(activeRecStream, { mimeType: chosenMime })
+      : new MediaRecorder(activeRecStream);
+  } catch (_) {
+    activeRecorder = new MediaRecorder(activeRecStream);
+  }
+
+  const maxSec = Math.max(10, Number(settings.voiceMessageMaxSec) || 30);
+  recStartedAtMs = Date.now();
+  recDeadlineMs = recStartedAtMs + maxSec * 1000;
+
+  const ov = ensureVoiceRecordOverlay();
+  ov.style.display = 'flex';
+  const doneBtn = $('nana-rec-done-btn');
+  const cancelBtn = $('nana-rec-cancel-btn');
+  if (doneBtn) doneBtn.disabled = true;
+  if (cancelBtn) cancelBtn.disabled = true;
+  setTimeout(() => {
+    if (doneBtn) doneBtn.disabled = false;
+    if (cancelBtn) cancelBtn.disabled = false;
+  }, VOICE_TAP_GUARD_MS);
+
+  playVoiceChime();
+
+  activeRecorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) activeRecChunks.push(e.data);
+  };
+
+  activeRecorder.onstop = async () => {
+    stopRecStreams();
+    ov.style.display = 'none';
+    if (recCancelled) return;
+
+    const elapsedSec = Math.round((Date.now() - recStartedAtMs) / 1000);
+    const mimeType = activeRecorder?.mimeType || chosenMime || 'audio/webm';
+    const blob = new Blob(activeRecChunks, { type: mimeType });
+    activeRecChunks = [];
+
+    if (elapsedSec < 1.5 || blob.size < 1000) {
+      if ($('tg-send-status')) {
+        $('tg-send-status').innerText = '🎙️ Didn’t hear anything — tap to try again';
+        setTimeout(() => { if ($('tg-send-status')) $('tg-send-status').innerText = '🟢 Connected to Family Group'; }, 3500);
+      }
+      return;
+    }
+
+    if ($('tg-send-status')) $('tg-send-status').innerText = '📤 Sending voice message...';
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(String(reader.result || ''));
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+
+      await push(refs.bulletin, {
+        author: 'Nana',
+        fromNana: true,
+        type: 'voice',
+        voiceDurationSec: elapsedSec,
+        text: `🎙️ Voice Message (${elapsedSec}s)`,
+        timestamp: Date.now()
+      });
+
+      if (CONFIG?.googleScriptUrl && SERVICE_TOKEN) {
+        await fetch(CONFIG.googleScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            secret: SERVICE_TOKEN,
+            portalNode: PORTAL_NODE_ID,
+            action: 'nana_voice_reply',
+            author: 'Nana',
+            audioBase64: base64,
+            mimeType,
+            durationSec: elapsedSec
+          })
+        });
+      }
+      if ($('tg-send-status')) {
+        $('tg-send-status').innerText = '✅ Voice message sent!';
+        setTimeout(() => { if ($('tg-send-status')) $('tg-send-status').innerText = '🟢 Connected to Family Group'; }, 3000);
+      }
+    } catch (err) {
+      console.warn('Voice send failed:', err);
+      if ($('tg-send-status')) $('tg-send-status').innerText = '⚠️ Could not send voice message';
+    }
+  };
+
+  activeRecorder.start(250);
+
+  recTimerInterval = setInterval(() => {
+    const remMs = Math.max(0, recDeadlineMs - Date.now());
+    const remSec = Math.ceil(remMs / 1000);
+    const totalMs = Math.max(1000, recDeadlineMs - recStartedAtMs);
+    if ($('nana-rec-countdown')) $('nana-rec-countdown').innerText = `${remSec}s left`;
+    if ($('nana-rec-progress')) $('nana-rec-progress').style.width = `${Math.max(0, Math.min(100, (remMs / totalMs) * 100))}%`;
+    if (remMs <= 0 && activeRecorder?.state === 'recording') {
+      try { activeRecorder.stop(); } catch (_) {}
+    }
+  }, 250);
+
+  recCallWatchInterval = setInterval(() => {
+    if (state.currentState && state.currentState !== 'idle') {
+      cancelNanaVoiceRecording(true);
+    }
+  }, 500);
+};
+
+function ensureVoiceMessagingUI() {
+  if (role !== 'nana') return;
+  const enabled = settings.voiceMessagingEnabled !== false;
+
+  const composer = document.querySelector('#bulletin-modal .tg-composer-area');
+  if (composer) {
+    let banner = $('nana-voice-coax-banner');
+    if (!banner) {
+      banner = document.createElement('button');
+      banner.id = 'nana-voice-coax-banner';
+      banner.type = 'button';
+      banner.style.cssText = 'width:100%;padding:16px 14px;margin-bottom:10px;border-radius:16px;border:3px solid #fef08a;background:linear-gradient(135deg,#065f46,#047857);color:#fff;font-size:1.35rem;font-weight:900;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.35);';
+      banner.innerHTML = '🎙️ TAP HERE TO SEND A VOICE MESSAGE <span style="display:block;font-size:0.95rem;font-weight:700;color:#fef08a;margin-top:2px;">Easier than typing!</span>';
+      banner.onclick = () => window.startNanaVoiceRecording();
+      composer.prepend(banner);
+    }
+    banner.style.display = enabled ? 'block' : 'none';
+  }
+
+  const kb = $('senior-onscreen-keyboard');
+  if (kb) {
+    let kbBtn = $('nana-kb-voice-coax-btn');
+    if (!kbBtn) {
+      kbBtn = document.createElement('button');
+      kbBtn.id = 'nana-kb-voice-coax-btn';
+      kbBtn.type = 'button';
+      kbBtn.style.cssText = 'width:100%;padding:12px;margin-bottom:6px;border-radius:12px;border:2px solid #fef08a;background:#047857;color:#fff;font-size:1.15rem;font-weight:900;cursor:pointer;';
+      kbBtn.textContent = '🎙️ Easier: Tap Here to Speak Instead of Typing!';
+      kbBtn.onclick = () => window.startNanaVoiceRecording();
+      kb.prepend(kbBtn);
+    }
+    kbBtn.style.display = enabled ? 'block' : 'none';
+  }
+}
+
+if (role === 'nana') {
+  renderSeniorKeyboardLayout();
+  ensureVoiceMessagingUI();
+}
+
+// --- 6. TELEGRAM GROUP VIDEO PLAYBACK IN FAMILY CHAT ---
+const chatVideoBlobCache = new Map();
+
+function isVideoChatItem(item) {
+  return !!(item && (item.videoFileId || item.type === 'video'));
+}
+
+function buildChatVideoCardHtml(msgKey, item) {
+  const durLabel = fmtVoiceDur(item.videoDurationSec);
+  const tooBig = Number(item.videoFileSize || 0) > 20 * 1024 * 1024;
+  if (tooBig) {
+    return `<div class="nana-chat-video-card" data-vid-key="${esc(msgKey)}" style="margin:8px 0;padding:12px;border-radius:14px;border:2px solid #f87171;background:#1e293b;color:#fca5a5;font-size:1.05rem;font-weight:800;">
+      📹 Video is too large to play here (&gt;20 MB) — ask family to send a shorter clip
+    </div>`;
+  }
+  const watched = !!item.watchedByNanaAt;
+  const btnBg = watched ? '#334155' : '#0284c7';
+  return `<div class="nana-chat-video-card" data-vid-key="${esc(msgKey)}" style="margin:8px 0;">
+    <button type="button" onclick="toggleChatVideoMessage('${esc(msgKey)}')" style="width:100%;padding:16px 14px;border-radius:16px;border:3px solid #fef08a;background:${btnBg};color:#fff;font-size:1.35rem;font-weight:900;cursor:pointer;">
+      ${watched ? '▶️ WATCH VIDEO AGAIN' : '▶️ PLAY FAMILY VIDEO'}${durLabel ? ` (${esc(durLabel)})` : ''}
+    </button>
+    <div class="nana-chat-video-status" style="margin-top:4px;font-size:0.95rem;color:#cbd5e1;font-weight:700;"></div>
+    <div class="nana-chat-video-stage"></div>
+  </div>`;
+}
+
+window.toggleChatVideoMessage = async (msgKey) => {
+  const item = state.bulletinSnap[msgKey];
+  const card = document.querySelector(`.nana-chat-video-card[data-vid-key="${msgKey}"]`);
+  if (!item || !card) return;
+  const statusEl = card.querySelector('.nana-chat-video-status');
+  const stageEl = card.querySelector('.nana-chat-video-stage');
+  if (!stageEl) return;
+
+  const existingVid = stageEl.querySelector('video');
+  if (existingVid) {
+    if (existingVid.paused) {
+      pauseActiveChatVoiceMessage?.();
+      window.stopRadioAndSync?.(false);
+      hooks.pauseVideo?.('chat_video');
+      existingVid.play().catch(() => {});
+    } else {
+      existingVid.pause();
+    }
+    return;
+  }
+
+  pauseActiveChatVoiceMessage?.();
+  window.stopRadioAndSync?.(false);
+  hooks.pauseVideo?.('chat_video');
+  window.wakeScreenAndResetDimTimer?.();
+
+  try {
+    if (statusEl) statusEl.textContent = '⏳ Loading video...';
+    let src = chatVideoBlobCache.get(item.videoFileId);
+    if (!src) {
+      const proxyUrl = `${CONFIG.googleScriptUrl}?action=get_media&fileId=${encodeURIComponent(item.videoFileId)}&secret=${encodeURIComponent(SERVICE_TOKEN)}`;
+      const res = await fetch(proxyUrl);
+      const data = await res.json();
+      if (!data?.ok) {
+        if (statusEl) statusEl.textContent = data?.tooLarge
+          ? '⚠️ Video too large (>20 MB) — ask family to send a shorter clip'
+          : `⚠️ ${data?.error || 'Could not load video'}`;
+        return;
+      }
+      if (data.base64) {
+        const bin = atob(data.base64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        src = URL.createObjectURL(new Blob([bytes], { type: data.mimeType || 'video/mp4' }));
+      } else {
+        src = data.dataUrl;
+      }
+      if (!src) throw new Error('No video data');
+      chatVideoBlobCache.set(item.videoFileId, src);
+    }
+
+    if (statusEl) statusEl.textContent = '';
+    stageEl.innerHTML = `<video controls autoplay playsinline style="width:100%;max-height:340px;border-radius:12px;margin-top:8px;background:#000;"></video>`;
+    const vid = stageEl.querySelector('video');
+    vid.src = src;
+    vid.onplay = () => {
+      window.wakeScreenAndResetDimTimer?.();
+      if (role === 'nana' && !item.watchedByNanaAt) {
+        const now = Date.now();
+        item.watchedByNanaAt = now;
+        item.readByNanaAt = item.readByNanaAt || now;
+        syncUnreadMarkersInPlace();
+        update(ref(db, `${basePath}/bulletin/${msgKey}`), {
+          watchedByNanaAt: now,
+          readByNanaAt: item.readByNanaAt
+        }).catch(() => {});
+      }
+    };
+  } catch (err) {
+    console.warn('Chat video load failed:', err);
+    if (statusEl) statusEl.textContent = '⚠️ Could not load video';
+  }
+};
