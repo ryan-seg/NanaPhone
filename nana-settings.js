@@ -152,12 +152,16 @@ const fmtDelay = (sec) => {
       <div class="opt-row">${optBtns('nightEndHour', [[6,'06:00'],[7,'07:00'],[8,'08:00'],[9,'09:00']])}</div>
     </div>
     <div class="settings-card">
-      <div class="settings-label"><span>💬 Family Notes Alert Bar & Read Aloud</span></div>
+      <div class="settings-label"><span>💬 Family Notes Alert Bar, Voice &amp; Read Aloud</span></div>
       <div class="opt-row" style="margin-bottom:6px;">
         ${optBtns('showBulletinBar', [[true,'💬 Show Alert Bar'],[false,'🙈 Hide Alert Bar']])}
         <button class="opt-btn" style="background:#0284c7;border-color:#fff;color:#fff;" onclick="dismissCurrentBulletinBar(true)">🧹 Mark All Read</button>
       </div>
-      <div class="opt-row">${optBtns('showReadAloud', [[false,'🙈 Hide "Read Aloud"'],[true,'🔊 Show "Read Aloud"']])}</div>
+      <div class="opt-row" style="margin-bottom:6px;">${optBtns('showReadAloud', [[false,'🙈 Hide "Read Aloud"'],[true,'🔊 Show "Read Aloud"']])}</div>
+      <div class="settings-sub" style="margin-bottom:4px;">🎙️ Voice Messaging (Listen to Telegram voice notes &amp; let Nana speak replies):</div>
+      <div class="opt-row" style="margin-bottom:6px;">${optBtns('voiceMessagingEnabled', [[true,'🎙️ Voice Messaging ON'],[false,'🚫 Off (Text Only)']])}</div>
+      <div class="settings-sub" style="margin-bottom:4px;">⏱️ Voice Recording Max Time (auto-sends at 0):</div>
+      <div class="opt-row">${optBtns('voiceMessageMaxSec', [[15,'15s'],[20,'20s'],[30,'30s'],[45,'45s'],[60,'60s']])}</div>
     </div>
     <div class="settings-card">
       <div class="settings-label"><span>🎵 Nana's Ringtone, Auto-Answer & Duration</span></div>
