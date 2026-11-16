@@ -706,7 +706,7 @@ window.openFamilyBulletin = () => {
 window.closeFamilyBulletin = () => {
   if (chatIntersectionObserver) chatIntersectionObserver.disconnect();
   pauseActiveChatVoiceMessage?.();
-  document.querySelectorAll('#bulletin-posts-container video').forEach(v => { try { v.pause(); } catch (_) {} });
+  window.closeChatVideoOverlay?.();
   $('bulletin-modal').style.display = 'none';
   window.closeSeniorKeyboard(false);
   window.speechSynthesis?.cancel();
@@ -1087,6 +1087,7 @@ hooks.renderBulletinFeed = renderBulletinFeed;
 let lastRenderedVoiceEnabled = !!settings.voiceMessagingEnabled;
 hooks.onSettingsChanged.push((s) => {
   if (lastRenderedKbLayout !== (s.keyboardLayout || 'qwerty')) renderSeniorKeyboardLayout();
+  if (s.videoVolume !== undefined) syncChatVideoVolume?.();
   if (lastRenderedReadAloud !== !!s.showReadAloud || lastRenderedVoiceEnabled !== (s.voiceMessagingEnabled !== false)) {
     lastRenderedVoiceEnabled = s.voiceMessagingEnabled !== false;
     if (!lastRenderedVoiceEnabled) {
@@ -1564,10 +1565,57 @@ if (role === 'nana') {
 
 // --- 6. TELEGRAM GROUP VIDEO PLAYBACK IN FAMILY CHAT ---
 const chatVideoBlobCache = new Map();
+let chatVideoCallWatchInterval = null;
 
 function isVideoChatItem(item) {
   return !!(item && (item.videoFileId || item.type === 'video'));
 }
+
+function syncChatVideoVolume() {
+  const vol = Math.max(10, Math.min(100, Number(settings.videoVolume) || 80));
+  const lbl = $('nana-chat-video-vol-lbl');
+  if (lbl) lbl.innerText = `${vol}%`;
+  const vid = $('nana-chat-video-el');
+  if (vid) vid.volume = Math.min(1.0, Math.max(0.1, vol / 100));
+}
+
+function ensureChatVideoOverlay() {
+  if ($('nana-chat-video-overlay')) return $('nana-chat-video-overlay');
+  const ov = document.createElement('div');
+  ov.id = 'nana-chat-video-overlay';
+  ov.style.cssText = 'display:none;position:fixed;inset:0;z-index:9998;background:#020617;flex-direction:column;justify-content:space-between;padding:14px;box-sizing:border-box;';
+  ov.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <div id="nana-chat-video-title" style="font-size:1.25rem;font-weight:900;color:#fef08a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📹 Family Video</div>
+      <button type="button" onclick="closeChatVideoOverlay()" style="padding:12px 20px;border-radius:14px;border:2px solid #f87171;background:#991b1b;color:#fff;font-size:1.2rem;font-weight:900;cursor:pointer;flex-shrink:0;">✕ Close</button>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:0;margin:10px 0;">
+      <video id="nana-chat-video-el" controls autoplay playsinline style="width:100%;height:100%;max-height:70vh;border-radius:14px;background:#000;"></video>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;">
+      <button type="button" class="vol-step-btn" onclick="adjustNanaVideoVolume(-15)">🔉 Quieter</button>
+      <span id="nana-chat-video-vol-lbl" style="font-size:1.2rem;font-weight:900;color:#38bdf8;min-width:52px;text-align:center;">80%</span>
+      <button type="button" class="vol-step-btn" style="background:#0284c7;" onclick="adjustNanaVideoVolume(15)">🔊 Louder</button>
+      <button type="button" onclick="closeChatVideoOverlay()" style="flex:1;min-width:190px;padding:16px 20px;border-radius:16px;border:3px solid #fff;background:#dc2626;color:#fff;font-size:1.35rem;font-weight:900;cursor:pointer;">⬅️ Back to Family Chat</button>
+    </div>
+  `;
+  document.body.appendChild(ov);
+  return ov;
+}
+
+window.closeChatVideoOverlay = () => {
+  clearInterval(chatVideoCallWatchInterval);
+  chatVideoCallWatchInterval = null;
+  const vid = $('nana-chat-video-el');
+  if (vid) {
+    try { vid.pause(); } catch (_) {}
+    vid.removeAttribute('src');
+    try { vid.load(); } catch (_) {}
+  }
+  const ov = $('nana-chat-video-overlay');
+  if (ov) ov.style.display = 'none';
+  window.wakeScreenAndResetDimTimer?.();
+};
 
 function buildChatVideoCardHtml(msgKey, item) {
   const durLabel = fmtVoiceDur(item.videoDurationSec);
@@ -1584,7 +1632,6 @@ function buildChatVideoCardHtml(msgKey, item) {
       ${watched ? '▶️ WATCH VIDEO AGAIN' : '▶️ PLAY FAMILY VIDEO'}${durLabel ? ` (${esc(durLabel)})` : ''}
     </button>
     <div class="nana-chat-video-status" style="margin-top:4px;font-size:0.95rem;color:#cbd5e1;font-weight:700;"></div>
-    <div class="nana-chat-video-stage"></div>
   </div>`;
 }
 
@@ -1593,21 +1640,6 @@ window.toggleChatVideoMessage = async (msgKey) => {
   const card = document.querySelector(`.nana-chat-video-card[data-vid-key="${msgKey}"]`);
   if (!item || !card) return;
   const statusEl = card.querySelector('.nana-chat-video-status');
-  const stageEl = card.querySelector('.nana-chat-video-stage');
-  if (!stageEl) return;
-
-  const existingVid = stageEl.querySelector('video');
-  if (existingVid) {
-    if (existingVid.paused) {
-      pauseActiveChatVoiceMessage?.();
-      window.stopRadioAndSync?.(false);
-      hooks.pauseVideo?.('chat_video');
-      existingVid.play().catch(() => {});
-    } else {
-      existingVid.pause();
-    }
-    return;
-  }
 
   pauseActiveChatVoiceMessage?.();
   window.stopRadioAndSync?.(false);
@@ -1640,10 +1672,17 @@ window.toggleChatVideoMessage = async (msgKey) => {
     }
 
     if (statusEl) statusEl.textContent = '';
-    stageEl.innerHTML = `<video controls autoplay playsinline style="width:100%;max-height:340px;border-radius:12px;margin-top:8px;background:#000;"></video>`;
-    const vid = stageEl.querySelector('video');
+    const ov = ensureChatVideoOverlay();
+    if ($('nana-chat-video-title')) {
+      $('nana-chat-video-title').innerText = `📹 From ${item.author || 'Family'}`;
+    }
+    ov.style.display = 'flex';
+    const vid = $('nana-chat-video-el');
+    syncChatVideoVolume();
     vid.src = src;
+
     vid.onplay = () => {
+      syncChatVideoVolume();
       window.wakeScreenAndResetDimTimer?.();
       if (role === 'nana' && !item.watchedByNanaAt) {
         const now = Date.now();
@@ -1656,6 +1695,19 @@ window.toggleChatVideoMessage = async (msgKey) => {
         }).catch(() => {});
       }
     };
+
+    vid.onended = () => {
+      window.closeChatVideoOverlay();
+    };
+
+    clearInterval(chatVideoCallWatchInterval);
+    chatVideoCallWatchInterval = setInterval(() => {
+      if (state.currentState && state.currentState !== 'idle') {
+        window.closeChatVideoOverlay();
+      }
+    }, 500);
+
+    vid.play().catch(() => {});
   } catch (err) {
     console.warn('Chat video load failed:', err);
     if (statusEl) statusEl.textContent = '⚠️ Could not load video';
