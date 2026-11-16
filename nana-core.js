@@ -149,6 +149,8 @@ export const refs = {
   quickQuestion:    ref(db, `${basePath}/quickQuestion`),
   questionHistory:  ref(db, `${basePath}/questionHistory`),
   callBeat:         ref(db, `${basePath}/callBeat`),
+  dailyUsage:       ref(db, `${basePath}/dailyUsage`),
+  videoIssues:      ref(db, `${basePath}/videoIssues`),
   reloadCmd:        ref(db, `${basePath}/commands/reloadAt`),
   connectedInfo:    ref(db, `.info/connected`)
 };
@@ -194,6 +196,8 @@ export const state = {
   callSchedulesSnap: {},
   callHistorySnap: {},
   questionHistorySnap: {},
+  dailyUsageSnap: {},
+  videoIssuesSnap: {},
   streamData: { queue: [], currentIndex: 0, state: "paused", savedTimes: {}, viewCounts: {} },
   familyComposerSilent: false,
   lastActivityOrCallMs: Date.now()
