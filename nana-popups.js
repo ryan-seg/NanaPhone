@@ -73,7 +73,7 @@ function hasUnreadFamilyChatMessages() {
 }
 
 async function evaluateScheduledPopupsOnNana() {
-  if (role !== 'nana' || !settings.periodicPopupsEnabled || NanaCore.isCurrentlyInNightWindow?.()) return;
+  if (role !== 'nana' || !settings.periodicPopupsEnabled || NanaCore.isCurrentlyInNightWindow?.() || NanaCore.isLowPowerMode?.()) return;
   if (state.callSnap?.status && state.callSnap.status !== 'idle') return;
   if (activeQuestionData?.status === 'pending') return;
   if ($('nana-question-modal')?.style.display === 'flex' || $('confirm-modal')?.style.display === 'flex') return;
@@ -213,13 +213,16 @@ window.submitNanaQuestionAnswer = async (choice) => {
     const nextItem = state.streamData.queue?.[targetIdx];
     if (choice === 'YES') {
       if (nextItem) localStorage.setItem(`nana_vid_pos_${nextItem.url}`, '0');
+      const blockedLowPower = !!NanaCore.isLowPowerMode?.();
       const updatePayload = {
         currentIndex: targetIdx,
-        state: 'playing',
+        state: blockedLowPower ? 'paused' : 'playing',
         updatedAt: now
       };
+      if (blockedLowPower) updatePayload.pauseReason = 'low_power_unplugged';
       if (nextItem?.id) updatePayload[`savedTimes/${nextItem.id}`] = 0;
       await update(refs.videoStream, updatePayload);
+      if (blockedLowPower) hooks.syncVideoUI?.();
     }
     return;
   }
@@ -243,7 +246,11 @@ window.submitNanaQuestionAnswer = async (choice) => {
     if (choice === 'YES') {
       window.openVideoScreen?.();
       if ((state.streamData.queue || []).length) {
-        await update(refs.videoStream, { state: 'playing', updatedAt: now }).catch(() => {});
+        const blockedLowPower = !!NanaCore.isLowPowerMode?.();
+        await update(refs.videoStream, blockedLowPower
+          ? { state: 'paused', pauseReason: 'low_power_unplugged', updatedAt: now }
+          : { state: 'playing', updatedAt: now }
+        ).catch(() => {});
       }
     }
     return;
