@@ -443,18 +443,21 @@ window.muteBatteryVoiceForMinutesCareHome = async (minutes) => {
   await update(refs.settings, { batteryVoiceMutedUntil: mutedUntil }).catch(() => {});
 };
 
-let lastPowerModeNotified = null;
+let lastEffectiveLowPowerNotified = null;
+let lastVideoBlockedNotified = null;
 
 function applyPowerModeFromChargingState(isCharging, level) {
   if (role !== 'nana') return;
-  const nextUnplugged = (isCharging === false);
-  const changed = (state.isTabletUnplugged !== nextUnplugged) || (lastPowerModeNotified !== nextUnplugged);
-  state.isTabletUnplugged = nextUnplugged;
-  document.body.classList.toggle('low-power-mode', NanaCore.isLowPowerMode());
+  state.isTabletUnplugged = (isCharging === false);
+  const effectiveLP = !!NanaCore.isLowPowerMode?.();
+  const videoBlocked = !!NanaCore.isVideoBlockedByLowPower?.();
+  document.body.classList.toggle('low-power-mode', effectiveLP);
+  const changed = (lastEffectiveLowPowerNotified !== effectiveLP) || (lastVideoBlockedNotified !== videoBlocked);
   if (changed) {
-    lastPowerModeNotified = nextUnplugged;
+    lastEffectiveLowPowerNotified = effectiveLP;
+    lastVideoBlockedNotified = videoBlocked;
     hooks.onPowerModeChanged.forEach(fn => {
-      try { fn(nextUnplugged, level); } catch (_) {}
+      try { fn(effectiveLP, level, videoBlocked); } catch (_) {}
     });
   }
 }
@@ -474,10 +477,11 @@ function syncUnpluggedBannerAndVoice(level, isCharging) {
   }
 
   const muted = isBatteryVoiceCurrentlyMuted();
+  const lpPrefix = NanaCore.isLowPowerMode?.() ? 'LOW POWER' : 'UNPLUGGED';
   if (txtEl) {
     txtEl.textContent = muted
-      ? `LOW POWER (${level}%) • UNPLUGGED • 🔇 MUTED`
-      : `LOW POWER (${level}%) • PLUG IN CHARGER`;
+      ? `${lpPrefix} (${level}%) • UNPLUGGED • 🔇 MUTED`
+      : `${lpPrefix} (${level}%) • PLUG IN CHARGER`;
   }
   banner.style.display = 'flex';
   positionUnpluggedBannerOverRadioAndVideo();
@@ -849,7 +853,9 @@ export function updateFamilyPresenceBanner() {
 
   const lastTouchTs = p.lastTouched || p.lastActive || null;
   const touchText = `👆 Last touched: ${formatDurationAgo(lastTouchTs)}`;
-  const lpLabel = (p.lowPowerMode || p.isCharging === false) ? ' • 🔋 Low Power Mode' : '';
+  const lpMode = settings.lowPowerModeSetting || 'auto';
+  const isLpForFamily = lpMode === 'on' || (lpMode === 'auto' && (p.lowPowerMode || p.isCharging === false));
+  const lpLabel = isLpForFamily ? ' • 🔋 Low Power Mode' : '';
   const battText = p.batteryLevel != null
     ? ` • ${p.isCharging ? "🔌 Charging" : "⚠️ UNPLUGGED"} (${p.batteryLevel}%)${lpLabel}`
     : "";
