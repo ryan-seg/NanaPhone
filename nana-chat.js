@@ -767,6 +767,7 @@ window.closeFamilyBulletin = () => {
 };
 
 window.openActualSeniorKeyboard = () => {
+  if (role !== 'nana') return;
   window.closeReplyChooser?.();
   const modal = $('bulletin-modal');
   const input = $('nana-chat-input');
@@ -789,6 +790,7 @@ window.openActualSeniorKeyboard = () => {
 };
 
 window.openSeniorKeyboard = () => {
+  if (role !== 'nana') return;
   const modal = $('bulletin-modal');
   const input = $('nana-chat-input');
   if (modal?.classList.contains('kb-fullscreen')) {
@@ -966,6 +968,20 @@ window.typeSeniorKey = (char, ev) => {
 window.kbHideTapped = () => { if (Date.now() - lastKeyTapMs >= 350) window.closeSeniorKeyboard(true); };
 
 window.submitTypedNanaMessage = async () => {
+  if (role === 'family') {
+    const nativeInp = $('family-chat-native-input');
+    const text = (nativeInp?.value || '').trim();
+    if (!nativeInp || !text) return;
+    if (Date.now() - lastChatSendMs < 4000) {
+      const st = $('tg-send-status');
+      if (st) { st.style.color = "#ffff00"; st.innerText = "⏳ One moment, then tap Send again"; }
+      return;
+    }
+    nativeInp.value = "";
+    savedChatScrollTop = null;
+    await window.sendNanaChatMessage(text);
+    return;
+  }
   const input = $('nana-chat-input');
   if (!input || (Date.now() - lastKeyTapMs < 350) || !input.value.trim()) return;
   if (Date.now() - lastChatSendMs < 4000) {
@@ -982,6 +998,15 @@ window.submitTypedNanaMessage = async () => {
   window.closeSeniorKeyboard(false);
   await window.sendNanaChatMessage(text);
 };
+
+if (role === 'family') {
+  $('family-chat-native-input')?.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && !ev.shiftKey) {
+      ev.preventDefault();
+      window.submitTypedNanaMessage();
+    }
+  });
+}
 
 window.sendNanaChatMessage = async (rawText) => {
   const text = (rawText || "").trim();
