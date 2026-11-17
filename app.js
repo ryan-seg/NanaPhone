@@ -1041,6 +1041,7 @@ async function startCallFromNana(member) {
       nanaTabId: CLIENT_TAB_ID,
       timestamp: Date.now()
     });
+    touchMemberLastCallAt(member.id);
   } catch (_) {
     state.currentState = 'idle';
     showScreen('grid-screen');
@@ -1079,6 +1080,7 @@ window.confirmFamilyPickupFromTelegram = async () => {
     alert("Nana's call has already finished. You can ring her from here whenever you like.");
     return;
   }
+  touchMemberLastCallAt(activeFamilyMember.id);
   didManuallyInitiateOrAnswerOnThisTab = true;
   showScreen('call-screen');
   joinDailyRoom();
@@ -1087,6 +1089,10 @@ window.confirmFamilyPickupFromTelegram = async () => {
 
 window.startCallFromFamily = async () => {
   if (!settings.callingEnabled) return alert("Video calling is currently switched off.");
+  if (!NanaCore.hasRequiredCallerProfile?.()) {
+    window.openMyProfileEditorModal?.(true);
+    return;
+  }
   if (!confirm("Ring Nana's tablet now?")) return;
   // Unlock audio AFTER confirm() returns so Android Chrome keeps the user gesture active!
   unlockCallAudioImmediate();
@@ -1106,6 +1112,7 @@ window.startCallFromFamily = async () => {
       return {
         status: 'ringing_nana',
         callerId: activeFamilyMember.id,
+        callerName: activeFamilyMember.name,
         targetId: 'nana',
         familyTabId: CLIENT_TAB_ID,
         nanaRingingConfirmedAt: null,
@@ -1118,6 +1125,7 @@ window.startCallFromFamily = async () => {
       if (btn) btn.disabled = false;
       return;
     }
+    touchMemberLastCallAt(activeFamilyMember.id);
     showScreen('call-screen');
     joinDailyRoom(); // Pre-warm camera, mic & WebRTC room while ringing Nana for instant connection
     const b = $('call-connecting-banner');
@@ -1145,7 +1153,10 @@ window.answerCallAsNana = async (isAuto = false) => {
   showScreen('call-screen');
   joinDailyRoom();
   const cId = state.callSnap?.callerId;
-  if (cId && cId !== 'nana') await clearMissedCallsForMember(cId);
+  if (cId && cId !== 'nana') {
+    touchMemberLastCallAt(cId);
+    await clearMissedCallsForMember(cId);
+  }
   await set(refs.callState, {
     status: 'connected',
     callerId: cId || 'family',
