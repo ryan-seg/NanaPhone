@@ -723,3 +723,18 @@ body.role-nana #nana-top-orientation-bar {
   gap: 14px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85);
 }
+
+/* Battery saving: halt continuous 60fps CSS keyframe repaints when unplugged or dimmed */
+body.low-power-mode .chat-unread-badge,
+body.low-power-mode .family-card.has-missed,
+body.low-power-mode .tg-unread-divider,
+body.low-power-mode .giant-radio-btn.playing,
+body.low-power-mode .tg-flashing-cursor,
+body.screen-dimmed .chat-unread-badge,
+body.screen-dimmed .family-card.has-missed,
+body.screen-dimmed .tg-unread-divider,
+body.screen-dimmed .giant-radio-btn.playing,
+body.screen-dimmed .tg-flashing-cursor {
+  animation: none !important;
+}
+
