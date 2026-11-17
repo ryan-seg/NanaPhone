@@ -152,6 +152,8 @@ export const refs = {
   dailyUsage:       ref(db, `${basePath}/dailyUsage`),
   videoIssues:      ref(db, `${basePath}/videoIssues`),
   reloadCmd:        ref(db, `${basePath}/commands/reloadAt`),
+  reloadNanaCmd:    ref(db, `${basePath}/commands/reloadNanaAt`),
+  reloadFamilyCmd:  ref(db, `${basePath}/commands/reloadFamilyAt`),
   connectedInfo:    ref(db, `.info/connected`)
 };
 
@@ -166,8 +168,9 @@ export const settings = {
   speechRate: 0.9, awakeBrightness: 85, dimBrightness: 15, dimDelaySec: 120,
   nightModeEnabled: true, nightStartHour: 21, nightEndHour: 8, nightBlockCalls: false,
   batteryVoiceMutedUntil: 0, batteryVoiceIntervalMin: 0, batteryVoiceVolume: 85, batteryVoiceThresholdPct: 30,
+  lowPowerModeSetting: 'auto', lowPowerBlockVideo: true, lowPowerMaxBrightness: 50, lowPowerDimDelaySec: 45,
   showBulletinBar: true, showReadAloud: false, colorTheme: 'classic-dark',
-  voiceMessagingEnabled: true, voiceMessageMaxSec: 30,
+  voiceMessagingEnabled: true, voiceMessageMaxSec: 30, nanaMessageEntryMode: 'choice',
   keyboardLayout: 'qwerty', keyboardTimeoutSec: 60, keyGuardMs: 350, bulletinClearedAt: 0,
   callingEnabled: TEST_MODE,
   showTodaysCallsBanner: true, periodicPopupsEnabled: true, unreadChatPopupMin: 30,
@@ -214,6 +217,7 @@ export const hooks = {
   openVideoScreen: null,
   confirmRestartVideo: null,
   broadcastScreen: null,
+  syncBatteryUI: null,
   refreshFamilyPresence: null,
   renderTodaysCallsBanner: null,
   startNormalDimCountdownOnPause: null,
@@ -222,7 +226,15 @@ export const hooks = {
   updateBulletinTicker: null
 };
 
-export const isLowPowerMode = () => role === 'nana' && state.isTabletUnplugged === true;
+export const isLowPowerMode = () => {
+  if (role !== 'nana') return false;
+  const mode = settings.lowPowerModeSetting || 'auto';
+  if (mode === 'on') return true;
+  if (mode === 'off') return false;
+  return state.isTabletUnplugged === true;
+};
+
+export const isVideoBlockedByLowPower = () => isLowPowerMode() && settings.lowPowerBlockVideo !== false;
 
 export const isBatteryVoiceCurrentlyMuted = () => (Number(settings.batteryVoiceMutedUntil) || 0) > Date.now();
 
@@ -254,7 +266,7 @@ export const NanaCore = {
   activeFamilyMember, isAdminFamilyMember, isAdminFamily: isAdminFamilyMember,
   FAMILY_NAMES, senderName: activeFamilyMember.name,
   basePath, db, refs, settings, state, hooks, audioCtx,
-  showScreen, speakMsg, isBatteryVoiceCurrentlyMuted, isLowPowerMode, askNana,
+  showScreen, speakMsg, isBatteryVoiceCurrentlyMuted, isLowPowerMode, isVideoBlockedByLowPower, askNana,
   isNanaVideoActivelyPlaying: () => false,
   isChatVideoActivelyPlaying: () => false,
   getCurrentQueueItem: () => null
