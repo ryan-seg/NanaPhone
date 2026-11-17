@@ -294,6 +294,7 @@ body.theme-black-cream .todays-call-pill { background: #fff; border-color: #000;
 .tg-bubble { max-width: 85%; padding: 12px 16px; border-radius: 20px; text-align: left; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
 .tg-bubble.incoming { align-self: flex-start; background: var(--bubble-in-bg); border: 3px solid var(--bubble-in-border); border-bottom-left-radius: 4px; }
 .tg-bubble.outgoing { align-self: flex-end; background: var(--bubble-out-bg); border: 3px solid var(--bubble-out-border); border-bottom-right-radius: 4px; }
+.tg-bubble.system-alert { align-self: center; max-width: 92%; background: var(--bg-card); border: 3px dashed var(--border-accent); border-radius: 16px; }
 .tg-bubble.unread-msg { border-width: 4px; border-color: #ff0; box-shadow: 0 0 18px rgba(254,240,138,0.5); }
 .tg-new-tag { background: #dc2626; color: #ff0; border: 2px solid #fff; border-radius: 8px; padding: 1px 8px; font-size: 0.95rem; font-weight: 900; margin-left: 8px; }
 .tg-read-receipt { font-size: 0.9rem; font-weight: 800; padding: 2px 8px; border-radius: 8px; align-self: flex-end; margin-top: 2px; }
@@ -736,5 +737,151 @@ body.screen-dimmed .tg-unread-divider,
 body.screen-dimmed .giant-radio-btn.playing,
 body.screen-dimmed .tg-flashing-cursor {
   animation: none !important;
+}
+
+/* Family Members Manager, Profile Editor & Interactive Face Cropper Modals */
+#family-members-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 13, 22, 0.98);
+  z-index: 10002;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 20px 14px 40px 14px;
+  overflow-y: auto;
+  color: #fff;
+  text-align: center;
+}
+#profile-editor-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 13, 22, 0.94);
+  z-index: 10025;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+}
+#photo-crop-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.96);
+  z-index: 10075;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  text-align: center;
+}
+.crop-modal-card {
+  background: #0f172a;
+  border: 4px solid #38bdf8;
+  border-radius: 24px;
+  padding: 18px;
+  width: 92vw;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.9);
+}
+.crop-canvas-wrap {
+  width: 260px;
+  height: 260px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 3px solid #475569;
+  background: #020617;
+  touch-action: none;
+  cursor: grab;
+}
+.crop-canvas-wrap:active { cursor: grabbing; }
+#face-crop-canvas {
+  width: 260px;
+  height: 260px;
+  display: block;
+  touch-action: none;
+}
+.crop-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.fm-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+}
+.fm-member-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #0f172a;
+  border: 2px solid #334155;
+  border-radius: 14px;
+  padding: 8px 10px;
+  text-align: left;
+}
+.fm-row-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fde047;
+  background: #1e293b;
+  flex-shrink: 0;
+}
+.fm-row-info {
+  flex: 1;
+  min-width: 0;
+}
+.fm-row-name {
+  font-size: 0.98rem;
+  font-weight: 900;
+  color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fm-row-meta {
+  margin-top: 2px;
+}
+.fm-badge {
+  display: inline-block;
+  font-size: 0.74rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+.fm-badge.tg-on { background: rgba(6, 78, 59, 0.75); color: #4ade80; border: 1px solid #22c55e; }
+.fm-badge.tg-wait { background: rgba(120, 53, 15, 0.6); color: #fde68a; border: 1px solid #f59e0b; }
+.fm-badge.tg-off { background: rgba(30, 58, 138, 0.6); color: #93c5fd; border: 1px solid #38bdf8; }
+.fm-row-actions {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.fm-mini-btn {
+  background: #1e293b;
+  color: #fff;
+  border: 2px solid #64748b;
+  border-radius: 9px;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.fm-mini-btn.danger {
+  background: #7f1d1d;
+  border-color: #f87171;
 }
 
