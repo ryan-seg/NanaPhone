@@ -97,6 +97,11 @@ const fmtDelay = (sec) => {
         <button class="opt-btn" id="remote-refresh-family-btn" onclick="requestFamilyReload()">📱 Prompt Family Update</button>
       </div>
     </div>
+    ${isAdminFamilyMember ? `<div class="settings-card">
+      <div class="settings-label"><span>👥 Family Members &amp; Call Grid</span></div>
+      <div class="settings-sub" style="margin-bottom:6px;">Add new family members, edit names &amp; face-cropped photos, and copy personal links (top 8 recent Telegram-connected appear on Nana's grid).</div>
+      <button class="opt-btn" style="width:100%;background:#0f766e;border-color:#5eead4;color:#fff;" onclick="closeSettingsModal(); openFamilyMembersModal();">👥 Add / Manage Family Members</button>
+    </div>` : ''}
     <div class="settings-card">
       <div class="settings-label"><span>🎨 High-Contrast Visibility Theme</span></div>
       <div class="opt-row">${optBtns('colorTheme', [['classic-dark','🌙 Classic Dark'],['yellow-black','👁️ Yellow on Black'],['white-black','🤍 White on Black'],['black-cream','☀️ Black on Cream']])}</div>
@@ -148,6 +153,8 @@ const fmtDelay = (sec) => {
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceIntervalMin', [[0,'⚡ Dynamic'],[3,'3m'],[5,'5m'],[10,'10m'],[15,'15m'],[30,'30m']])}</div>
       <div class="settings-sub" style="margin-bottom:4px;">🔊 Unplugged Voice Alert Volume:</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
+      <div class="settings-sub" style="margin-bottom:4px;">💬 Post Battery-Out &amp; Back-Online Messages to Family Chat:</div>
+      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryChatAlertsEnabled', [[true,'🔋 Chat Alerts ON'],[false,'🔕 Off']])}</div>
       <div class="opt-row" style="margin-bottom:8px;">
         <button class="opt-btn" style="background:#dc2626;border-color:#fff;color:#fff;" onclick="clearAllMissedCalls()">🧹 Clear Missed Calls</button>
         <button class="opt-btn" onclick="muteBatteryVoiceForHours(0)">🔊 Unmute Battery Voice</button>
