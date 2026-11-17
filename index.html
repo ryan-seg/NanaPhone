@@ -307,15 +307,20 @@
 
   <!-- 5. Family Member Screen (Organized into 3 Clean Tabs) -->
   <div id="family-screen" class="screen" style="justify-content:flex-start;gap:8px;padding:12px 12px 28px 12px;overflow-y:auto;">
-    <div style="display:flex;align-items:center;gap:12px;margin-top:4px;">
-      <img id="family-self-photo" src="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:3px solid #fff;">
-      <h1 id="family-greeting" style="font-size:1.45rem;margin:0;">Call Nana</h1>
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:4px;flex-wrap:wrap;width:92vw;max-width:540px;">
+      <img id="family-self-photo" src="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:3px solid #fff;cursor:pointer;" onclick="openMyProfileEditorModal()" title="Tap to edit your name or profile photo">
+      <h1 id="family-greeting" style="font-size:1.4rem;margin:0;">Call Nana</h1>
+      <button type="button" class="tone-btn" style="padding:5px 10px;font-size:0.82rem;background:#334155;border-color:#94a3b8;" onclick="openMyProfileEditorModal()" title="Edit your name and profile photo">✏️ Photo / Name</button>
+    </div>
+    <div id="family-profile-setup-warning" style="display:none;background:#7c2d12;border:2px solid #fbbf24;border-radius:14px;padding:8px 12px;font-size:0.9rem;font-weight:800;color:#fef08a;width:92vw;max-width:540px;cursor:pointer;" onclick="openMyProfileEditorModal(true)">
+      ⚠️ Tap here to add your Name and Profile Photo before calling Nana
     </div>
     <div id="nana-presence-card" style="background:#1e293b;border:2px solid #38bdf8;border-radius:14px;padding:8px 14px;font-size:0.95rem;line-height:1.4;width:92vw;max-width:540px;">Checking tablet status...</div>
     <button id="family-ring-btn" class="giant-btn" style="height:11vh;min-height:74px;font-size:1.85rem;width:92vw;max-width:540px;border-width:5px;border-radius:26px;" onclick="startCallFromFamily()">📹 Ring Nana Now</button>
 
     <div style="display:flex;gap:8px;width:92vw;max-width:540px;">
       <button class="tone-btn" style="flex:1;background:#0088cc;border-color:#7dd3fc;" onclick="openFamilyBulletin()">✈️ Family Chat</button>
+      <button id="family-manage-members-btn" class="tone-btn" style="flex:1;background:#0f766e;border-color:#5eead4;color:#fff;display:none;" onclick="openFamilyMembersModal()">👥 Family</button>
       <button id="family-controls-btn" class="tone-btn" style="flex:1;background:#1e293b;border-color:#facc15;color:#fef08a;display:none;" onclick="openSettingsModal()">⚙️ Controls</button>
     </div>
 
@@ -444,6 +449,61 @@
     <button class="cancel-btn" style="font-size:1.4rem;padding:12px 32px;" onclick="endCall(true)">✖ Decline</button>
   </div>
 
+  <!-- Manage Family Members Modal (Admin Only) -->
+  <div id="family-members-modal">
+    <h2 style="font-size:1.65rem;color:#fef08a;margin:0 0 4px 0;">👥 Manage Family Members</h2>
+    <p style="font-size:0.88rem;color:#cbd5e1;margin:0 0 10px 0;max-width:600px;line-height:1.4;">
+      Add extra family members below. If they connect Telegram, Nana can call them (her screen shows the <strong>8 most recently called</strong> Telegram-connected people). Without Telegram, they can still call Nana using their personal link, and all chat stays in the shared Telegram group.
+    </p>
+
+    <div class="settings-card" style="width:94vw;max-width:600px;margin-bottom:12px;">
+      <div class="settings-label"><span id="fm-form-heading">➕ Add New Family Member</span></div>
+      <div class="settings-sub" style="margin-bottom:6px;">Every person needs a Name and a Profile Photo cropped to their face.</div>
+      <input id="fm-name-input" class="family-input-box" type="text" maxlength="28" placeholder="Person's Name (required, e.g. Sarah or Uncle Bob)" />
+      <div style="display:flex;align-items:center;gap:12px;margin:4px 0 8px 0;flex-wrap:wrap;">
+        <img id="fm-photo-preview" src="" alt="Preview" style="display:none;width:68px;height:68px;border-radius:50%;object-fit:cover;border:3px solid #fde047;flex-shrink:0;" />
+        <div style="flex:1;min-width:190px;text-align:left;">
+          <input id="fm-photo-file-input" type="file" accept="image/*" style="display:none;" />
+          <button type="button" class="opt-btn" style="width:100%;background:#0284c7;border-color:#7dd3fc;color:#fff;" onclick="triggerAdminMemberPhotoPick()">📷 Choose &amp; Crop Face Photo</button>
+          <div id="fm-photo-status" style="font-size:0.8rem;font-weight:700;color:#fbbf24;margin-top:4px;">Required: choose a photo and crop it to their face</div>
+        </div>
+      </div>
+      <div id="fm-form-error" style="font-size:0.86rem;font-weight:800;color:#fca5a5;margin-bottom:6px;"></div>
+      <div class="opt-row">
+        <button id="fm-save-member-btn" type="button" class="opt-btn" style="background:#059669;border-color:#4ade80;color:#fff;" onclick="saveFamilyMemberForm()">✅ Add Person</button>
+        <button id="fm-cancel-edit-btn" type="button" class="opt-btn" style="display:none;background:#334155;border-color:#94a3b8;color:#fff;flex:0.45;" onclick="cancelEditFamilyMemberForm()">✖ Cancel Edit</button>
+      </div>
+    </div>
+
+    <div class="settings-card" style="width:94vw;max-width:600px;margin-bottom:14px;">
+      <div class="settings-label">
+        <span>👨‍👩‍👧‍👦 Family Members</span>
+        <span id="fm-grid-summary-lbl" style="font-size:0.82rem;color:#38bdf8;"></span>
+      </div>
+      <div id="fm-members-list-box" class="fm-members-list"></div>
+    </div>
+
+    <button class="cancel-btn" style="background:#22c55e;color:#000;padding:12px 40px;font-size:1.35rem;" onclick="closeFamilyMembersModal()">✔ Done</button>
+  </div>
+
+  <!-- Self Profile Editor Modal (Any Family Member: Name & Face-Cropped Photo) -->
+  <div id="profile-editor-modal">
+    <div class="end-confirm-card" style="border-color:#38bdf8;max-width:460px;">
+      <div style="font-size:1.45rem;font-weight:900;color:#fef08a;">✏️ My Name &amp; Profile Photo</div>
+      <div style="font-size:0.88rem;color:#cbd5e1;font-weight:700;">Nana sees your name and photo when you call or answer.</div>
+      <img id="self-prof-photo-preview" src="" alt="Profile Photo" style="width:112px;height:112px;border-radius:50%;object-fit:cover;border:4px solid #fde047;background:#0f172a;" />
+      <input id="self-prof-file-input" type="file" accept="image/*" style="display:none;" />
+      <button type="button" class="opt-btn" style="width:100%;background:#0284c7;border-color:#7dd3fc;color:#fff;" onclick="triggerSelfPhotoPick()">📷 Choose &amp; Crop Photo to Face</button>
+      <div id="self-prof-photo-status" style="font-size:0.82rem;font-weight:700;color:#93c5fd;"></div>
+      <input id="self-prof-name-input" class="family-input-box" type="text" maxlength="28" placeholder="Your Name (required)" style="margin-bottom:0;" />
+      <div id="self-prof-error" style="font-size:0.88rem;font-weight:800;color:#fca5a5;"></div>
+      <div class="opt-row" style="width:100%;">
+        <button type="button" class="opt-btn" style="background:#334155;border-color:#94a3b8;color:#fff;flex:0.45;" onclick="closeMyProfileEditorModal()">✖ Cancel</button>
+        <button id="self-prof-save-btn" type="button" class="opt-btn" style="background:#22c55e;border-color:#fff;color:#000;font-weight:900;" onclick="saveMyProfileChanges()">💾 Save Profile</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Remote Family Settings Modal -->
   <div id="settings-modal">
     <h2 style="font-size:1.7rem;color:#fef08a;margin:0 0 4px 0;">⚙️ Remote Tablet Controls</h2>
@@ -471,6 +531,7 @@
   <script type="module" src="nana-video.js?v=2.9.5"></script>
   <script type="module" src="nana-popups.js?v=2.9.5"></script>
   <script type="module" src="nana-telemetry.js?v=2.9.5"></script>
+  <script type="module" src="nana-members.js?v=2.9.5"></script>
   <script type="module" src="app.js?v=2.9.5"></script>
 </body>
 </html>
