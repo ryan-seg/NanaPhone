@@ -1,5 +1,5 @@
 import {
-  $, NanaCore, ref, set, update, push, onValue, remove, runTransaction
+  $, NanaCore, esc, ref, set, update, push, onValue, remove, runTransaction
 } from "./nana-core.js?v=2.9.5";
 import { updateClock, isCurrentlyInNightWindow, isHiddenFromNana } from "./nana-settings.js?v=2.9.5";
 
@@ -189,7 +189,51 @@ hooks.onSettingsChanged.push((s) => {
   }
 });
 
-// --- 3. MISSED CALLS & CONTACT GRID ---
+// --- 3. MISSED CALLS, CALL RECENCY & CONTACT GRID ---
+function resolveMemberById(id, fallbackName = null) {
+  const cleanId = String(id || 'family').trim() || 'family';
+  const found = CONFIG.familyMembers.find(m => m.id === cleanId);
+  if (found) return found;
+  const pretty = String(fallbackName || '').trim()
+    || cleanId.split(/[-_]+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    || 'Family';
+  const fb = NanaCore.makeFallbackAvatarUrl(pretty, cleanId);
+  return {
+    id: cleanId,
+    name: pretty,
+    spokenName: pretty,
+    photo: fb,
+    fallback: fb,
+    isBuiltIn: false,
+    isCustom: true,
+    hasProfilePhoto: false
+  };
+}
+
+function getLastCalledTimestamp(memberId) {
+  let histMax = 0;
+  Object.values(state.callHistorySnap || {}).forEach(c => {
+    if (c && c.partnerId === memberId) {
+      const t = Math.max(Number(c.endedAt || 0), Number(c.startedAt || 0));
+      if (t > histMax) histMax = t;
+    }
+  });
+  return Math.max(
+    Number(state.memberLastCallAtSnap?.[memberId] || 0),
+    Number(state.missedCallsByMember?.[memberId]?.timestamp || 0),
+    histMax
+  );
+}
+
+function touchMemberLastCallAt(memberId) {
+  if (!memberId || memberId === 'nana' || memberId === 'family') return;
+  const now = Date.now();
+  state.memberLastCallAtSnap[memberId] = Math.max(Number(state.memberLastCallAtSnap[memberId] || 0), now);
+  set(ref(db, `${basePath}/memberLastCallAt/${memberId}`), now).catch(() => {});
+  if (role === 'nana') renderContacts(state.connectedMemberIds);
+  else hooks.renderManageFamily?.();
+}
+
 const incrementMissedCallForMember = (id) =>
   runTransaction(ref(db, `${basePath}/missedCalls/${id}`), cur => ({
     count: (Number(cur?.count) || 0) + 1,
@@ -217,8 +261,7 @@ function renderMissedCallsBanner() {
     return;
   }
   entries.forEach(([id, info]) => {
-    const m = CONFIG.familyMembers.find(x => x.id === id);
-    if (!m) return;
+    const m = resolveMemberById(id);
     const t = info.timestamp ? new Date(info.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
     const btn = document.createElement('button');
     btn.className = 'missed-chip-btn';
@@ -234,9 +277,15 @@ export function renderContacts(connectedList = []) {
   const grid = $('family-grid');
   if (!grid) return;
   const connected = CONFIG.familyMembers.filter(m => connectedList.includes(m.id));
-  const display = connected.filter(m => !isHiddenFromNana(m.id)).slice(0, 8);
+  const available = connected.filter(m => !isHiddenFromNana(m.id));
+  const display = [...available]
+    .map((m, idx) => ({ m, idx, lastTs: getLastCalledTimestamp(m.id) }))
+    .sort((a, b) => (b.lastTs - a.lastTs) || (a.idx - b.idx))
+    .slice(0, 8)
+    .map(x => x.m);
+
   const sig = display.length
-    ? display.map(m => `${m.id}:${Number(state.missedCallsByMember[m.id]?.count) || 0}`).join('|')
+    ? display.map(m => `${m.id}:${m.name}:${m.photo?.length || 0}:${Number(state.missedCallsByMember[m.id]?.count) || 0}`).join('|')
     : `empty:${connected.length}`;
   if (sig === lastContactsRenderSig && grid.children.length > 0) return;
   lastContactsRenderSig = sig;
@@ -252,7 +301,7 @@ export function renderContacts(connectedList = []) {
     const missed = Number(state.missedCallsByMember[m.id]?.count) || 0;
     const card = document.createElement('div');
     card.className = missed > 0 ? 'family-card has-missed' : 'family-card';
-    card.innerHTML = `${missed > 0 ? `<div class="missed-card-badge">📞 ${missed} MISSED</div>` : ''}<div class="photo-wrapper"><img src="${m.photo}" onerror="this.src='${m.fallback}'"></div><div class="contact-nameplate">${m.name}</div>`;
+    card.innerHTML = `${missed > 0 ? `<div class="missed-card-badge">📞 ${missed} MISSED</div>` : ''}<div class="photo-wrapper"><img src="${esc(m.photo)}" onerror="this.src='${esc(m.fallback)}'"></div><div class="contact-nameplate">${esc(m.name)}</div>`;
     card.onclick = () => window.openCallConfirmation(m);
     grid.appendChild(card);
   });
@@ -263,13 +312,41 @@ onValue(refs.missedCalls, snap => {
   state.missedCallsByMember = snap.val() || {};
   renderMissedCallsBanner();
   if (role === 'nana') renderContacts(state.connectedMemberIds);
+  else hooks.renderManageFamily?.();
+});
+
+onValue(refs.memberLastCallAt, snap => {
+  state.memberLastCallAtSnap = snap.val() || {};
+  if (role === 'nana') renderContacts(state.connectedMemberIds);
+  else hooks.renderManageFamily?.();
 });
 
 onValue(refs.connectedMembers, snap => {
   const val = snap.val();
   state.connectedMemberIds = Array.isArray(val) ? val : (val && typeof val === 'object' ? Object.values(val) : []);
   if (role === 'nana') renderContacts(state.connectedMemberIds);
-  else hooks.refreshFamilyPresence?.();
+  else {
+    hooks.refreshFamilyPresence?.();
+    hooks.renderManageFamily?.();
+  }
+});
+
+hooks.onFamilyMembersChanged.push(() => {
+  lastContactsRenderSig = null;
+  if (role === 'nana') {
+    renderMissedCallsBanner();
+    renderContacts(state.connectedMemberIds);
+  } else {
+    if ($('family-greeting')) $('family-greeting').innerText = `Call Nana (as ${activeFamilyMember.name})`;
+    const img = $('family-self-photo');
+    if (img) {
+      img.onerror = () => { img.src = activeFamilyMember.fallback; };
+      img.src = activeFamilyMember.photo;
+    }
+    if ($('telegram-link-btn')) $('telegram-link-btn').href = `https://t.me/${CONFIG.telegramBotUsername}?start=${activeFamilyMember.id}_${SERVICE_TOKEN}`;
+    hooks.refreshFamilyPresence?.();
+    hooks.renderManageFamily?.();
+  }
 });
 
 window.syncConnectedFamilyFromTelegram = async () => {
@@ -286,7 +363,10 @@ window.syncConnectedFamilyFromTelegram = async () => {
     if (data.ok && Array.isArray(data.connected)) {
       state.connectedMemberIds = data.connected;
       if (role === 'nana') renderContacts(state.connectedMemberIds);
-      else hooks.refreshFamilyPresence?.();
+      else {
+        hooks.refreshFamilyPresence?.();
+        hooks.renderManageFamily?.();
+      }
     }
     return data;
   } catch (e) {
@@ -1294,9 +1374,13 @@ onValue(refs.callState, snap => {
       activeCallPartnerId = null;
       hadRemoteMediaInCurrentCall = false;
       if (wasMediaConnected && durationSec >= 15) {
+        const partnerName = FAMILY_NAMES[partnerId] || resolveMemberById(partnerId).name || 'Family';
+        if (partnerId && partnerId !== 'nana' && partnerId !== 'family') {
+          touchMemberLastCallAt(partnerId);
+        }
         push(refs.callHistory, {
           partnerId,
-          partnerName: FAMILY_NAMES[partnerId] || 'Family',
+          partnerName,
           connected: true,
           startedAt,
           endedAt,
@@ -1307,7 +1391,7 @@ onValue(refs.callState, snap => {
 
     const act = isActiveNanaTab;
     if (data.status === 'ringing_nana') {
-      const caller = CONFIG.familyMembers.find(m => m.id === data.callerId) || CONFIG.familyMembers[0];
+      const caller = resolveMemberById(data.callerId, data.callerName);
       if (isRealAndroidTablet && isCurrentlyInNightWindow() && settings.nightBlockCalls) {
         incrementMissedCallForMember(caller.id);
         executeEndCallCleanup();
