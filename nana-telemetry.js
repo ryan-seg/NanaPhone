@@ -667,6 +667,8 @@ window.muteBatteryVoiceForMinutesCareHome = async (minutes) => {
 
 let lastEffectiveLowPowerNotified = null;
 let lastVideoBlockedNotified = null;
+let prevObservedCharging = null;
+let unplugVoicePending = false;
 
 function applyPowerModeFromChargingState(isCharging, level) {
   if (role !== 'nana') return;
@@ -686,6 +688,15 @@ function applyPowerModeFromChargingState(isCharging, level) {
 
 function syncUnpluggedBannerAndVoice(level, isCharging) {
   if (role !== 'nana') return;
+  if (typeof isCharging === 'boolean') {
+    if (isCharging) {
+      unplugVoicePending = false;
+    } else if (prevObservedCharging === true) {
+      unplugVoicePending = true;
+    }
+    prevObservedCharging = isCharging;
+  }
+
   applyPowerModeFromChargingState(isCharging, level);
   const banner = ensureUnpluggedWarningBanner();
   const txtEl = $('nana-unplugged-warning-text');
@@ -699,6 +710,17 @@ function syncUnpluggedBannerAndVoice(level, isCharging) {
   }
 
   const muted = isBatteryVoiceCurrentlyMuted();
+  const inNight = !!NanaCore.isCurrentlyInNightWindow?.();
+  let spokeUnplugJustNow = false;
+  if (unplugVoicePending) {
+    unplugVoicePending = false;
+    if (!muted && !inNight) {
+      const battVol = Math.min(1.0, Math.max(0.2, (Number(settings.batteryVoiceVolume ?? 85)) / 100));
+      NanaCore.speakMsg?.('Please keep tablet cable connected, thank you.', true, battVol);
+      spokeUnplugJustNow = true;
+    }
+  }
+
   const lpPrefix = NanaCore.isLowPowerMode?.() ? 'LOW POWER' : 'UNPLUGGED';
   if (txtEl) {
     txtEl.textContent = muted
@@ -709,8 +731,8 @@ function syncUnpluggedBannerAndVoice(level, isCharging) {
   positionUnpluggedBannerOverRadioAndVideo();
   requestAnimationFrame(positionUnpluggedBannerOverRadioAndVideo);
 
-  const shouldSpeak = battThresh > 0 && level <= battThresh && !muted && !NanaCore.isCurrentlyInNightWindow?.();
-  if (shouldSpeak) {
+  const shouldSpeak = battThresh > 0 && level <= battThresh && !muted && !inNight;
+  if (!spokeUnplugJustNow && shouldSpeak) {
     window.announceBatteryWarning?.(level);
   }
 }
