@@ -32,7 +32,7 @@ export function isNanaVideoActivelyPlaying() {
 NanaCore.isNanaVideoActivelyPlaying = isNanaVideoActivelyPlaying;
 
 async function requestVideoWakeLock() {
-  if (role !== 'nana' || !('wakeLock' in navigator)) return;
+  if (role !== 'nana' || NanaCore.isLowPowerMode() || !('wakeLock' in navigator)) return;
   try {
     if (!screenWakeLock) {
       screenWakeLock = await navigator.wakeLock.request('screen');
@@ -49,7 +49,7 @@ function releaseVideoWakeLock() {
 }
 
 function keepScreenAwakeIfPlayingVideo() {
-  if (!isNanaVideoActivelyPlaying()) return;
+  if (!isNanaVideoActivelyPlaying() || NanaCore.isLowPowerMode()) return;
   const overlay = $('brightness-overlay');
   if (overlay) { overlay.style.opacity = '0'; overlay.style.pointerEvents = 'none'; }
   if ($('night-dimmer') && $('night-dimmer').style.display !== 'none') window.wakeFromNightMode?.();
@@ -62,9 +62,15 @@ function startNormalDimCountdownOnPause() {
 }
 hooks.startNormalDimCountdownOnPause = startNormalDimCountdownOnPause;
 
-setInterval(() => {
-  if (isNanaVideoActivelyPlaying()) { keepScreenAwakeIfPlayingVideo(); requestVideoWakeLock(); }
-}, 5000);
+if (role === 'nana' && videoEl) {
+  setInterval(() => {
+    if (NanaCore.isLowPowerMode()) {
+      releaseVideoWakeLock();
+      return;
+    }
+    if (isNanaVideoActivelyPlaying()) { keepScreenAwakeIfPlayingVideo(); requestVideoWakeLock(); }
+  }, 5000);
+}
 
 // --- 2. STREAM DATA NORMALIZATION & VOLUME ---
 function normalizeStreamData(raw) {
@@ -218,9 +224,16 @@ function saveCurrentVideoTime(force = false) {
   }
 }
 
+function speakUnpluggedVideoNotice() {
+  if (role === 'nana' && !NanaCore.isCurrentlyInNightWindow?.()) {
+    NanaCore.speakMsg?.('Please plug in the tablet charger to watch videos.');
+  }
+}
+
 export function syncVideoUI(customStatusMessage = null) {
   const curItem = getCurrentQueueItem();
-  const playing = !!(videoEl && !videoEl.paused && !videoEl.ended && curItem);
+  const lowPower = role === 'nana' && NanaCore.isLowPowerMode();
+  const playing = !!(videoEl && !videoEl.paused && !videoEl.ended && curItem && !lowPower);
   const overlay = $('video-tap-overlay'), icon = $('video-overlay-icon'), main = $('video-overlay-main'), sub = $('video-overlay-sub'), btn = $('btn-bottom-video-toggle');
 
   $('video-screen')?.classList.toggle('video-is-playing', playing && !customStatusMessage);
@@ -230,7 +243,12 @@ export function syncVideoUI(customStatusMessage = null) {
       ? `🎬 (${curItem.index + 1}/${curItem.total}) ${curItem.item.title || 'Family Video'}${curItem.item.subtitleUrl ? ' [CC]' : ''}`
       : '🎬 Family Video Player';
   }
-  if (!curItem) {
+  if (lowPower) {
+    overlay?.classList.remove('playing-hidden');
+    if (icon) icon.innerText = '🔌';
+    if (main) main.innerText = 'Low Power Mode — Video Paused';
+    if (sub) sub.innerText = 'Plug in the tablet charger to watch videos';
+  } else if (!curItem) {
     overlay?.classList.remove('playing-hidden');
     if (icon) icon.innerText = '🎬';
     if (main) main.innerText = 'No videos in queue yet';
@@ -249,9 +267,15 @@ export function syncVideoUI(customStatusMessage = null) {
     if (sub) sub.innerText = 'Tap anywhere on the video screen or press Play Video below';
   }
   if (btn) {
-    btn.innerText = playing ? '⏸️ Pause Video' : '▶️ Play Video';
-    btn.style.background = playing ? '#b45309' : '#059669';
-    btn.style.borderColor = playing ? '#fde047' : '#4ade80';
+    if (lowPower) {
+      btn.innerText = '🔌 Plug In to Play';
+      btn.style.background = '#475569';
+      btn.style.borderColor = '#fbbf24';
+    } else {
+      btn.innerText = playing ? '⏸️ Pause Video' : '▶️ Play Video';
+      btn.style.background = playing ? '#b45309' : '#059669';
+      btn.style.borderColor = playing ? '#fde047' : '#4ade80';
+    }
   }
 }
 hooks.syncVideoUI = syncVideoUI;
@@ -303,6 +327,11 @@ function pauseVideoAndSavePosition(reason = 'manual') {
 hooks.pauseVideo = pauseVideoAndSavePosition;
 
 function startOrResumeVideo() {
+  if (role === 'nana' && NanaCore.isLowPowerMode()) {
+    pauseVideoAndSavePosition('low_power_unplugged');
+    syncVideoUI();
+    return;
+  }
   const curItem = getCurrentQueueItem();
   if (!videoEl || !curItem || !curItem.item.url) {
     syncVideoUI('No video in queue yet');
@@ -338,6 +367,10 @@ function startOrResumeVideo() {
   const playPromise = videoEl.play();
   if (playPromise !== undefined) {
     playPromise.then(() => {
+      if (role === 'nana' && NanaCore.isLowPowerMode()) {
+        pauseVideoAndSavePosition('low_power_unplugged');
+        return;
+      }
       requestVideoWakeLock();
       keepScreenAwakeIfPlayingVideo();
       syncVideoUI();
@@ -367,6 +400,11 @@ window.handleVideoStageTap = (ev) => {
   if (ev) ev.stopPropagation();
   const curItem = getCurrentQueueItem();
   if (!videoEl || !curItem) return syncVideoUI('No video in queue yet');
+  if (role === 'nana' && NanaCore.isLowPowerMode()) {
+    pauseVideoAndSavePosition('low_power_unplugged');
+    speakUnpluggedVideoNotice();
+    return;
+  }
   if (!videoEl.paused) pauseVideoAndSavePosition('screen_touch');
   else startOrResumeVideo();
 };
@@ -374,6 +412,11 @@ window.handleVideoStageTap = (ev) => {
 window.toggleNanaVideoPlayback = () => {
   const curItem = getCurrentQueueItem();
   if (!videoEl || !curItem) return syncVideoUI('No video in queue yet');
+  if (role === 'nana' && NanaCore.isLowPowerMode()) {
+    pauseVideoAndSavePosition('low_power_unplugged');
+    speakUnpluggedVideoNotice();
+    return;
+  }
   if (!videoEl.paused) pauseVideoAndSavePosition('button_tap');
   else startOrResumeVideo();
 };
@@ -396,6 +439,17 @@ hooks.confirmRestartVideo = async () => {
   if (!state.streamData.savedTimes) state.streamData.savedTimes = {};
   state.streamData.savedTimes[curItem.item.id] = 0;
   try { videoEl.currentTime = 0; } catch (_) {}
+  if (role === 'nana' && NanaCore.isLowPowerMode()) {
+    await update(refs.videoStream, {
+      [`savedTimes/${curItem.item.id}`]: 0,
+      state: 'paused',
+      pauseReason: 'low_power_unplugged',
+      updatedAt: Date.now()
+    }).catch(() => {});
+    syncVideoUI();
+    speakUnpluggedVideoNotice();
+    return;
+  }
   await update(refs.videoStream, {
     [`savedTimes/${curItem.item.id}`]: 0,
     state: 'playing',
@@ -520,6 +574,7 @@ if (role === 'nana' && videoEl) {
   setInterval(() => {
     const curItem = getCurrentQueueItem();
     const shouldBePlaying = !!(
+      !NanaCore.isLowPowerMode() &&
       curItem &&
       state.streamData.state === 'playing' &&
       $('video-screen')?.classList.contains('active') &&
@@ -883,6 +938,54 @@ window.remoteCommandVideo = async (cmd) => {
   await update(refs.videoStream, { currentIndex: nextIndex, state: nextState, updatedBy: senderName, updatedAt: Date.now() });
 };
 
+function updateFamilyVideoStatus() {
+  if (role !== 'family') return;
+  const st = $('fam-vid-status');
+  if (!st) return;
+  const curItem = getCurrentQueueItem();
+  const isUnplugged = state.presenceSnap?.isCharging === false || !!state.presenceSnap?.lowPowerMode;
+  if (isUnplugged) {
+    st.innerText = curItem
+      ? `🔋 Tablet Unplugged (Low Power) — Video disabled (#${curItem.index + 1}: ${curItem.item.title})`
+      : '🔋 Tablet Unplugged (Low Power) — Video disabled';
+    st.style.color = '#f59e0b';
+    return;
+  }
+  if (!curItem) {
+    st.innerText = 'Queue Empty';
+    st.style.color = '#94a3b8';
+  } else {
+    const isTrulyPlaying = state.presenceSnap?.currentScreen === 'video_playing';
+    const sec = getSavedTimeForItem(curItem.item, curItem.index);
+    const mins = Math.floor(sec / 60), secs = String(sec % 60).padStart(2, '0');
+    st.innerText = isTrulyPlaying
+      ? `▶️ Playing #${curItem.index + 1}: ${curItem.item.title} (${mins}:${secs})`
+      : `⏸️ Active #${curItem.index + 1}: ${curItem.item.title} (${mins}:${secs})`;
+    st.style.color = isTrulyPlaying ? '#4ade80' : '#fbbf24';
+  }
+}
+hooks.updateFamilyVideoStatus = updateFamilyVideoStatus;
+
+if (role === 'nana') {
+  hooks.onPowerModeChanged.push((isUnplugged) => {
+    if (isUnplugged) {
+      releaseVideoWakeLock();
+      if (videoEl && !videoEl.paused) {
+        pauseVideoAndSavePosition('low_power_unplugged');
+      } else if (state.streamData.state === 'playing') {
+        update(refs.videoStream, {
+          state: 'paused',
+          pauseReason: 'low_power_unplugged',
+          updatedAt: Date.now()
+        }).catch(() => {});
+      }
+      syncVideoUI();
+    } else {
+      syncVideoUI();
+    }
+  });
+}
+
 onValue(refs.videoStream, snap => {
   const prevItem = getCurrentQueueItem();
   state.streamData = normalizeStreamData(snap.val());
@@ -891,21 +994,7 @@ onValue(refs.videoStream, snap => {
   if (role === 'family') {
     renderFamilyQueueUI();
     hooks.refreshFamilyPresence?.();
-    const st = $('fam-vid-status');
-    if (st) {
-      if (!curItem) {
-        st.innerText = 'Queue Empty';
-        st.style.color = '#94a3b8';
-      } else {
-        const isTrulyPlaying = state.presenceSnap?.currentScreen === 'video_playing';
-        const sec = getSavedTimeForItem(curItem.item, curItem.index);
-        const mins = Math.floor(sec / 60), secs = String(sec % 60).padStart(2, '0');
-        st.innerText = isTrulyPlaying
-          ? `▶️ Playing #${curItem.index + 1}: ${curItem.item.title} (${mins}:${secs})`
-          : `⏸️ Active #${curItem.index + 1}: ${curItem.item.title} (${mins}:${secs})`;
-        st.style.color = isTrulyPlaying ? '#4ade80' : '#fbbf24';
-      }
-    }
+    updateFamilyVideoStatus();
   } else if (role === 'nana') {
     const urlChanged = prevItem?.item?.url !== curItem?.item?.url;
     const subChanged = prevItem?.item?.subtitleUrl !== curItem?.item?.subtitleUrl;
@@ -931,6 +1020,10 @@ onValue(refs.videoStream, snap => {
     const callBusy = !!state.currentState && state.currentState !== 'idle';
     if (state.streamData.state === 'playing' && curItem && callBusy) {
       update(refs.videoStream, { state: 'paused', pauseReason: 'call_in_progress', updatedAt: Date.now() }).catch(() => {});
+    } else if (state.streamData.state === 'playing' && curItem && NanaCore.isLowPowerMode()) {
+      releaseVideoWakeLock();
+      if (videoEl && !videoEl.paused) videoEl.pause();
+      update(refs.videoStream, { state: 'paused', pauseReason: 'low_power_unplugged', updatedAt: Date.now() }).catch(() => {});
     } else if (state.streamData.state === 'playing' && curItem) {
       if (!$('video-screen')?.classList.contains('active')) window.openVideoScreen();
       if (videoEl?.paused || urlChanged || idChanged) startOrResumeVideo();
