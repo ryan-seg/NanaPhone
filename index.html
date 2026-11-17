@@ -104,6 +104,10 @@
   <!-- Senior Telegram Chat & Fullscreen Keyboard -->
   <div id="bulletin-modal" oncontextmenu="return false;">
     <div class="tg-header">
+      <div class="fam-chat-header-bar">
+        <button type="button" class="fam-chat-back-btn" onclick="closeFamilyBulletin()">⬅️ Back</button>
+        <div class="fam-chat-title">✈️ Family Chat</div>
+      </div>
       <div class="nana-nav-pills">
         <button class="nav-pill-btn calls-pill" onclick="switchNanaMainTab('calls')">📞 Family Calls</button>
         <button class="nav-pill-btn chat-pill-x active-tab">✈️ Family Chat</button>
@@ -120,6 +124,7 @@
           <span id="nana-chat-placeholder" class="tg-placeholder">Tap here to open big keyboard...</span>
           <span id="nana-chat-typed"></span><span id="nana-chat-cursor" class="tg-flashing-cursor"></span>
         </div>
+        <input id="family-chat-native-input" class="tg-family-native-input" type="text" maxlength="500" placeholder="Type a message..." autocomplete="on" enterkeyhint="send" />
         <button class="tg-send-btn" onclick="submitTypedNanaMessage()"><span>Send</span> <span>➤</span></button>
       </div>
     </div>
