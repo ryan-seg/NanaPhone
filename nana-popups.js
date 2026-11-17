@@ -73,7 +73,7 @@ function hasUnreadFamilyChatMessages() {
 }
 
 async function evaluateScheduledPopupsOnNana() {
-  if (role !== 'nana' || !settings.periodicPopupsEnabled || NanaCore.isCurrentlyInNightWindow?.() || NanaCore.isLowPowerMode?.()) return;
+  if (role !== 'nana' || !settings.periodicPopupsEnabled || NanaCore.isCurrentlyInNightWindow?.()) return;
   if (state.callSnap?.status && state.callSnap.status !== 'idle') return;
   if (activeQuestionData?.status === 'pending') return;
   if ($('nana-question-modal')?.style.display === 'flex' || $('confirm-modal')?.style.display === 'flex') return;
@@ -95,7 +95,8 @@ async function evaluateScheduledPopupsOnNana() {
     }
   }
 
-  if (chatOpen || radioOpenOrPlaying || videoPlaying) return;
+  // During Low Power Mode, skip Radio and Video prompts (Unread Family Chat prompts above remain active)
+  if (NanaCore.isLowPowerMode?.() || chatOpen || radioOpenOrPlaying || videoPlaying) return;
   if (now - state.lastActivityOrCallMs < 180000) return;
 
   const d = new Date();
@@ -213,7 +214,7 @@ window.submitNanaQuestionAnswer = async (choice) => {
     const nextItem = state.streamData.queue?.[targetIdx];
     if (choice === 'YES') {
       if (nextItem) localStorage.setItem(`nana_vid_pos_${nextItem.url}`, '0');
-      const blockedLowPower = !!NanaCore.isLowPowerMode?.();
+      const blockedLowPower = !!NanaCore.isVideoBlockedByLowPower?.();
       const updatePayload = {
         currentIndex: targetIdx,
         state: blockedLowPower ? 'paused' : 'playing',
@@ -246,7 +247,7 @@ window.submitNanaQuestionAnswer = async (choice) => {
     if (choice === 'YES') {
       window.openVideoScreen?.();
       if ((state.streamData.queue || []).length) {
-        const blockedLowPower = !!NanaCore.isLowPowerMode?.();
+        const blockedLowPower = !!NanaCore.isVideoBlockedByLowPower?.();
         await update(refs.videoStream, blockedLowPower
           ? { state: 'paused', pauseReason: 'low_power_unplugged', updatedAt: now }
           : { state: 'playing', updatedAt: now }
@@ -276,6 +277,10 @@ function showNanaQuestionPopup() {
   const q = activeQuestionData;
   const inCall = !!state.currentState && state.currentState !== 'idle';
   if (q && q.status === 'pending' && q.question && !inCall) {
+    if (NanaCore.isLowPowerMode?.() && (q.type === 'idle_radio_prompt' || q.type === 'idle_video_prompt')) {
+      modal.style.display = 'none';
+      return;
+    }
     // Do not call pauseVideo when the video has already ended and is showing next_video_prompt
     if (q.type !== 'next_video_prompt') {
       hooks.pauseVideo?.('question_popup');
