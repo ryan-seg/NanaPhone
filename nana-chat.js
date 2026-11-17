@@ -660,6 +660,14 @@ function syncChatInputDisplay() {
   const input = $('nana-chat-input'), typed = $('nana-chat-typed'), ph = $('nana-chat-placeholder'), box = $('nana-chat-display');
   if (!input || !typed || !ph) return;
   const val = input.value || "", kbOpen = $('bulletin-modal')?.classList.contains('kb-fullscreen');
+  if (role === 'nana' && settings.voiceMessagingEnabled !== false) {
+    const mode = settings.nanaMessageEntryMode || 'choice';
+    ph.textContent = mode === 'voice'
+      ? '🎙️ Tap here to speak a voice message...'
+      : (mode === 'keyboard' ? 'Tap here to open big keyboard...' : '💬 Tap here to speak or type a message...');
+  } else {
+    ph.textContent = 'Tap here to open big keyboard...';
+  }
   ph.style.display = (!val.length && !kbOpen) ? 'inline' : 'none';
   typed.textContent = val.replace(/ /g, '\u00A0');
   if (box) box.scrollLeft = box.scrollWidth;
@@ -787,8 +795,15 @@ window.openSeniorKeyboard = () => {
     return;
   }
   if (role === 'nana' && settings.voiceMessagingEnabled !== false && !(input?.value || '').trim()) {
-    window.openReplyChooser?.();
-    return;
+    const entryMode = settings.nanaMessageEntryMode || 'choice';
+    if (entryMode === 'voice') {
+      window.startNanaVoiceRecording?.();
+      return;
+    }
+    if (entryMode === 'choice') {
+      window.openReplyChooser?.();
+      return;
+    }
   }
   window.openActualSeniorKeyboard();
 };
@@ -1174,6 +1189,10 @@ hooks.onSettingsChanged.push((s) => {
     ensureVoiceMessagingUI();
     renderBulletinFeed(false);
   }
+  if ((s.nanaMessageEntryMode || 'choice') !== 'choice') {
+    window.closeReplyChooser?.();
+  }
+  syncChatInputDisplay();
 });
 
 let lastBulletinContentSig = null;
@@ -1723,8 +1742,8 @@ NanaCore.isChatVideoActivelyPlaying = () => {
 };
 
 if (role === 'nana') {
-  hooks.onPowerModeChanged.push((isUnplugged) => {
-    if (isUnplugged) window.closeChatVideoOverlay?.();
+  hooks.onPowerModeChanged.push((_isLP, _lvl, videoBlocked) => {
+    if (videoBlocked) window.closeChatVideoOverlay?.();
     if ($('bulletin-modal')?.style.display === 'flex') renderBulletinFeed(false);
   });
 }
@@ -1787,9 +1806,12 @@ function buildChatVideoCardHtml(msgKey, item) {
       📹 Video is too large to play here (&gt;20 MB) — ask family to send a shorter clip
     </div>`;
   }
-  if (role === 'nana' && NanaCore.isLowPowerMode?.()) {
+  if (role === 'nana' && NanaCore.isVideoBlockedByLowPower?.()) {
+    const lpMsg = state.isTabletUnplugged
+      ? '🔌 Plug in the tablet charger to watch this family video'
+      : '🔋 Low Power Mode is active — video playback paused';
     return `<div class="nana-chat-video-card" data-vid-key="${esc(msgKey)}" style="margin:8px 0;padding:14px;border-radius:16px;border:2px solid #fbbf24;background:#1e293b;color:#fde68a;font-size:1.15rem;font-weight:800;">
-      🔌 Plug in the tablet charger to watch this family video${durLabel ? ` (${esc(durLabel)})` : ''}
+      ${lpMsg}${durLabel ? ` (${esc(durLabel)})` : ''}
     </div>`;
   }
   const watched = !!item.watchedByNanaAt;
@@ -1808,10 +1830,10 @@ window.toggleChatVideoMessage = async (msgKey) => {
   if (!item || !card) return;
   const statusEl = card.querySelector('.nana-chat-video-status');
 
-  if (role === 'nana' && NanaCore.isLowPowerMode?.()) {
-    if (statusEl) statusEl.textContent = '🔌 Low Power Mode — plug in charger to watch videos';
+  if (role === 'nana' && NanaCore.isVideoBlockedByLowPower?.()) {
+    if (statusEl) statusEl.textContent = state.isTabletUnplugged ? '🔌 Low Power Mode — plug in charger to watch videos' : '🔋 Low Power Mode is active';
     if (!NanaCore.isCurrentlyInNightWindow?.()) {
-      NanaCore.speakMsg?.('Please plug in the tablet charger to watch videos.');
+      NanaCore.speakMsg?.(state.isTabletUnplugged ? 'Please plug in the tablet charger to watch videos.' : 'Low power mode is active.');
     }
     return;
   }
@@ -1846,7 +1868,7 @@ window.toggleChatVideoMessage = async (msgKey) => {
       setBoundedBlobCache(chatVideoBlobCache, item.videoFileId, src, 3);
     }
 
-    if (role === 'nana' && NanaCore.isLowPowerMode?.()) return;
+    if (role === 'nana' && NanaCore.isVideoBlockedByLowPower?.()) return;
     if (statusEl) statusEl.textContent = '';
     const ov = ensureChatVideoOverlay();
     if ($('nana-chat-video-title')) {
@@ -1886,7 +1908,7 @@ window.toggleChatVideoMessage = async (msgKey) => {
 
     clearInterval(chatVideoCallWatchInterval);
     chatVideoCallWatchInterval = setInterval(() => {
-      if ((state.currentState && state.currentState !== 'idle') || (role === 'nana' && NanaCore.isLowPowerMode?.())) {
+      if ((state.currentState && state.currentState !== 'idle') || (role === 'nana' && NanaCore.isVideoBlockedByLowPower?.())) {
         window.closeChatVideoOverlay();
       }
     }, 500);
