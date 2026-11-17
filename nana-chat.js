@@ -515,6 +515,7 @@ window.deleteLastSeniorWord = (ev) => {
 // --- 1. UNREAD CHECK & PHOTO URL RESOLUTION ---
 export function isMessageUnreadByNana(item) {
   if (!item) return false;
+  if (item.systemAlert) return false;
   const isOut = !!item.fromNana || item.author?.toLowerCase() === 'nana';
   if (isOut) return false;
   const clearedAt = Number(settings.bulletinClearedAt) || 0;
@@ -1042,7 +1043,8 @@ export function renderBulletinFeed(forceInitialScroll = false) {
 
   validEntries.forEach(([k, item]) => {
     try {
-      const isOut = !!item.fromNana || item.author?.toLowerCase() === 'nana';
+      const isSys = !!item.systemAlert;
+      const isOut = !isSys && (!!item.fromNana || item.author?.toLowerCase() === 'nana');
       const isUnread = isMessageUnreadByNana(item);
       const hasVoice = isVoiceMessageItem(item);
       const hasVideo = isVideoChatItem(item);
@@ -1057,14 +1059,16 @@ export function renderBulletinFeed(forceInitialScroll = false) {
       }
 
       const b = document.createElement('div');
-      b.className = `tg-bubble ${isOut ? 'outgoing' : 'incoming'}${isUnread ? ' unread-msg' : ''}`;
+      b.className = `tg-bubble ${isSys ? 'system-alert' : (isOut ? 'outgoing' : 'incoming')}${isUnread ? ' unread-msg' : ''}`;
       b.dataset.msgKey = k;
 
       const top = document.createElement('div');
       top.className = 'tg-sender-row';
       const auth = document.createElement('span');
       auth.className = 'tg-sender-name';
-      auth.textContent = isOut ? (role === 'nana' ? '👵 Nana (You)' : '👵 Nana') : `👤 ${item.author || 'Family'}`;
+      auth.textContent = isSys
+        ? `🔋 ${item.author || 'Tablet Status'}`
+        : (isOut ? (role === 'nana' ? '👵 Nana (You)' : '👵 Nana') : `👤 ${item.author || 'Family'}`);
       if (isUnread) {
         const tag = document.createElement('span');
         tag.className = 'tg-new-tag';
@@ -1122,7 +1126,7 @@ export function renderBulletinFeed(forceInitialScroll = false) {
         b.appendChild(p);
       }
 
-      if (role === 'family' && !isOut) {
+      if (role === 'family' && !isOut && !isSys) {
         const rc = document.createElement('div');
         if (hasVoice) {
           if (item.listenedByNanaAt) {
