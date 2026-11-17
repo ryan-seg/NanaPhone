@@ -226,14 +226,16 @@ function saveCurrentVideoTime(force = false) {
 
 function speakUnpluggedVideoNotice() {
   if (role === 'nana' && !NanaCore.isCurrentlyInNightWindow?.()) {
-    NanaCore.speakMsg?.('Please plug in the tablet charger to watch videos.');
+    NanaCore.speakMsg?.(state.isTabletUnplugged
+      ? 'Please plug in the tablet charger to watch videos.'
+      : 'Low power mode is switched on at the moment.');
   }
 }
 
 export function syncVideoUI(customStatusMessage = null) {
   const curItem = getCurrentQueueItem();
-  const lowPower = role === 'nana' && NanaCore.isLowPowerMode();
-  const playing = !!(videoEl && !videoEl.paused && !videoEl.ended && curItem && !lowPower);
+  const lowPowerBlocked = role === 'nana' && !!NanaCore.isVideoBlockedByLowPower?.();
+  const playing = !!(videoEl && !videoEl.paused && !videoEl.ended && curItem && !lowPowerBlocked);
   const overlay = $('video-tap-overlay'), icon = $('video-overlay-icon'), main = $('video-overlay-main'), sub = $('video-overlay-sub'), btn = $('btn-bottom-video-toggle');
 
   $('video-screen')?.classList.toggle('video-is-playing', playing && !customStatusMessage);
@@ -243,11 +245,13 @@ export function syncVideoUI(customStatusMessage = null) {
       ? `🎬 (${curItem.index + 1}/${curItem.total}) ${curItem.item.title || 'Family Video'}${curItem.item.subtitleUrl ? ' [CC]' : ''}`
       : '🎬 Family Video Player';
   }
-  if (lowPower) {
+  if (lowPowerBlocked) {
     overlay?.classList.remove('playing-hidden');
-    if (icon) icon.innerText = '🔌';
+    if (icon) icon.innerText = state.isTabletUnplugged ? '🔌' : '🔋';
     if (main) main.innerText = 'Low Power Mode — Video Paused';
-    if (sub) sub.innerText = 'Plug in the tablet charger to watch videos';
+    if (sub) sub.innerText = state.isTabletUnplugged
+      ? 'Plug in the tablet charger to watch videos'
+      : 'Low Power Mode is currently turned on by family controls';
   } else if (!curItem) {
     overlay?.classList.remove('playing-hidden');
     if (icon) icon.innerText = '🎬';
@@ -267,8 +271,8 @@ export function syncVideoUI(customStatusMessage = null) {
     if (sub) sub.innerText = 'Tap anywhere on the video screen or press Play Video below';
   }
   if (btn) {
-    if (lowPower) {
-      btn.innerText = '🔌 Plug In to Play';
+    if (lowPowerBlocked) {
+      btn.innerText = state.isTabletUnplugged ? '🔌 Plug In to Play' : '🔋 Low Power Mode';
       btn.style.background = '#475569';
       btn.style.borderColor = '#fbbf24';
     } else {
@@ -327,7 +331,7 @@ function pauseVideoAndSavePosition(reason = 'manual') {
 hooks.pauseVideo = pauseVideoAndSavePosition;
 
 function startOrResumeVideo() {
-  if (role === 'nana' && NanaCore.isLowPowerMode()) {
+  if (role === 'nana' && NanaCore.isVideoBlockedByLowPower?.()) {
     pauseVideoAndSavePosition('low_power_unplugged');
     syncVideoUI();
     return;
@@ -367,7 +371,7 @@ function startOrResumeVideo() {
   const playPromise = videoEl.play();
   if (playPromise !== undefined) {
     playPromise.then(() => {
-      if (role === 'nana' && NanaCore.isLowPowerMode()) {
+      if (role === 'nana' && NanaCore.isVideoBlockedByLowPower?.()) {
         pauseVideoAndSavePosition('low_power_unplugged');
         return;
       }
@@ -400,7 +404,7 @@ window.handleVideoStageTap = (ev) => {
   if (ev) ev.stopPropagation();
   const curItem = getCurrentQueueItem();
   if (!videoEl || !curItem) return syncVideoUI('No video in queue yet');
-  if (role === 'nana' && NanaCore.isLowPowerMode()) {
+  if (role === 'nana' && NanaCore.isVideoBlockedByLowPower?.()) {
     pauseVideoAndSavePosition('low_power_unplugged');
     speakUnpluggedVideoNotice();
     return;
@@ -412,7 +416,7 @@ window.handleVideoStageTap = (ev) => {
 window.toggleNanaVideoPlayback = () => {
   const curItem = getCurrentQueueItem();
   if (!videoEl || !curItem) return syncVideoUI('No video in queue yet');
-  if (role === 'nana' && NanaCore.isLowPowerMode()) {
+  if (role === 'nana' && NanaCore.isVideoBlockedByLowPower?.()) {
     pauseVideoAndSavePosition('low_power_unplugged');
     speakUnpluggedVideoNotice();
     return;
@@ -439,7 +443,7 @@ hooks.confirmRestartVideo = async () => {
   if (!state.streamData.savedTimes) state.streamData.savedTimes = {};
   state.streamData.savedTimes[curItem.item.id] = 0;
   try { videoEl.currentTime = 0; } catch (_) {}
-  if (role === 'nana' && NanaCore.isLowPowerMode()) {
+  if (role === 'nana' && NanaCore.isVideoBlockedByLowPower?.()) {
     await update(refs.videoStream, {
       [`savedTimes/${curItem.item.id}`]: 0,
       state: 'paused',
@@ -574,7 +578,7 @@ if (role === 'nana' && videoEl) {
   setInterval(() => {
     const curItem = getCurrentQueueItem();
     const shouldBePlaying = !!(
-      !NanaCore.isLowPowerMode() &&
+      !NanaCore.isVideoBlockedByLowPower?.() &&
       curItem &&
       state.streamData.state === 'playing' &&
       $('video-screen')?.classList.contains('active') &&
@@ -943,11 +947,14 @@ function updateFamilyVideoStatus() {
   const st = $('fam-vid-status');
   if (!st) return;
   const curItem = getCurrentQueueItem();
-  const isUnplugged = state.presenceSnap?.isCharging === false || !!state.presenceSnap?.lowPowerMode;
-  if (isUnplugged) {
+  const lpMode = settings.lowPowerModeSetting || 'auto';
+  const lpActive = lpMode === 'on' || (lpMode === 'auto' && (state.presenceSnap?.isCharging === false || !!state.presenceSnap?.lowPowerMode));
+  const videoBlocked = lpActive && settings.lowPowerBlockVideo !== false;
+  if (videoBlocked) {
+    const why = state.presenceSnap?.isCharging === false ? 'Tablet Unplugged (Low Power)' : 'Low Power Mode ON';
     st.innerText = curItem
-      ? `🔋 Tablet Unplugged (Low Power) — Video disabled (#${curItem.index + 1}: ${curItem.item.title})`
-      : '🔋 Tablet Unplugged (Low Power) — Video disabled';
+      ? `🔋 ${why} — Video disabled (#${curItem.index + 1}: ${curItem.item.title})`
+      : `🔋 ${why} — Video disabled`;
     st.style.color = '#f59e0b';
     return;
   }
@@ -967,9 +974,9 @@ function updateFamilyVideoStatus() {
 hooks.updateFamilyVideoStatus = updateFamilyVideoStatus;
 
 if (role === 'nana') {
-  hooks.onPowerModeChanged.push((isUnplugged) => {
-    if (isUnplugged) {
-      releaseVideoWakeLock();
+  hooks.onPowerModeChanged.push((isLP, _lvl, videoBlocked) => {
+    if (isLP) releaseVideoWakeLock();
+    if (videoBlocked) {
       if (videoEl && !videoEl.paused) {
         pauseVideoAndSavePosition('low_power_unplugged');
       } else if (state.streamData.state === 'playing') {
@@ -979,10 +986,8 @@ if (role === 'nana') {
           updatedAt: Date.now()
         }).catch(() => {});
       }
-      syncVideoUI();
-    } else {
-      syncVideoUI();
     }
+    syncVideoUI();
   });
 }
 
@@ -1020,7 +1025,7 @@ onValue(refs.videoStream, snap => {
     const callBusy = !!state.currentState && state.currentState !== 'idle';
     if (state.streamData.state === 'playing' && curItem && callBusy) {
       update(refs.videoStream, { state: 'paused', pauseReason: 'call_in_progress', updatedAt: Date.now() }).catch(() => {});
-    } else if (state.streamData.state === 'playing' && curItem && NanaCore.isLowPowerMode()) {
+    } else if (state.streamData.state === 'playing' && curItem && NanaCore.isVideoBlockedByLowPower?.()) {
       releaseVideoWakeLock();
       if (videoEl && !videoEl.paused) videoEl.pause();
       update(refs.videoStream, { state: 'paused', pauseReason: 'low_power_unplugged', updatedAt: Date.now() }).catch(() => {});
