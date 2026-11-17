@@ -186,6 +186,7 @@ export const state = {
   settingsLoaded: false,
   currentState: 'idle',
   isRadioPlaying: false,
+  isTabletUnplugged: false,
   returnToVideoAfterCall: false,
   callSnap: { status: 'idle' },
   presenceSnap: {},
@@ -206,6 +207,7 @@ export const state = {
 
 export const hooks = {
   onSettingsChanged: [],
+  onPowerModeChanged: [],
   pauseVideo: null,
   resumeVideo: null,
   syncVideoUI: null,
@@ -219,6 +221,8 @@ export const hooks = {
   renderBulletinFeed: null,
   updateBulletinTicker: null
 };
+
+export const isLowPowerMode = () => role === 'nana' && state.isTabletUnplugged === true;
 
 export const isBatteryVoiceCurrentlyMuted = () => (Number(settings.batteryVoiceMutedUntil) || 0) > Date.now();
 
@@ -250,8 +254,9 @@ export const NanaCore = {
   activeFamilyMember, isAdminFamilyMember, isAdminFamily: isAdminFamilyMember,
   FAMILY_NAMES, senderName: activeFamilyMember.name,
   basePath, db, refs, settings, state, hooks, audioCtx,
-  showScreen, speakMsg, isBatteryVoiceCurrentlyMuted, askNana,
+  showScreen, speakMsg, isBatteryVoiceCurrentlyMuted, isLowPowerMode, askNana,
   isNanaVideoActivelyPlaying: () => false,
+  isChatVideoActivelyPlaying: () => false,
   getCurrentQueueItem: () => null
 };
 
