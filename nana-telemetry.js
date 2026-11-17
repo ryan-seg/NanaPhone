@@ -1,15 +1,237 @@
 import {
-  $, NanaCore, esc, update, remove, onValue, runTransaction, onDisconnect, query, limitToLast
+  $, NanaCore, esc, update, remove, push, onValue, runTransaction, onDisconnect, query, limitToLast
 } from "./nana-core.js?v=2.9.5";
 
 const {
+  CONFIG, SERVICE_TOKEN, PORTAL_NODE_ID,
   role, activeFamilyMember, isAdminFamilyMember, FAMILY_NAMES, refs, settings, state, hooks, isBatteryVoiceCurrentlyMuted
 } = NanaCore;
 
+const PAGE_LOAD_MS = Date.now();
 let lastTouchWriteMs = 0;
 let webBatteryObj = null;
 let cachedBatteryLevel = null;
 let cachedIsCharging = null;
+let alertsLoaded = false;
+let firebaseConnected = false;
+let prevPresenceReady = (role !== 'nana');
+let bootPrevPresence = null;
+let bootAbruptDeathChecked = false;
+let batteryAlertTxInFlight = false;
+
+async function postSystemFamilyChatAlert(text) {
+  const cleanText = String(text || '').trim();
+  if (!cleanText) return;
+  const now = Date.now();
+  try {
+    await push(refs.bulletin, {
+      author: 'Tablet Status',
+      fromNana: true,
+      systemAlert: true,
+      text: cleanText,
+      timestamp: now,
+      readByNanaAt: now
+    });
+  } catch (_) {}
+  if (CONFIG?.googleScriptUrl && SERVICE_TOKEN) {
+    try {
+      await fetch(CONFIG.googleScriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          secret: SERVICE_TOKEN,
+          portalNode: PORTAL_NODE_ID,
+          action: 'system_alert',
+          text: cleanText
+        })
+      });
+    } catch (_) {}
+  }
+}
+
+function evaluateNanaBatteryChatAlerts() {
+  if (role !== 'nana' || batteryAlertTxInFlight) return;
+  if (!firebaseConnected || !state.settingsLoaded || !alertsLoaded || !prevPresenceReady) return;
+  if (settings.batteryChatAlertsEnabled === false) {
+    bootAbruptDeathChecked = true;
+    return;
+  }
+  if (cachedBatteryLevel === null || typeof cachedIsCharging !== 'boolean') return;
+
+  const level = Math.round(cachedBatteryLevel);
+  const charging = !!cachedIsCharging;
+  const alerts = state.alertsSnap || {};
+  const now = Date.now();
+
+  let abruptCandidate = false;
+  if (!bootAbruptDeathChecked) {
+    const prevLastPing = Number(bootPrevPresence?.lastPing || 0);
+    const prevBatt = bootPrevPresence?.batteryLevel != null ? Number(bootPrevPresence.batteryLevel) : null;
+    const prevCharging = bootPrevPresence?.isCharging;
+    const offlineGapMs = prevLastPing > 0 ? (PAGE_LOAD_MS - prevLastPing) : 0;
+    const isAbruptLowBatteryDeath = !alerts.batteryOutActive
+      && prevCharging === false
+      && prevBatt !== null
+      && prevBatt <= 15
+      && offlineGapMs > 180000
+      && (now - (Number(alerts.backOnlineSentAt) || 0) > 300000);
+    if (isAbruptLowBatteryDeath) {
+      abruptCandidate = (charging || level > 6);
+    } else {
+      bootAbruptDeathChecked = true;
+    }
+  }
+
+  // 1. Back online notification (after battery-out or abrupt low-battery shutdown)
+  if ((alerts.batteryOutActive === true || abruptCandidate) && (charging || level > 6)) {
+    batteryAlertTxInFlight = true;
+    let postKind = null;
+    runTransaction(refs.alerts, current => {
+      postKind = null;
+      const cur = (current && typeof current === 'object') ? { ...current } : {};
+      const curOut = !!cur.batteryOutActive;
+      const lastBack = Number(cur.backOnlineSentAt || 0);
+      if (!curOut && !abruptCandidate) return;
+      if (!curOut && (Date.now() - lastBack < 300000)) return;
+      postKind = curOut ? 'marked' : 'abrupt';
+      return {
+        ...cur,
+        batteryOutActive: false,
+        backOnlineSentAt: Date.now(),
+        backOnlineSource: 'tablet',
+        backOnlineLevel: level,
+        backOnlineCharging: charging
+      };
+    }).then(txRes => {
+      bootAbruptDeathChecked = true;
+      if (txRes.committed && postKind) {
+        const chTxt = charging ? '🔌 Charging' : '⚠️ Unplugged';
+        const msgText = postKind === 'marked'
+          ? `✅🔋 Nana's tablet is back online! (Battery: ${level}% • ${chTxt})`
+          : `✅🔋 Nana's tablet is back online after running out of battery! (Battery: ${level}% • ${chTxt})`;
+        return postSystemFamilyChatAlert(msgText);
+      }
+    }).catch(() => {}).finally(() => {
+      batteryAlertTxInFlight = false;
+    });
+    return;
+  }
+
+  // 2. Critically low battery alert before tablet powers off (<= 5% and unplugged)
+  if (!charging && level <= 5 && !alerts.batteryOutActive && (now - (Number(alerts.backOnlineSentAt) || 0) > 300000)) {
+    batteryAlertTxInFlight = true;
+    let shouldPost = false;
+    runTransaction(refs.alerts, current => {
+      shouldPost = false;
+      const cur = (current && typeof current === 'object') ? { ...current } : {};
+      if (cur.batteryOutActive) return;
+      if (Date.now() - (Number(cur.backOnlineSentAt) || 0) < 300000) return;
+      shouldPost = true;
+      return {
+        ...cur,
+        batteryOutActive: true,
+        batteryOutSentAt: Date.now(),
+        batteryOutSource: 'tablet',
+        batteryOutLevel: level
+      };
+    }).then(txRes => {
+      if (txRes.committed && shouldPost) {
+        return postSystemFamilyChatAlert(`🪫 Nana's tablet battery has nearly run out (${level}%) and may switch off — please plug in the charger.`);
+      }
+    }).catch(() => {}).finally(() => {
+      batteryAlertTxInFlight = false;
+    });
+  }
+}
+
+function evaluateFamilyBatteryChatAlerts() {
+  if (role !== 'family' || batteryAlertTxInFlight) return;
+  if (!state.settingsLoaded || !alertsLoaded) return;
+  if (settings.batteryChatAlertsEnabled === false) return;
+
+  const p = state.presenceSnap || {};
+  const lastPing = Number(p.lastPing || 0);
+  if (!lastPing) return;
+
+  const now = Date.now();
+  const silenceSec = Math.floor((now - lastPing) / 1000);
+  const isOffline = (p.online === false) || (silenceSec > 75);
+  const batt = p.batteryLevel != null ? Number(p.batteryLevel) : null;
+  const charging = !!p.isCharging;
+  const alerts = state.alertsSnap || {};
+
+  // 1. Tablet is offline with dead/critically low unplugged battery
+  if (isOffline && batt !== null && !charging && (batt <= 6 || (batt <= 14 && silenceSec > 600))) {
+    if (!alerts.batteryOutActive && (now - (Number(alerts.backOnlineSentAt) || 0) > 300000)) {
+      batteryAlertTxInFlight = true;
+      let shouldPost = false;
+      runTransaction(refs.alerts, current => {
+        shouldPost = false;
+        const cur = (current && typeof current === 'object') ? { ...current } : {};
+        if (cur.batteryOutActive) return;
+        if (Date.now() - (Number(cur.backOnlineSentAt) || 0) < 300000) return;
+        shouldPost = true;
+        return {
+          ...cur,
+          batteryOutActive: true,
+          batteryOutSentAt: Date.now(),
+          batteryOutSource: 'family',
+          batteryOutLevel: batt
+        };
+      }).then(txRes => {
+        if (txRes.committed && shouldPost) {
+          return postSystemFamilyChatAlert(`🪫 Nana's tablet appears to have run out of battery (last seen at ${batt}%) and is offline.`);
+        }
+      }).catch(() => {}).finally(() => {
+        batteryAlertTxInFlight = false;
+      });
+    }
+    return;
+  }
+
+  // 2. Fallback back-online alert if tablet came back online >45s ago and alerts.batteryOutActive is still set
+  if (!isOffline && silenceSec < 60 && alerts.batteryOutActive === true && (charging || (batt !== null && batt > 6))) {
+    const connAgeMs = p.lastConnectedAt ? (now - Number(p.lastConnectedAt)) : 999999;
+    const outAgeMs = now - (Number(alerts.batteryOutSentAt) || 0);
+    if (connAgeMs > 45000 && outAgeMs > 45000) {
+      batteryAlertTxInFlight = true;
+      let shouldPost = false;
+      runTransaction(refs.alerts, current => {
+        shouldPost = false;
+        const cur = (current && typeof current === 'object') ? { ...current } : {};
+        if (!cur.batteryOutActive) return;
+        shouldPost = true;
+        return {
+          ...cur,
+          batteryOutActive: false,
+          backOnlineSentAt: Date.now(),
+          backOnlineSource: 'family',
+          backOnlineLevel: batt,
+          backOnlineCharging: charging
+        };
+      }).then(txRes => {
+        if (txRes.committed && shouldPost) {
+          const chTxt = charging ? '🔌 Charging' : '⚠️ Unplugged';
+          const battPart = batt != null ? `${batt}% • ` : '';
+          return postSystemFamilyChatAlert(`✅🔋 Nana's tablet is back online! (Battery: ${battPart}${chTxt})`);
+        }
+      }).catch(() => {}).finally(() => {
+        batteryAlertTxInFlight = false;
+      });
+    }
+  }
+}
+
+onValue(refs.alerts, snap => {
+  state.alertsSnap = snap.val() || {};
+  alertsLoaded = true;
+  if (role === 'nana') evaluateNanaBatteryChatAlerts();
+  else evaluateFamilyBatteryChatAlerts();
+});
+hooks.onSettingsChanged.push(() => {
+  if (role === 'nana') evaluateNanaBatteryChatAlerts();
+  else evaluateFamilyBatteryChatAlerts();
+});
 
 // --- 1. TOP 62PX NO-TOUCH ORIENTATION BANNER & DISCREET STAFF BUTTON ---
 if (role === 'nana') {
@@ -518,6 +740,8 @@ if (role === 'nana' && navigator.getBattery) {
     const onBattChange = () => {
       refreshCachedBatteryValues();
       syncUnpluggedBannerAndVoice(cachedBatteryLevel, cachedIsCharging);
+      evaluateNanaBatteryChatAlerts();
+      if (!prevPresenceReady) return;
       update(refs.presence, {
         online: true,
         lastPing: Date.now(),
@@ -535,6 +759,7 @@ if (role === 'nana' && navigator.getBattery) {
 export function readTabletBatteryStatus() {
   refreshCachedBatteryValues();
   syncUnpluggedBannerAndVoice(cachedBatteryLevel, cachedIsCharging);
+  evaluateNanaBatteryChatAlerts();
   return { batteryLevel: cachedBatteryLevel, isCharging: cachedIsCharging };
 }
 
@@ -544,8 +769,9 @@ export function recordTouchActivity(customActivity = null) {
   const now = Date.now();
   const minGapMs = NanaCore.isLowPowerMode() ? 30000 : 15000;
   if (!customActivity && (now - lastTouchWriteMs < minGapMs)) return;
-  lastTouchWriteMs = now;
   const { batteryLevel, isCharging } = readTabletBatteryStatus();
+  if (!prevPresenceReady) return;
+  lastTouchWriteMs = now;
   const payload = {
     online: true,
     appState: 'foreground',
@@ -566,6 +792,7 @@ let lastHeartbeatWriteMs = 0;
 function recordBackgroundHeartbeat(force = false) {
   if (role !== 'nana') return;
   const { batteryLevel, isCharging } = readTabletBatteryStatus();
+  if (!prevPresenceReady) return;
   const now = Date.now();
   // In Low Power Mode write every ~50s (safely under the 75s offline threshold) instead of every 20s
   const minHeartbeatGapMs = NanaCore.isLowPowerMode() ? 48000 : 18000;
@@ -630,8 +857,19 @@ export function broadcastNanaCurrentScreen() {
 hooks.broadcastScreen = broadcastNanaCurrentScreen;
 
 if (role === 'nana') {
+  const finalizePrevPresenceCapture = (val) => {
+    if (prevPresenceReady) return;
+    bootPrevPresence = val || {};
+    prevPresenceReady = true;
+    recordBackgroundHeartbeat(true);
+    evaluateNanaBatteryChatAlerts();
+  };
+  onValue(refs.presence, snap => finalizePrevPresenceCapture(snap.val()), { onlyOnce: true });
+  setTimeout(() => finalizePrevPresenceCapture({}), 3000);
+
   onValue(refs.connectedInfo, snap => {
-    if (snap.val() === true) {
+    firebaseConnected = (snap.val() === true);
+    if (firebaseConnected) {
       onDisconnect(refs.presence).update({ online: false, disconnectedAt: Date.now() }).catch(() => {});
       const appState = document.visibilityState === 'hidden' ? 'backgrounded' : 'foreground';
       const payload = {
@@ -642,6 +880,7 @@ if (role === 'nana') {
       };
       if (appState === 'foreground') payload.lastExitHint = 'active_in_app';
       update(refs.presence, payload).catch(() => {});
+      evaluateNanaBatteryChatAlerts();
     }
   });
 
@@ -765,8 +1004,14 @@ export function renderTodaysCallsBanner() {
 }
 hooks.renderTodaysCallsBanner = renderTodaysCallsBanner;
 
-onValue(query(refs.callHistory, limitToLast(25)), snap => {
+onValue(query(refs.callHistory, limitToLast(60)), snap => {
   state.callHistorySnap = snap.val() || {};
+  renderTodaysCallsBanner();
+  if (role === 'nana') hooks.renderContacts?.(state.connectedMemberIds);
+  else updateFamilyPresenceBanner();
+});
+hooks.onFamilyMembersChanged.push(() => {
+  lastCallsRenderSig = null;
   renderTodaysCallsBanner();
   if (role === 'family') updateFamilyPresenceBanner();
 });
@@ -796,7 +1041,7 @@ function getSimpleNanaStatusSummary() {
   const st = state.callSnap?.status || 'idle';
   if (st !== 'idle') {
     const otherId = state.callSnap.callerId === 'nana' ? state.callSnap.targetId : state.callSnap.callerId;
-    const withName = FAMILY_NAMES[otherId] || 'Family';
+    const withName = esc(FAMILY_NAMES[otherId] || state.callSnap.callerName || 'Family');
     return {
       border: '#f87171',
       text: st === 'connected' ? `🔴 In a call with ${withName}` : `🟡 Ringing (${withName})`
@@ -874,8 +1119,8 @@ export function updateFamilyPresenceBanner() {
 
   const tgConnected = state.connectedMemberIds.includes(activeFamilyMember.id);
   const tgStatus = tgConnected
-    ? `<span class="fam-tg-status-line" style="color:#4ade80;font-size:0.88rem;">✅ Your Telegram alerts are connected</span>`
-    : `<span class="fam-tg-status-line" style="color:#fbbf24;font-size:0.88rem;">⚠️ Tap "1. Connect Telegram" below so Nana can call you</span>`;
+    ? `<span class="fam-tg-status-line" style="color:#4ade80;font-size:0.88rem;">✅ Telegram connected — Nana can call you</span>`
+    : `<span class="fam-tg-status-line" style="color:#93c5fd;font-size:0.86rem;">📞 You can call Nana anytime • Connect Telegram below to also receive calls</span>`;
 
   card.innerHTML = `<div style="font-size:1.05rem;font-weight:900;color:#fef08a;margin-bottom:2px;">${summary.text}</div><span class="fam-touch-batt-line" style="color:#cbd5e1;font-size:0.9rem;">${touchText}${battText}</span>${todayLineHtml}<br>${tgStatus}`;
 
@@ -1069,6 +1314,7 @@ if (role === 'family') {
   onValue(refs.presence, snap => {
     state.presenceSnap = snap.val() || {};
     updateFamilyPresenceBanner();
+    evaluateFamilyBatteryChatAlerts();
   });
   if (isAdminFamilyMember) {
     hooks.onSettingsChanged.push(renderRyanControlsInsights);
@@ -1081,5 +1327,8 @@ if (role === 'family') {
       renderRyanControlsInsights();
     });
   }
-  setInterval(updateFamilyPresenceBanner, 15000);
+  setInterval(() => {
+    updateFamilyPresenceBanner();
+    evaluateFamilyBatteryChatAlerts();
+  }, 15000);
 }
