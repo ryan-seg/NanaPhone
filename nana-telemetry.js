@@ -90,6 +90,58 @@ function ensureCornerStaffAccessBtn() {
 }
 
 // --- 2. TAPPABLE "PLEASE PLUG IN" BANNER (BELOW TOP 62PX BLOCKER) & CARE HOME ("CANFORD") GATE ---
+function positionUnpluggedBannerOverRadioAndVideo() {
+  if (role !== 'nana') return;
+  const banner = $('nana-unplugged-warning-banner');
+  if (!banner || banner.style.display === 'none') return;
+
+  let navSel = '#grid-screen .header-bar';
+  if ($('bulletin-modal')?.style.display === 'flex') navSel = '#bulletin-modal .tg-header';
+  else if ($('radio-screen')?.classList.contains('active')) navSel = '#radio-screen .nana-top-nav';
+  else if ($('video-screen')?.classList.contains('active')) navSel = '#video-screen .nana-top-nav';
+
+  const nav = document.querySelector(navSel);
+  const chatBtn = nav?.querySelector('.chat-pill-x');
+  const radioBtn = nav?.querySelector('.radio-pill-x');
+  const videoBtn = nav?.querySelector('.video-pill-x');
+  const gearBtn = nav?.querySelector('.gear-pill');
+
+  const vw = window.innerWidth || 1024;
+  const chatRect = chatBtn?.getBoundingClientRect();
+  const radioRect = radioBtn?.getBoundingClientRect();
+  const videoRect = videoBtn?.getBoundingClientRect();
+  const gearRect = gearBtn?.getBoundingClientRect();
+  if (!nav || (!(chatRect?.width > 0) && !(radioRect?.width > 0) && !(videoRect?.width > 0))) return;
+
+  const afterChatLeft = (chatRect && chatRect.width > 0) ? Math.ceil(chatRect.right + 8) : Math.round(vw * 0.45);
+  let leftPx = (radioRect && radioRect.width > 0)
+    ? Math.max(afterChatLeft, Math.floor(radioRect.left))
+    : afterChatLeft;
+
+  let rightEdgePx = vw - 10;
+  if (navSel === '#grid-screen .header-bar' && gearRect && gearRect.width > 0) {
+    const beforeGear = Math.floor(gearRect.left - 8);
+    if (beforeGear - leftPx >= 240) rightEdgePx = beforeGear;
+  } else if (videoRect && videoRect.width > 0) {
+    rightEdgePx = Math.max(rightEdgePx, Math.ceil(videoRect.right));
+  }
+
+  rightEdgePx = Math.min(vw - 8, Math.max(leftPx + 180, rightEdgePx));
+  const rightPx = Math.max(8, vw - rightEdgePx);
+
+  const refRect = (radioRect && radioRect.height > 0) ? radioRect : videoRect;
+  const topPx = (refRect && refRect.height > 0) ? Math.max(64, Math.floor(refRect.top - 2)) : 64;
+  const minH = (refRect && refRect.height > 0) ? Math.max(44, Math.ceil(refRect.height + 4)) : 48;
+
+  banner.style.top = `${topPx}px`;
+  banner.style.left = `${leftPx}px`;
+  banner.style.right = `${rightPx}px`;
+  banner.style.transform = 'none';
+  banner.style.width = 'auto';
+  banner.style.maxWidth = 'none';
+  banner.style.minHeight = `${minH}px`;
+}
+
 function ensureUnpluggedWarningBanner() {
   let banner = $('nana-unplugged-warning-banner');
   if (banner) return banner;
@@ -100,31 +152,30 @@ function ensureUnpluggedWarningBanner() {
     'position:fixed',
     'top:64px',
     'left:50%',
-    'transform:translateX(-50%)',
-    'min-height:54px',
+    'right:10px',
+    'min-height:46px',
     'z-index:9995',
     'background:#991b1b',
     'color:#fef08a',
     'border:3px solid #fde047',
-    'border-radius:16px',
-    'padding:6px 14px 6px 16px',
-    'font-size:clamp(1.02rem, 1.85vw, 1.32rem)',
+    'border-radius:14px',
+    'padding:4px 8px 4px 10px',
+    'font-size:clamp(0.78rem, 1.18vw, 1.02rem)',
     'font-weight:900',
+    'line-height:1.15',
     'box-shadow:0 6px 20px rgba(0,0,0,0.85)',
     'display:none',
     'align-items:center',
     'justify-content:center',
-    'gap:10px',
+    'gap:6px',
     'text-align:center',
-    'width:auto',
-    'max-width:96vw',
     'flex-wrap:wrap',
     'pointer-events:auto'
   ].join(';');
   banner.innerHTML = `
-    <span style="font-size:1.55rem;line-height:1;">🔌</span>
-    <span id="nana-unplugged-warning-text">PLEASE PLUG IN THE TABLET CHARGER</span>
-    <button id="nana-banner-staff-btn" type="button" style="pointer-events:auto;background:#1e293b;color:#fff;border:2px solid #fde047;border-radius:11px;padding:7px 12px;font-size:1rem;font-weight:900;cursor:pointer;margin-left:2px;">
+    <span style="font-size:1.15rem;line-height:1;">🔌</span>
+    <span id="nana-unplugged-warning-text">LOW POWER • PLUG IN CHARGER</span>
+    <button id="nana-banner-staff-btn" type="button" style="pointer-events:auto;background:#1e293b;color:#fff;border:2px solid #fde047;border-radius:10px;padding:4px 8px;font-size:0.84rem;font-weight:900;white-space:nowrap;cursor:pointer;margin-left:2px;">
       🏥 Care Home
     </button>
   `;
@@ -133,6 +184,7 @@ function ensureUnpluggedWarningBanner() {
     ev.stopPropagation();
     window.openCareHomeStaffGate();
   });
+  window.addEventListener('resize', positionUnpluggedBannerOverRadioAndVideo);
   return banner;
 }
 
@@ -424,10 +476,12 @@ function syncUnpluggedBannerAndVoice(level, isCharging) {
   const muted = isBatteryVoiceCurrentlyMuted();
   if (txtEl) {
     txtEl.textContent = muted
-      ? `UNPLUGGED • ${level}% • 🔋 LOW POWER • 🔇 MUTED`
-      : `UNPLUGGED (${level}%) • 🔋 LOW POWER • PLUG IN CHARGER`;
+      ? `LOW POWER (${level}%) • UNPLUGGED • 🔇 MUTED`
+      : `LOW POWER (${level}%) • PLUG IN CHARGER`;
   }
   banner.style.display = 'flex';
+  positionUnpluggedBannerOverRadioAndVideo();
+  requestAnimationFrame(positionUnpluggedBannerOverRadioAndVideo);
 
   const shouldSpeak = battThresh > 0 && level <= battThresh && !muted && !NanaCore.isCurrentlyInNightWindow?.();
   if (shouldSpeak) {
@@ -541,6 +595,8 @@ window.addEventListener('pointerdown', () => {
 let lastBroadcastScreenState = '';
 export function broadcastNanaCurrentScreen() {
   if (role !== 'nana') return;
+  positionUnpluggedBannerOverRadioAndVideo();
+  requestAnimationFrame(positionUnpluggedBannerOverRadioAndVideo);
   const videoEl = $('nana-video-el');
   let screenState = 'home';
   const isPlayingVideo = !!(
