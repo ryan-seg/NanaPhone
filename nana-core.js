@@ -77,8 +77,91 @@ const DERIVED_DAILY_ROOM = `NanaPhone_${computedKeyHash.slice(0, 12)}`;
 // --- 3. CONFIGURATION & FAMILY MEMBERS ---
 const mkMember = (id, name, spokenName, av, bg) => ({
   id, name, spokenName, photo: `photos/${id}.jpg`,
-  fallback: `https://ui-avatars.com/api/?name=${av}&size=256&background=${bg}&color=fff&bold=true`
+  fallback: `https://ui-avatars.com/api/?name=${av}&size=256&background=${bg}&color=fff&bold=true`,
+  isBuiltIn: true, hasProfilePhoto: true
 });
+
+export const DEFAULT_FAMILY_MEMBERS = [
+  mkMember("phil", "Phil", "Phil", "Phil", "1d4ed8"),
+  mkMember("nicky-s", "Nicky S", "Nicky", "NS", "be185d"),
+  mkMember("denise", "Denise", "Denise", "Denise", "047857"),
+  mkMember("gill", "Gill", "Gill", "Gill", "b45309"),
+  mkMember("ryan", "Ryan", "Ryan", "Ryan", "4338ca"),
+  mkMember("nicola-p", "Nicola P", "Nicola", "NP", "0e7490"),
+  mkMember("zara", "Zara", "Zara", "Zara", "6d28d9"),
+  mkMember("megan", "Megan", "Megan", "Megan", "be123c")
+];
+
+const BUILTIN_MEMBER_IDS = new Set(DEFAULT_FAMILY_MEMBERS.map(m => m.id));
+const CUSTOM_AVATAR_PALETTE = ["0284c7", "059669", "7c3aed", "d97706", "db2777", "4338ca", "0f766e", "b91c1c"];
+export const makeFallbackAvatarUrl = (name, idHint = '') => {
+  const clean = String(name || idHint || 'Family').trim() || 'Family';
+  let hash = 0;
+  for (let i = 0; i < clean.length; i++) hash = ((hash << 5) - hash + clean.charCodeAt(i)) | 0;
+  const bg = CUSTOM_AVATAR_PALETTE[Math.abs(hash) % CUSTOM_AVATAR_PALETTE.length];
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(clean)}&size=256&background=${bg}&color=fff&bold=true`;
+};
+const prettifyMemberId = (id) => String(id || 'family')
+  .split(/[-_]+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Family';
+
+const CUSTOM_MEMBERS_CACHE_KEY = `nana_family_members_cache_${PORTAL_NODE_ID}_${TEST_MODE ? 'test' : 'live'}`;
+let initialCachedMembersMap = {};
+try {
+  const raw = localStorage.getItem(CUSTOM_MEMBERS_CACHE_KEY);
+  if (raw) {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') initialCachedMembersMap = parsed;
+  }
+} catch (_) {}
+
+function buildResolvedMemberList(overridesMap = {}) {
+  const resolved = DEFAULT_FAMILY_MEMBERS.map(base => {
+    const ov = overridesMap?.[base.id];
+    if (!ov || typeof ov !== 'object') return { ...base };
+    const name = String(ov.name || base.name).trim() || base.name;
+    const spokenName = String(ov.spokenName || ov.name || base.spokenName).trim() || name;
+    const customPhoto = typeof ov.photoDataUrl === 'string' && ov.photoDataUrl.startsWith('data:image/') ? ov.photoDataUrl : null;
+    return {
+      ...base,
+      name,
+      spokenName,
+      photo: customPhoto || base.photo,
+      fallback: customPhoto ? base.fallback : makeFallbackAvatarUrl(name, base.id),
+      isBuiltIn: true,
+      hasProfilePhoto: true,
+      updatedAt: Number(ov.updatedAt || 0)
+    };
+  });
+
+  const customList = Object.entries(overridesMap || {})
+    .map(([k, v]) => ({ key: String(v?.id || k).toLowerCase(), raw: v }))
+    .filter(x => x.raw && typeof x.raw === 'object' && !BUILTIN_MEMBER_IDS.has(x.key))
+    .filter(x => String(x.raw.name || '').trim().length > 0)
+    .sort((a, b) => (Number(a.raw.createdAt || 0) - Number(b.raw.createdAt || 0)) || a.key.localeCompare(b.key));
+
+  customList.forEach(({ key, raw }) => {
+    const name = String(raw.name || prettifyMemberId(key)).trim();
+    const spokenName = String(raw.spokenName || name).trim() || name;
+    const fb = makeFallbackAvatarUrl(name, key);
+    const hasCustomPhoto = typeof raw.photoDataUrl === 'string' && raw.photoDataUrl.startsWith('data:image/');
+    resolved.push({
+      id: key,
+      name,
+      spokenName,
+      photo: hasCustomPhoto ? raw.photoDataUrl : fb,
+      fallback: fb,
+      isBuiltIn: false,
+      isCustom: true,
+      hasProfilePhoto: hasCustomPhoto,
+      createdAt: Number(raw.createdAt || 0),
+      updatedAt: Number(raw.updatedAt || 0)
+    });
+  });
+
+  return resolved;
+}
+
+const initialMembers = buildResolvedMemberList(initialCachedMembersMap);
 
 export const CONFIG = {
   appVersion: APP_VERSION,
@@ -98,21 +181,22 @@ export const CONFIG = {
     return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
   })(),
   firebase: { databaseURL: "https://nanaphone-f644b-default-rtdb.europe-west1.firebasedatabase.app" },
-  familyMembers: [
-    mkMember("phil", "Phil", "Phil", "Phil", "1d4ed8"),
-    mkMember("nicky-s", "Nicky S", "Nicky", "NS", "be185d"),
-    mkMember("denise", "Denise", "Denise", "Denise", "047857"),
-    mkMember("gill", "Gill", "Gill", "Gill", "b45309"),
-    mkMember("ryan", "Ryan", "Ryan", "Ryan", "4338ca"),
-    mkMember("nicola-p", "Nicola P", "Nicola", "NP", "0e7490"),
-    mkMember("zara", "Zara", "Zara", "Zara", "6d28d9"),
-    mkMember("megan", "Megan", "Megan", "Megan", "be123c")
-  ]
+  familyMembers: initialMembers
 };
 
 export const FAMILY_NAMES = Object.fromEntries(CONFIG.familyMembers.map(m => [m.id, m.name]));
-export const activeFamilyMember = CONFIG.familyMembers.find(m => m.id === callerId) || CONFIG.familyMembers[4];
-export const isAdminFamilyMember = (role === 'family' && activeFamilyMember.id === 'ryan');
+const resolveActiveMemberSnapshot = (membersList) => {
+  const match = membersList.find(m => m.id === callerId);
+  if (match) return { ...match };
+  if (params.get('id')) {
+    const pretty = prettifyMemberId(callerId);
+    const fb = makeFallbackAvatarUrl(pretty, callerId);
+    return { id: callerId, name: pretty, spokenName: pretty, photo: fb, fallback: fb, isBuiltIn: false, isCustom: true, hasProfilePhoto: false };
+  }
+  return { ...(membersList.find(m => m.id === 'ryan') || membersList[0]) };
+};
+export const activeFamilyMember = resolveActiveMemberSnapshot(CONFIG.familyMembers);
+export const isAdminFamilyMember = (role === 'family' && callerId === 'ryan');
 
 // --- 4. TEST MODE SANDBOX INTERCEPTOR ---
 if (TEST_MODE) {
@@ -142,6 +226,8 @@ export const refs = {
   settings:         ref(db, `${basePath}/settings`),
   missedCalls:      ref(db, `${basePath}/missedCalls`),
   connectedMembers: ref(db, `${basePath}/connectedMembers`),
+  familyMembers:    ref(db, `${basePath}/familyMembers`),
+  memberLastCallAt: ref(db, `${basePath}/memberLastCallAt`),
   hiddenContacts:   ref(db, `${basePath}/hiddenContacts`),
   callSchedules:    ref(db, `${basePath}/callSchedules`),
   entertainment:    ref(db, `${basePath}/entertainment`),
@@ -151,6 +237,7 @@ export const refs = {
   callBeat:         ref(db, `${basePath}/callBeat`),
   dailyUsage:       ref(db, `${basePath}/dailyUsage`),
   videoIssues:      ref(db, `${basePath}/videoIssues`),
+  alerts:           ref(db, `${basePath}/alerts`),
   reloadCmd:        ref(db, `${basePath}/commands/reloadAt`),
   reloadNanaCmd:    ref(db, `${basePath}/commands/reloadNanaAt`),
   reloadFamilyCmd:  ref(db, `${basePath}/commands/reloadFamilyAt`),
@@ -168,6 +255,7 @@ export const settings = {
   speechRate: 0.9, awakeBrightness: 85, dimBrightness: 15, dimDelaySec: 120,
   nightModeEnabled: true, nightStartHour: 21, nightEndHour: 8, nightBlockCalls: false,
   batteryVoiceMutedUntil: 0, batteryVoiceIntervalMin: 0, batteryVoiceVolume: 85, batteryVoiceThresholdPct: 30,
+  batteryChatAlertsEnabled: true,
   lowPowerModeSetting: 'auto', lowPowerBlockVideo: true, lowPowerMaxBrightness: 50, lowPowerDimDelaySec: 45,
   showBulletinBar: true, showReadAloud: false, colorTheme: 'classic-dark',
   voiceMessagingEnabled: true, voiceMessageMaxSec: 30, nanaMessageEntryMode: 'choice',
@@ -187,6 +275,7 @@ export function askNana(type, question, askedBy, extra = {}) {
 
 export const state = {
   settingsLoaded: false,
+  familyMembersLoaded: false,
   currentState: 'idle',
   isRadioPlaying: false,
   isTabletUnplugged: false,
@@ -197,12 +286,15 @@ export const state = {
   entSnap: { activeKey: 'off', title: 'Off' },
   missedCallsByMember: {},
   connectedMemberIds: [],
+  familyMembersSnap: { ...initialCachedMembersMap },
+  memberLastCallAtSnap: {},
   hiddenSnap: {},
   callSchedulesSnap: {},
   callHistorySnap: {},
   questionHistorySnap: {},
   dailyUsageSnap: {},
   videoIssuesSnap: {},
+  alertsSnap: {},
   streamData: { queue: [], currentIndex: 0, state: "paused", savedTimes: {}, viewCounts: {} },
   familyComposerSilent: false,
   lastActivityOrCallMs: Date.now()
@@ -211,6 +303,7 @@ export const state = {
 export const hooks = {
   onSettingsChanged: [],
   onPowerModeChanged: [],
+  onFamilyMembersChanged: [],
   pauseVideo: null,
   resumeVideo: null,
   syncVideoUI: null,
@@ -267,10 +360,33 @@ export const NanaCore = {
   FAMILY_NAMES, senderName: activeFamilyMember.name,
   basePath, db, refs, settings, state, hooks, audioCtx,
   showScreen, speakMsg, isBatteryVoiceCurrentlyMuted, isLowPowerMode, isVideoBlockedByLowPower, askNana,
+  makeFallbackAvatarUrl,
   isNanaVideoActivelyPlaying: () => false,
   isChatVideoActivelyPlaying: () => false,
   getCurrentQueueItem: () => null
 };
+
+onValue(refs.familyMembers, snap => {
+  const remoteMap = snap.val() || {};
+  state.familyMembersSnap = remoteMap;
+  state.familyMembersLoaded = true;
+  try { localStorage.setItem(CUSTOM_MEMBERS_CACHE_KEY, JSON.stringify(remoteMap)); } catch (_) {}
+
+  const nextMembers = buildResolvedMemberList(remoteMap);
+  CONFIG.familyMembers.splice(0, CONFIG.familyMembers.length, ...nextMembers);
+
+  Object.keys(FAMILY_NAMES).forEach(k => delete FAMILY_NAMES[k]);
+  nextMembers.forEach(m => { FAMILY_NAMES[m.id] = m.name; });
+
+  const resolvedSelf = resolveActiveMemberSnapshot(nextMembers);
+  Object.keys(activeFamilyMember).forEach(k => delete activeFamilyMember[k]);
+  Object.assign(activeFamilyMember, resolvedSelf);
+  NanaCore.senderName = activeFamilyMember.name;
+
+  hooks.onFamilyMembersChanged.forEach(fn => {
+    try { fn(nextMembers, activeFamilyMember); } catch (_) {}
+  });
+});
 
 // --- 7. GLOBAL NAVIGATION & VERSION FOOTER ---
 (function initVersionBadges() {
