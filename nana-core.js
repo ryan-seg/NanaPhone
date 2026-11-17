@@ -386,6 +386,7 @@ onValue(refs.familyMembers, snap => {
   hooks.onFamilyMembersChanged.forEach(fn => {
     try { fn(nextMembers, activeFamilyMember); } catch (_) {}
   });
+  if (TEST_MODE) set(refs.connectedMembers, nextMembers.map(m => m.id)).catch(() => {});
 });
 
 // --- 7. GLOBAL NAVIGATION & VERSION FOOTER ---
