@@ -229,12 +229,19 @@ function renderMissedCallsBanner() {
   banner.style.display = 'flex';
 }
 
+let lastContactsRenderSig = null;
 export function renderContacts(connectedList = []) {
   const grid = $('family-grid');
   if (!grid) return;
-  grid.innerHTML = "";
   const connected = CONFIG.familyMembers.filter(m => connectedList.includes(m.id));
   const display = connected.filter(m => !isHiddenFromNana(m.id)).slice(0, 8);
+  const sig = display.length
+    ? display.map(m => `${m.id}:${Number(state.missedCallsByMember[m.id]?.count) || 0}`).join('|')
+    : `empty:${connected.length}`;
+  if (sig === lastContactsRenderSig && grid.children.length > 0) return;
+  lastContactsRenderSig = sig;
+
+  grid.innerHTML = "";
   if (!display.length) {
     grid.innerHTML = connected.length
       ? `<div style="grid-column:1/-1;grid-row:1/-1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:1.8rem;font-weight:700;padding:20px;">😴 Nobody is available to call right now.<br>Try again later or send a Family Chat message.</div>`
@@ -633,7 +640,14 @@ document.addEventListener('pointerdown', () => {
   if (audioCtx?.state === 'suspended') audioCtx.resume().catch(() => {});
   ['remote-audio', 'remote-video'].forEach(id => {
     const el = $(id);
-    if (el?.srcObject && el.paused) el.play().catch(() => {});
+    if (el?.srcObject && el.paused) {
+      el.play().then(() => {
+        if (id === 'remote-audio') {
+          const b = $('call-connecting-banner');
+          if (b && b.innerText.includes('Touch the screen to hear')) b.style.display = 'none';
+        }
+      }).catch(() => {});
+    }
   });
 }, { passive: true });
 
@@ -1426,7 +1440,12 @@ if (role === 'family') {
   renderContacts(state.connectedMemberIds);
   window.syncConnectedFamilyFromTelegram();
   showScreen('grid-screen');
-  setInterval(updateClock, 10000);
+  let clockTickCount = 0;
+  setInterval(() => {
+    clockTickCount++;
+    if (NanaCore.isLowPowerMode() && clockTickCount % 3 !== 0) return;
+    updateClock();
+  }, 10000);
   updateClock();
   window.wakeScreenAndResetDimTimer?.();
 }
