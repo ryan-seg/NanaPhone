@@ -1194,24 +1194,29 @@ function showFamilyUpdatePromptModal() {
     }
   };
 
-  onValue(refs.reloadCmd, snap => {
-    const val = Number(snap.val() || 0);
-    if (!val) return;
-    const storageKey = `nana_last_reload_cmd_${role}`;
-    const last = localStorage.getItem(storageKey);
-    localStorage.setItem(storageKey, String(val));
+  const watchReloadRef = (targetRef, storagePrefix) => {
+    onValue(targetRef, snap => {
+      const val = Number(snap.val() || 0);
+      if (!val) return;
+      const storageKey = `${storagePrefix}_${role}`;
+      const last = localStorage.getItem(storageKey);
+      localStorage.setItem(storageKey, String(val));
 
-    if (last !== null && val > Number(last)) {
-      reloadPending = true;
-      tryReload();
-    } else if (last === null && (Date.now() - val < 3600 * 1000)) {
-      const lastBust = Number(new URLSearchParams(window.location.search).get('u') || 0);
-      if (val > lastBust + 10000) {
+      if (last !== null && val > Number(last)) {
         reloadPending = true;
         tryReload();
+      } else if (last === null && (Date.now() - val < 3600 * 1000)) {
+        const lastBust = Number(new URLSearchParams(window.location.search).get('u') || 0);
+        if (val > lastBust + 10000) {
+          reloadPending = true;
+          tryReload();
+        }
       }
-    }
-  });
+    });
+  };
+
+  watchReloadRef(role === 'nana' ? refs.reloadNanaCmd : refs.reloadFamilyCmd, role === 'nana' ? 'nana_last_reload_nana' : 'nana_last_reload_family');
+  watchReloadRef(refs.reloadCmd, 'nana_last_reload_cmd');
   setInterval(tryReload, 5000);
 
   // Quiet nightly maintenance reload around 4:00 AM on Nana's tablet
