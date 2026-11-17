@@ -13,7 +13,13 @@ let cachedIsCharging = null;
 
 // --- 1. TOP 62PX NO-TOUCH ORIENTATION BANNER & DISCREET STAFF BUTTON ---
 if (role === 'nana') {
-  const updateTopOrientationBanner = () => {
+  let lastOrientationBannerText = '';
+  let lastOrientationTickMs = 0;
+  const updateTopOrientationBanner = (force = false) => {
+    const nowMs = Date.now();
+    if (!force && NanaCore.isLowPowerMode?.() && (nowMs - lastOrientationTickMs < 29000)) return;
+    lastOrientationTickMs = nowMs;
+
     const topBar = $('nana-top-orientation-bar');
     if (!topBar) return;
     const now = new Date();
@@ -27,12 +33,16 @@ if (role === 'nana') {
     const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
     const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase();
 
-    topBar.textContent = `${period} • ${dayName} ${dateStr} • ${timeStr}`;
+    const nextText = `${period} • ${dayName} ${dateStr} • ${timeStr}`;
+    if (nextText !== lastOrientationBannerText) {
+      lastOrientationBannerText = nextText;
+      topBar.textContent = nextText;
+    }
     ensureCornerStaffAccessBtn();
   };
 
-  updateTopOrientationBanner();
-  setInterval(updateTopOrientationBanner, 10000);
+  updateTopOrientationBanner(true);
+  setInterval(() => updateTopOrientationBanner(false), 10000);
 }
 
 // Discreet "🏥 Staff" button placed inside the tappable header bar (below the top 52px/62px kiosk touch-blocker)
@@ -97,24 +107,24 @@ function ensureUnpluggedWarningBanner() {
     'color:#fef08a',
     'border:3px solid #fde047',
     'border-radius:16px',
-    'padding:6px 16px 6px 20px',
-    'font-size:1.35rem',
+    'padding:6px 14px 6px 16px',
+    'font-size:clamp(1.02rem, 1.85vw, 1.32rem)',
     'font-weight:900',
     'box-shadow:0 6px 20px rgba(0,0,0,0.85)',
     'display:none',
     'align-items:center',
     'justify-content:center',
-    'gap:14px',
+    'gap:10px',
     'text-align:center',
     'width:auto',
     'max-width:96vw',
-    'white-space:nowrap',
+    'flex-wrap:wrap',
     'pointer-events:auto'
   ].join(';');
   banner.innerHTML = `
-    <span style="font-size:1.7rem;line-height:1;">🔌</span>
+    <span style="font-size:1.55rem;line-height:1;">🔌</span>
     <span id="nana-unplugged-warning-text">PLEASE PLUG IN THE TABLET CHARGER</span>
-    <button id="nana-banner-staff-btn" type="button" style="pointer-events:auto;background:#1e293b;color:#fff;border:2px solid #fde047;border-radius:11px;padding:8px 14px;font-size:1.05rem;font-weight:900;cursor:pointer;margin-left:4px;">
+    <button id="nana-banner-staff-btn" type="button" style="pointer-events:auto;background:#1e293b;color:#fff;border:2px solid #fde047;border-radius:11px;padding:7px 12px;font-size:1rem;font-weight:900;cursor:pointer;margin-left:2px;">
       🏥 Care Home
     </button>
   `;
@@ -381,8 +391,25 @@ window.muteBatteryVoiceForMinutesCareHome = async (minutes) => {
   await update(refs.settings, { batteryVoiceMutedUntil: mutedUntil }).catch(() => {});
 };
 
+let lastPowerModeNotified = null;
+
+function applyPowerModeFromChargingState(isCharging, level) {
+  if (role !== 'nana') return;
+  const nextUnplugged = (isCharging === false);
+  const changed = (state.isTabletUnplugged !== nextUnplugged) || (lastPowerModeNotified !== nextUnplugged);
+  state.isTabletUnplugged = nextUnplugged;
+  document.body.classList.toggle('low-power-mode', NanaCore.isLowPowerMode());
+  if (changed) {
+    lastPowerModeNotified = nextUnplugged;
+    hooks.onPowerModeChanged.forEach(fn => {
+      try { fn(nextUnplugged, level); } catch (_) {}
+    });
+  }
+}
+
 function syncUnpluggedBannerAndVoice(level, isCharging) {
   if (role !== 'nana') return;
+  applyPowerModeFromChargingState(isCharging, level);
   const banner = ensureUnpluggedWarningBanner();
   const txtEl = $('nana-unplugged-warning-text');
   const rawThresh = Number(settings.batteryVoiceThresholdPct ?? 30);
@@ -397,8 +424,8 @@ function syncUnpluggedBannerAndVoice(level, isCharging) {
   const muted = isBatteryVoiceCurrentlyMuted();
   if (txtEl) {
     txtEl.textContent = muted
-      ? `UNPLUGGED • ${level}% • 🔇 MUTED`
-      : `UNPLUGGED • PLEASE PLUG IN CHARGER (${level}%)`;
+      ? `UNPLUGGED • ${level}% • 🔋 LOW POWER • 🔇 MUTED`
+      : `UNPLUGGED (${level}%) • 🔋 LOW POWER • PLUG IN CHARGER`;
   }
   banner.style.display = 'flex';
 
@@ -409,19 +436,36 @@ function syncUnpluggedBannerAndVoice(level, isCharging) {
 }
 hooks.syncBatteryUI = () => syncUnpluggedBannerAndVoice(cachedBatteryLevel, cachedIsCharging);
 
+function refreshCachedBatteryValues() {
+  if (window.AndroidBridge?.getBatteryStatusJson) {
+    try {
+      const b = JSON.parse(window.AndroidBridge.getBatteryStatusJson());
+      if (typeof b.level === 'number') {
+        cachedBatteryLevel = b.level;
+        cachedIsCharging = !!b.charging;
+        return;
+      }
+    } catch (_) {}
+  }
+  if (webBatteryObj && typeof webBatteryObj.level === 'number' && !Number.isNaN(webBatteryObj.level)) {
+    cachedBatteryLevel = Math.round(webBatteryObj.level * 100);
+    cachedIsCharging = !!webBatteryObj.charging;
+  }
+}
+
 // Initialize Chromium's native navigator.getBattery() for instant hardware events & real readings
 if (role === 'nana' && navigator.getBattery) {
   navigator.getBattery().then(bm => {
     webBatteryObj = bm;
     const onBattChange = () => {
-      cachedBatteryLevel = Math.round((bm.level ?? 1) * 100);
-      cachedIsCharging = !!bm.charging;
+      refreshCachedBatteryValues();
       syncUnpluggedBannerAndVoice(cachedBatteryLevel, cachedIsCharging);
       update(refs.presence, {
         online: true,
         lastPing: Date.now(),
         batteryLevel: cachedBatteryLevel,
-        isCharging: cachedIsCharging
+        isCharging: cachedIsCharging,
+        lowPowerMode: NanaCore.isLowPowerMode()
       }).catch(() => {});
     };
     bm.addEventListener('chargingchange', onBattChange);
@@ -431,19 +475,7 @@ if (role === 'nana' && navigator.getBattery) {
 }
 
 export function readTabletBatteryStatus() {
-  if (webBatteryObj && typeof webBatteryObj.level === 'number' && !Number.isNaN(webBatteryObj.level)) {
-    cachedBatteryLevel = Math.round(webBatteryObj.level * 100);
-    cachedIsCharging = !!webBatteryObj.charging;
-  } else if (window.AndroidBridge?.getBatteryStatusJson) {
-    try {
-      const b = JSON.parse(window.AndroidBridge.getBatteryStatusJson());
-      if (typeof b.level === 'number') {
-        cachedBatteryLevel = b.level;
-        cachedIsCharging = !!b.charging;
-      }
-    } catch (_) {}
-  }
-
+  refreshCachedBatteryValues();
   syncUnpluggedBannerAndVoice(cachedBatteryLevel, cachedIsCharging);
   return { batteryLevel: cachedBatteryLevel, isCharging: cachedIsCharging };
 }
@@ -452,7 +484,8 @@ export function recordTouchActivity(customActivity = null) {
   state.lastActivityOrCallMs = Date.now();
   if (role !== 'nana') return;
   const now = Date.now();
-  if (!customActivity && (now - lastTouchWriteMs < 15000)) return;
+  const minGapMs = NanaCore.isLowPowerMode() ? 30000 : 15000;
+  if (!customActivity && (now - lastTouchWriteMs < minGapMs)) return;
   lastTouchWriteMs = now;
   const { batteryLevel, isCharging } = readTabletBatteryStatus();
   const payload = {
@@ -463,23 +496,32 @@ export function recordTouchActivity(customActivity = null) {
     lastActive: now,
     lastPing: now,
     batteryLevel,
-    isCharging
+    isCharging,
+    lowPowerMode: NanaCore.isLowPowerMode()
   };
   if (customActivity) payload.lastActivity = customActivity;
   update(refs.presence, payload).catch(() => {});
 }
 NanaCore.recordTouchActivity = recordTouchActivity;
 
-function recordBackgroundHeartbeat() {
+let lastHeartbeatWriteMs = 0;
+function recordBackgroundHeartbeat(force = false) {
   if (role !== 'nana') return;
   const { batteryLevel, isCharging } = readTabletBatteryStatus();
+  const now = Date.now();
+  // In Low Power Mode write every ~50s (safely under the 75s offline threshold) instead of every 20s
+  const minHeartbeatGapMs = NanaCore.isLowPowerMode() ? 48000 : 18000;
+  if (!force && (now - lastHeartbeatWriteMs < minHeartbeatGapMs)) return;
+  lastHeartbeatWriteMs = now;
+
   const isHidden = document.visibilityState === 'hidden';
   const payload = {
     online: true,
     appState: isHidden ? 'backgrounded' : 'foreground',
-    lastPing: Date.now(),
+    lastPing: now,
     batteryLevel,
-    isCharging
+    isCharging,
+    lowPowerMode: NanaCore.isLowPowerMode()
   };
   if (!isHidden) payload.lastExitHint = 'active_in_app';
   update(refs.presence, payload).catch(() => {});
@@ -598,11 +640,16 @@ if (role === 'nana') {
   setTimeout(() => {
     ensureCornerStaffAccessBtn();
     window.wakeScreenAndResetDimTimer?.();
-    recordBackgroundHeartbeat();
+    recordBackgroundHeartbeat(true);
     broadcastNanaCurrentScreen();
   }, 2000);
-  setInterval(recordBackgroundHeartbeat, 20000);
-  setInterval(broadcastNanaCurrentScreen, 10000);
+  setInterval(() => recordBackgroundHeartbeat(false), 20000);
+  let screenTickCount = 0;
+  setInterval(() => {
+    screenTickCount++;
+    if (NanaCore.isLowPowerMode() && screenTickCount % 3 !== 0) return;
+    broadcastNanaCurrentScreen();
+  }, 10000);
 }
 
 // --- 4. TODAY'S CONNECTED CALLS BANNER (NEVER SHOWS MISSED CALLS) ---
@@ -621,21 +668,28 @@ export function getTodaysCompletedCallsList() {
     .sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
 }
 
+let lastCallsRenderSig = null;
 export function renderTodaysCallsBanner() {
   const banner = $('todays-calls-reassurance-banner');
   const chipsBox = $('todays-calls-chips-container');
   if (!banner || !chipsBox) return;
 
   if (settings.showTodaysCallsBanner === false) {
+    lastCallsRenderSig = 'hidden';
     banner.style.display = 'none';
     return;
   }
 
   const callsToday = getTodaysCompletedCallsList();
   if (!callsToday.length) {
+    lastCallsRenderSig = 'empty';
     banner.style.display = 'none';
     return;
   }
+
+  const sig = callsToday.map(c => `${c.partnerId || ''}_${c.startedAt || 0}_${c.durationSec || 0}`).join('|');
+  if (sig === lastCallsRenderSig && banner.style.display === 'flex') return;
+  lastCallsRenderSig = sig;
 
   chipsBox.innerHTML = '';
   callsToday.forEach(c => {
@@ -739,8 +793,9 @@ export function updateFamilyPresenceBanner() {
 
   const lastTouchTs = p.lastTouched || p.lastActive || null;
   const touchText = `👆 Last touched: ${formatDurationAgo(lastTouchTs)}`;
+  const lpLabel = (p.lowPowerMode || p.isCharging === false) ? ' • 🔋 Low Power Mode' : '';
   const battText = p.batteryLevel != null
-    ? ` • ${p.isCharging ? "🔌 Charging" : "⚠️ UNPLUGGED"} (${p.batteryLevel}%)`
+    ? ` • ${p.isCharging ? "🔌 Charging" : "⚠️ UNPLUGGED"} (${p.batteryLevel}%)${lpLabel}`
     : "";
 
   const callsToday = getTodaysCompletedCallsList();
@@ -771,6 +826,7 @@ export function updateFamilyPresenceBanner() {
       ringBtn.disabled = !settings.callingEnabled;
     }
   }
+  hooks.updateFamilyVideoStatus?.();
 }
 hooks.refreshFamilyPresence = updateFamilyPresenceBanner;
 
@@ -805,7 +861,7 @@ function renderRyanControlsInsights() {
   if (!card) {
     card = document.createElement('div');
     card.id = 'ryan-media-insights-card';
-    card.className = 'admin-card';
+    card.className = 'settings-card';
     card.style.marginBottom = '10px';
     mount.prepend(card);
   }
@@ -865,6 +921,7 @@ if (role === 'nana') {
   let lastUsageTickMs = Date.now();
   let lastTrackedVideoTime = -1;
   let lastFlushMs = Date.now();
+  let lpUsageTick = 0;
 
   const flushDailyUsage = () => {
     const addV = Math.floor(pendingVideoSec);
@@ -894,13 +951,22 @@ if (role === 'nana') {
   };
 
   setInterval(() => {
+    const lowPower = NanaCore.isLowPowerMode();
+    if (lowPower) {
+      lpUsageTick++;
+      if (lpUsageTick % 5 !== 0) return;
+    } else {
+      lpUsageTick = 0;
+    }
+
     const now = Date.now();
-    const dtSec = Math.min(5, Math.max(0, (now - lastUsageTickMs) / 1000));
+    const dtSec = Math.min(lowPower ? 12 : 5, Math.max(0, (now - lastUsageTickMs) / 1000));
     lastUsageTickMs = now;
     const inCall = !!(state.currentState && state.currentState !== 'idle');
 
     const videoEl = $('nana-video-el');
     const videoPlaying = !!(
+      !lowPower &&
       !inCall &&
       $('video-screen')?.classList.contains('active') &&
       videoEl && !videoEl.paused && !videoEl.ended && videoEl.readyState >= 2
@@ -924,7 +990,8 @@ if (role === 'nana') {
       pendingRadioSec += dtSec;
     }
 
-    if (now - lastFlushMs >= 30000) {
+    const flushGapMs = lowPower ? 120000 : 30000;
+    if (now - lastFlushMs >= flushGapMs) {
       lastFlushMs = now;
       flushDailyUsage();
     }
