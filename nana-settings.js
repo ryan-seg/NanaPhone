@@ -207,23 +207,47 @@ const fmtDelay = (sec) => {
 // --- 2. BRIGHTNESS, NIGHT MODE & CLOCK ---
 let lastAppliedBrightnessPct = null;
 let lastAppliedInCallState = null;
+let lastAppliedDimDelaySec = null;
+let isScreenDimmed = false;
 
-export function applyScreenBrightness(targetPercent) {
+function getEffectiveDimDelaySec() {
+  const raw = Number(settings.dimDelaySec ?? 120);
+  if (NanaCore.isLowPowerMode?.()) {
+    return raw > 0 ? Math.min(raw, 45) : 45;
+  }
+  return raw;
+}
+
+export function applyScreenBrightness(targetPercent, dimmed = false) {
   if (role !== 'nana') return;
   const inCallOrRinging = !!(state.currentState && state.currentState !== 'idle');
-  const pct = inCallOrRinging ? 100 : Math.max(5, Math.min(100, Number(targetPercent) || 85));
+  const isLP = !!NanaCore.isLowPowerMode?.();
+  isScreenDimmed = !inCallOrRinging && !!dimmed;
+
+  let effectiveTarget = Number(targetPercent);
+  if (!Number.isFinite(effectiveTarget)) effectiveTarget = dimmed ? 15 : 85;
+  if (!inCallOrRinging && isLP) {
+    effectiveTarget = dimmed ? Math.min(effectiveTarget, 5) : Math.min(effectiveTarget, 50);
+  }
+  const pct = inCallOrRinging ? 100 : Math.max(5, Math.min(100, effectiveTarget));
+
+  document.body.classList.toggle('screen-dimmed', isScreenDimmed);
   const overlay = $('brightness-overlay');
   if (overlay) {
-    overlay.style.opacity = inCallOrRinging ? '0' : Math.max(0, Math.min(0.88, (100 - pct) / 105)).toFixed(2);
-    overlay.style.pointerEvents = (!inCallOrRinging && pct < (settings.awakeBrightness ?? 85)) ? 'auto' : 'none';
+    overlay.style.opacity = inCallOrRinging ? '0' : Math.max(0, Math.min(0.90, (100 - pct) / 105)).toFixed(2);
+    overlay.style.pointerEvents = isScreenDimmed ? 'auto' : 'none';
   }
-  if (pct !== lastAppliedBrightnessPct || inCallOrRinging !== lastAppliedInCallState) {
+
+  const effectiveDelay = getEffectiveDimDelaySec();
+  if (pct !== lastAppliedBrightnessPct || inCallOrRinging !== lastAppliedInCallState || effectiveDelay !== lastAppliedDimDelaySec) {
     lastAppliedBrightnessPct = pct;
     lastAppliedInCallState = inCallOrRinging;
+    lastAppliedDimDelaySec = effectiveDelay;
+    // MainActivity.AndroidBridge.updateTabletHardwareSettings(volumePct, brightnessPct, dimDelaySec, speechRate)
     window.AndroidBridge?.updateTabletHardwareSettings?.(
-      pct,
       100,
-      Number(settings.dimDelaySec ?? 120),
+      pct,
+      effectiveDelay,
       Number(settings.speechRate ?? 0.9)
     );
   }
@@ -231,23 +255,31 @@ export function applyScreenBrightness(targetPercent) {
 
 window.wakeScreenAndResetDimTimer = function () {
   if (role !== 'nana') return;
-  if (state.currentState === 'ringing_nana') {
-    applyScreenBrightness(100);
+  if (state.currentState === 'ringing_nana' || (state.currentState && state.currentState !== 'idle')) {
+    applyScreenBrightness(100, false);
     clearTimeout(idleDimTimer);
     return;
   }
-  applyScreenBrightness(settings.awakeBrightness ?? 85);
+  applyScreenBrightness(settings.awakeBrightness ?? 85, false);
   clearTimeout(idleDimTimer);
-  const delaySec = Number(settings.dimDelaySec ?? 120);
-  if (delaySec > 0 && state.currentState === 'idle' && !NanaCore.isNanaVideoActivelyPlaying()) {
+  const delaySec = getEffectiveDimDelaySec();
+  const anyVideoPlaying = () => !!(NanaCore.isNanaVideoActivelyPlaying?.() || NanaCore.isChatVideoActivelyPlaying?.());
+  if (delaySec > 0 && state.currentState === 'idle' && !anyVideoPlaying()) {
     idleDimTimer = setTimeout(() => {
-      if (state.currentState === 'idle' && !NanaCore.isNanaVideoActivelyPlaying()) {
+      if (state.currentState === 'idle' && !anyVideoPlaying()) {
         window.closeSeniorKeyboard?.(true);
-        applyScreenBrightness(settings.dimBrightness ?? 15);
+        const dimTarget = NanaCore.isLowPowerMode?.() ? 5 : (settings.dimBrightness ?? 15);
+        applyScreenBrightness(dimTarget, true);
       }
     }, delaySec * 1000);
   }
 };
+
+hooks.onPowerModeChanged.push(() => {
+  if (role === 'nana') {
+    window.wakeScreenAndResetDimTimer?.();
+  }
+});
 
 export function isCurrentlyInNightWindow() {
   if (!settings.nightModeEnabled) return false;
@@ -257,21 +289,31 @@ export function isCurrentlyInNightWindow() {
 }
 NanaCore.isCurrentlyInNightWindow = isCurrentlyInNightWindow;
 
+let lastClockText = '';
+let lastNightDimDisplay = '';
 export function updateClock() {
   const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if ($('clock')) $('clock').innerText = t;
-  if ($('night-clock')) $('night-clock').innerText = t;
+  if (t !== lastClockText) {
+    lastClockText = t;
+    if ($('night-clock')) $('night-clock').innerText = t;
+  }
   if ($('night-dimmer')) {
-    const showNight = isCurrentlyInNightWindow() && state.currentState === 'idle' && !NanaCore.isNanaVideoActivelyPlaying() && Date.now() > nightDismissedUntilMs;
-    $('night-dimmer').style.display = showNight ? 'flex' : 'none';
+    const anyVideoPlaying = !!(NanaCore.isNanaVideoActivelyPlaying?.() || NanaCore.isChatVideoActivelyPlaying?.());
+    const showNight = isCurrentlyInNightWindow() && state.currentState === 'idle' && !anyVideoPlaying && Date.now() > nightDismissedUntilMs;
+    const disp = showNight ? 'flex' : 'none';
+    if (disp !== lastNightDimDisplay) {
+      lastNightDimDisplay = disp;
+      $('night-dimmer').style.display = disp;
+    }
   }
 }
 
 window.wakeFromNightMode = () => {
   nightDismissedUntilMs = Date.now() + 15 * 60 * 1000;
+  lastNightDimDisplay = 'none';
   if ($('night-dimmer')) $('night-dimmer').style.display = 'none';
   if (state.currentState === 'ringing_nana') {
-    applyScreenBrightness(100);
+    applyScreenBrightness(100, false);
     return;
   }
   window.wakeScreenAndResetDimTimer();
@@ -308,6 +350,7 @@ window.muteBatteryVoiceForHours = async (hours) => {
 };
 
 window.announceBatteryWarning = (levelOrText) => {
+  if (state.currentState && state.currentState !== 'idle') return;
   if (isBatteryVoiceCurrentlyMuted() || isCurrentlyInNightWindow()) return;
 
   const isNumericLevel = typeof levelOrText === 'number' && !Number.isNaN(levelOrText);
@@ -471,7 +514,8 @@ export function refreshSettingsUI() {
   const ringBtn = $('family-ring-btn');
   if (ringBtn) {
     ringBtn.innerText = callingOn ? '📹 Ring Nana Now' : '📵 Calling is switched off';
-    if (!callingOn) ringBtn.disabled = true;
+    const busyOtherCall = !!(state.callSnap?.status && state.callSnap.status !== 'idle');
+    ringBtn.disabled = !callingOn || busyOtherCall;
   }
 
   const theme = settings.colorTheme || 'classic-dark';
@@ -682,7 +726,6 @@ onValue(refs.callSchedules, snap => {
 setInterval(() => {
   if (role === 'nana') {
     hooks.renderContacts?.(state.connectedMemberIds);
-    updateClock();
   } else {
     refreshHideUI();
   }
