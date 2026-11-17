@@ -90,8 +90,12 @@ const fmtDelay = (sec) => {
       </div>
     </div>
     <div class="settings-card">
-      <div class="settings-label"><span>🔄 Refresh Nana's Tablet & Prompt Family Devices</span></div>
-      <div class="opt-row"><button class="opt-btn" id="remote-refresh-btn" onclick="requestTabletReload()">🔄 Refresh Nana & Prompt Family Now</button></div>
+      <div class="settings-label"><span>🔄 Refresh Nana's Tablet &amp; Prompt Family Devices</span></div>
+      <div class="settings-sub" style="margin-bottom:6px;">Refresh Nana's tablet or prompt family members' browsers independently.</div>
+      <div class="opt-row">
+        <button class="opt-btn" id="remote-refresh-nana-btn" onclick="requestNanaReload()">🔄 Refresh Nana's Tablet</button>
+        <button class="opt-btn" id="remote-refresh-family-btn" onclick="requestFamilyReload()">📱 Prompt Family Update</button>
+      </div>
     </div>
     <div class="settings-card">
       <div class="settings-label"><span>🎨 High-Contrast Visibility Theme</span></div>
@@ -122,6 +126,18 @@ const fmtDelay = (sec) => {
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('radioVolume', [[25,'25%'],[45,'45%'],[60,'60%'],[75,'75%'],[90,'90%'],[100,'100%']])}</div>
       <div class="settings-sub" style="margin-bottom:4px;">🔔 Incoming Call Ringing Volume:</div>
       <div class="opt-row">${optBtns('ringVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
+    </div>
+    <div class="settings-card">
+      <div class="settings-label"><span>⚡ Nana's Low Power Mode Controls</span><span class="lbl-lowpower-summary" style="color:#38bdf8;font-size:0.9rem;">Auto</span></div>
+      <div class="settings-sub" style="margin-bottom:6px;">Lowers brightness, dims sooner, reduces background updates, and skips Radio/Video prompts (Unread Family Chat prompts stay active).</div>
+      <div class="settings-sub" style="margin-bottom:4px;">Activation Mode:</div>
+      <div class="opt-row" style="margin-bottom:8px;">${optBtns('lowPowerModeSetting', [['auto','🔋 Auto (Unplugged)'],['on','⚡ Force ON'],['off','🔌 Off']])}</div>
+      <div class="settings-sub" style="margin-bottom:4px;">Video Playback in Low Power Mode:</div>
+      <div class="opt-row" style="margin-bottom:8px;">${optBtns('lowPowerBlockVideo', [[true,'🚫 Block Videos'],[false,'🎬 Allow Videos']])}</div>
+      <div class="settings-sub" style="margin-bottom:4px;">Max Awake Brightness in Low Power Mode:</div>
+      <div class="opt-row" style="margin-bottom:8px;">${optBtns('lowPowerMaxBrightness', [[30,'30%'],[40,'40%'],[50,'50%'],[70,'70%']])}</div>
+      <div class="settings-sub" style="margin-bottom:4px;">Dim Screen After Inactivity in Low Power Mode:</div>
+      <div class="opt-row">${optBtns('lowPowerDimDelaySec', [[20,'20s'],[30,'30s'],[45,'45s'],[60,'1m']])}</div>
     </div>
     <div class="settings-card">
       <div class="settings-label"><span>🔋 Battery Unplugged Banner & Voice Alerts</span><span class="lbl-battery-summary" style="color:#38bdf8;font-size:0.92rem;"></span></div>
@@ -160,6 +176,8 @@ const fmtDelay = (sec) => {
       <div class="opt-row" style="margin-bottom:6px;">${optBtns('showReadAloud', [[false,'🙈 Hide "Read Aloud"'],[true,'🔊 Show "Read Aloud"']])}</div>
       <div class="settings-sub" style="margin-bottom:4px;">🎙️ Voice Messaging (Listen to Telegram voice notes &amp; let Nana speak replies):</div>
       <div class="opt-row" style="margin-bottom:6px;">${optBtns('voiceMessagingEnabled', [[true,'🎙️ Voice Messaging ON'],[false,'🚫 Off (Text Only)']])}</div>
+      <div class="settings-sub" style="margin-bottom:4px;">💬 Tapping Message Box on Nana's Tablet Opens:</div>
+      <div class="opt-row" style="margin-bottom:6px;">${optBtns('nanaMessageEntryMode', [['choice','💬 Choice Screen'],['keyboard','⌨️ Keyboard'],['voice','🎙️ Voice Message']])}</div>
       <div class="settings-sub" style="margin-bottom:4px;">⏱️ Voice Recording Max Time (auto-sends at 0):</div>
       <div class="opt-row">${optBtns('voiceMessageMaxSec', [[15,'15s'],[20,'20s'],[30,'30s'],[45,'45s'],[60,'60s']])}</div>
     </div>
@@ -183,7 +201,7 @@ const fmtDelay = (sec) => {
         <span>💚 Today's Calls Memory Banner & Scheduled Prompts</span>
         <span id="lbl-periodic-summary" style="color:#38bdf8;font-size:0.88rem;">Active</span>
       </div>
-      <div class="settings-sub">Reassures Nana with a summary of who she has spoken to today, and offers scheduled entertainment prompts (supports on-the-hour and half-past times).</div>
+      <div class="settings-sub">Reassures Nana with a summary of who she has spoken to today, and offers scheduled entertainment prompts (in Low Power Mode, Radio &amp; Video prompts stay off while Unread Chat reminders remain active).</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('showTodaysCallsBanner', [[true,"💚 Show Today's Calls Banner"],[false,"🙈 Hide Today's Calls Banner"]])}</div>
       <div class="opt-row" style="margin-bottom:8px;">${optBtns('periodicPopupsEnabled', [[true,'✅ Scheduled Pop-Ups ON'],[false,'🔕 Scheduled Pop-Ups OFF']])}</div>
       <div class="settings-sub" style="margin-bottom:4px;">🎻 Classic FM Radio Prompt Times (Tap times to toggle on/off):</div>
@@ -213,7 +231,8 @@ let isScreenDimmed = false;
 function getEffectiveDimDelaySec() {
   const raw = Number(settings.dimDelaySec ?? 120);
   if (NanaCore.isLowPowerMode?.()) {
-    return raw > 0 ? Math.min(raw, 45) : 45;
+    const lpCap = Number(settings.lowPowerDimDelaySec ?? 45);
+    return raw > 0 ? Math.min(raw, lpCap) : lpCap;
   }
   return raw;
 }
@@ -227,7 +246,8 @@ export function applyScreenBrightness(targetPercent, dimmed = false) {
   let effectiveTarget = Number(targetPercent);
   if (!Number.isFinite(effectiveTarget)) effectiveTarget = dimmed ? 15 : 85;
   if (!inCallOrRinging && isLP) {
-    effectiveTarget = dimmed ? Math.min(effectiveTarget, 5) : Math.min(effectiveTarget, 50);
+    const lpMaxAwake = Math.max(20, Math.min(100, Number(settings.lowPowerMaxBrightness ?? 50)));
+    effectiveTarget = dimmed ? Math.min(effectiveTarget, 5) : Math.min(effectiveTarget, lpMaxAwake);
   }
   const pct = inCallOrRinging ? 100 : Math.max(5, Math.min(100, effectiveTarget));
 
@@ -491,14 +511,24 @@ window.copyTestLink = async (kind) => {
   catch (_) { window.prompt('Copy link:', link); }
 };
 
-window.requestTabletReload = async () => {
-  const b = $('remote-refresh-btn');
+window.requestNanaReload = async () => {
+  const b = $('remote-refresh-nana-btn');
   try {
     await set(refs.callState, { status: 'idle', timestamp: Date.now() });
-    await set(refs.reloadCmd, Date.now());
-    if (b) { b.innerText = '✅ Sent to Nana & Family!'; setTimeout(() => { b.innerText = '🔄 Refresh Nana & Prompt Family Now'; }, 3000); }
+    await set(refs.reloadNanaCmd, Date.now());
+    if (b) { b.innerText = '✅ Refreshed Nana!'; setTimeout(() => { b.innerText = "🔄 Refresh Nana's Tablet"; }, 3000); }
   } catch (_) {}
 };
+
+window.requestFamilyReload = async () => {
+  const b = $('remote-refresh-family-btn');
+  try {
+    await set(refs.reloadFamilyCmd, Date.now());
+    if (b) { b.innerText = '✅ Prompted Family!'; setTimeout(() => { b.innerText = '📱 Prompt Family Update'; }, 3000); }
+  } catch (_) {}
+};
+
+window.requestTabletReload = window.requestNanaReload;
 
 export function refreshSettingsUI() {
   const callingOn = !!settings.callingEnabled;
@@ -539,6 +569,16 @@ export function refreshSettingsUI() {
   document.querySelectorAll('.lbl-kb-summary').forEach(e => { e.innerText = `${kbLayout.toUpperCase()} • ${fmtDelay(kbHideSec)}`; });
   document.querySelectorAll('.lbl-vol-summary').forEach(e => {
     e.innerText = `Call ${callVol}% • Radio ${radVol}% • Ring ${ringVol}%`;
+  });
+  const lpMode = settings.lowPowerModeSetting || 'auto';
+  const lpModeTxt = lpMode === 'on' ? 'Forced ON' : (lpMode === 'off' ? 'Off' : 'Auto');
+  const lpVidTxt = settings.lowPowerBlockVideo !== false ? 'Videos Blocked' : 'Videos Allowed';
+  const lpActiveNow = role === 'nana'
+    ? !!NanaCore.isLowPowerMode?.()
+    : (lpMode === 'on' || (lpMode === 'auto' && (state.presenceSnap?.lowPowerMode || state.presenceSnap?.isCharging === false)));
+  document.querySelectorAll('.lbl-lowpower-summary').forEach(e => {
+    e.innerText = `${lpModeTxt}${lpActiveNow ? ' (Active now)' : ''} • ${lpVidTxt}`;
+    e.style.color = lpActiveNow ? '#fbbf24' : '#38bdf8';
   });
   document.querySelectorAll('.lbl-battery-summary').forEach(e => {
     e.innerText = battThresh <= 0 ? 'Off' : `${battThreshLabel} • ${battFreqLabel} • Vol ${battVol}%`;
