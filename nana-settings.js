@@ -73,159 +73,204 @@ const fmtDelay = (sec) => {
   const radioTimeSlots = [9, 9.5, 10, 10.5, 11, 11.5, 13, 13.5, 14, 14.5, 15, 15.5, 16, 16.5, 19, 19.5];
   const videoTimeSlots = [11, 11.5, 14, 14.5, 16, 16.5, 17, 17.5, 18, 18.5, 19, 19.5, 20, 20.5];
 
+  window.toggleAllControlsSections = (expand) => {
+    document.querySelectorAll('#family-settings-mount details.controls-accordion').forEach(d => {
+      d.open = !!expand;
+    });
+  };
+
   sc.innerHTML = `
-    <div class="settings-card">
-      <div class="settings-label"><span>📞 Video Calling on Nana's Tablet</span><span class="calling-status-lbl" style="font-size:0.95rem;"></span></div>
-      <div class="opt-row">
-        <button class="opt-btn calling-off-btn" onclick="setCallingEnabled(false)">📵 Turn OFF (hide)</button>
-        <button class="opt-btn calling-on-btn" onclick="setCallingEnabled(true)">✅ Turn ON</button>
+    <div class="controls-toolbar">
+      <button type="button" class="opt-btn" style="flex:0;padding:6px 12px;font-size:0.82rem;" onclick="toggleAllControlsSections(true)">➕ Expand All</button>
+      <button type="button" class="opt-btn" style="flex:0;padding:6px 12px;font-size:0.82rem;" onclick="toggleAllControlsSections(false)">➖ Collapse All</button>
+    </div>
+
+    <details class="controls-accordion" open>
+      <summary><span>📞 Calling, Family &amp; Quick Actions</span><span class="controls-acc-meta calling-status-lbl"></span></summary>
+      <div class="controls-acc-body">
+        <div class="settings-card">
+          <div class="settings-label"><span>📞 Video Calling on Nana's Tablet</span><span class="calling-status-lbl" style="font-size:0.95rem;"></span></div>
+          <div class="opt-row">
+            <button class="opt-btn calling-off-btn" onclick="setCallingEnabled(false)">📵 Turn OFF (hide)</button>
+            <button class="opt-btn calling-on-btn" onclick="setCallingEnabled(true)">✅ Turn ON</button>
+          </div>
+        </div>
+        ${isAdminFamilyMember ? `<div class="settings-card">
+          <div class="settings-label"><span>👥 Family Members &amp; Call Grid</span></div>
+          <div class="settings-sub" style="margin-bottom:6px;">Add new family members, edit names &amp; face-cropped photos, and copy personal links (top 8 recent Telegram-connected appear on Nana's grid).</div>
+          <button class="opt-btn" style="width:100%;background:#0f766e;border-color:#5eead4;color:#fff;" onclick="closeSettingsModal(); openFamilyMembersModal();">👥 Add / Manage Family Members</button>
+        </div>` : ''}
+        <div class="settings-card">
+          <div class="settings-label"><span>🔄 Refresh Nana's Tablet &amp; Prompt Family Devices</span></div>
+          <div class="settings-sub" style="margin-bottom:6px;">Refresh Nana's tablet or prompt family members' browsers independently.</div>
+          <div class="opt-row">
+            <button class="opt-btn" id="remote-refresh-nana-btn" onclick="requestNanaReload()">🔄 Refresh Nana's Tablet</button>
+            <button class="opt-btn" id="remote-refresh-family-btn" onclick="requestFamilyReload()">📱 Prompt Family Update</button>
+          </div>
+        </div>
+        <div class="settings-card" id="test-links-card">
+          <div class="settings-label"><span>🧪 Test Calls Without Nana</span></div>
+          <div class="settings-sub">Practice calls in a private sandbox without ringing Nana's tablet.</div>
+          <div class="opt-row">
+            <button class="opt-btn" onclick="copyTestLink('nana')">📋 Copy "Pretend Nana" link</button>
+            <button class="opt-btn" onclick="copyTestLink('family')">📋 Copy "Me" link</button>
+          </div>
+        </div>
+        <div class="settings-card">
+          <div class="settings-label"><span>🔧 Telegram Bot Sync &amp; Webhook</span><span id="lbl-sync-status" style="font-size:0.9rem;color:#38bdf8;"></span></div>
+          <button class="opt-btn" style="width:100%;background:#0284c7;border-color:#38bdf8;color:#fff;" onclick="forceWebhookAndMemberSync()">🔄 Flush Telegram Queue &amp; Sync Contacts Now</button>
+        </div>
       </div>
-    </div>
-    <div class="settings-card" id="test-links-card">
-      <div class="settings-label"><span>🧪 Test Calls Without Nana</span></div>
-      <div class="settings-sub">Practice calls in a private sandbox without ringing Nana's tablet.</div>
-      <div class="opt-row">
-        <button class="opt-btn" onclick="copyTestLink('nana')">📋 Copy "Pretend Nana" link</button>
-        <button class="opt-btn" onclick="copyTestLink('family')">📋 Copy "Me" link</button>
+    </details>
+
+    <details class="controls-accordion">
+      <summary><span>🔊 Volumes, Ringtone &amp; Auto-Answer</span><span class="controls-acc-meta lbl-vol-summary"></span></summary>
+      <div class="controls-acc-body">
+        <div class="settings-card">
+          <div class="settings-label"><span>🔊 Tablet Volumes</span><span class="lbl-vol-summary" style="color:#38bdf8;font-size:0.92rem;"></span></div>
+          <div class="settings-sub" style="margin-bottom:4px;">📹 Video Call Voice Volume (On Nana's Tablet Speaker):</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('callVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">🎻 Classic FM Radio Volume:</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('radioVolume', [[25,'25%'],[45,'45%'],[60,'60%'],[75,'75%'],[90,'90%'],[100,'100%']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">🔔 Incoming Call Ringing Volume:</div>
+          <div class="opt-row">${optBtns('ringVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
+        </div>
+        <div class="settings-card">
+          <div class="settings-label"><span>🎵 Nana's Ringtone, Auto-Answer &amp; Duration</span></div>
+          <div class="opt-row" style="margin-bottom:8px;">
+            ${[['uk-phone','☎️ Phone'],['westminster','🕰️ Chime'],['marimba','🎵 Marimba'],['bell','🔔 Bell'],['nana_song1.mp3','🎶 Song 1'],['nana_song2.mp3','🎶 Song 2']].map(([t,l]) => `<button class="opt-btn" data-skey="ringtone" data-sval="${t}" onclick="previewAndSetTone('${t}')">${l}</button>`).join('')}
+          </div>
+          <div class="opt-row" style="margin-bottom:8px;">
+            ${optBtns('autoAnswer', [[false,'👆 Tap to Answer'],[true,'⚡ Auto-Answer (10s)']])}
+            ${optBtns('voicePrompts', [[true,'🗣️ Voice ID On'],[false,'🔇 Voice ID Off']])}
+          </div>
+          <div class="opt-row">${optBtns('ringDurationSec', [[30,'30s'],[45,'45s'],[60,'60s'],[90,'90s'],[120,'2m']])}</div>
+        </div>
       </div>
-    </div>
-    <div class="settings-card">
-      <div class="settings-label"><span>🔄 Refresh Nana's Tablet &amp; Prompt Family Devices</span></div>
-      <div class="settings-sub" style="margin-bottom:6px;">Refresh Nana's tablet or prompt family members' browsers independently.</div>
-      <div class="opt-row">
-        <button class="opt-btn" id="remote-refresh-nana-btn" onclick="requestNanaReload()">🔄 Refresh Nana's Tablet</button>
-        <button class="opt-btn" id="remote-refresh-family-btn" onclick="requestFamilyReload()">📱 Prompt Family Update</button>
+    </details>
+
+    <details class="controls-accordion">
+      <summary><span>🔆 Display, Themes &amp; Night Mode</span><span class="controls-acc-meta lbl-bright-summary">85% ➔ 15%</span></summary>
+      <div class="controls-acc-body">
+        <div class="settings-card">
+          <div class="settings-label"><span>🎨 High-Contrast Visibility Theme</span></div>
+          <div class="opt-row">${optBtns('colorTheme', [['classic-dark','🌙 Classic Dark'],['yellow-black','👁️ Yellow on Black'],['white-black','🤍 White on Black'],['black-cream','☀️ Black on Cream']])}</div>
+        </div>
+        <div class="settings-card">
+          <div class="settings-label"><span>🔆 Screen Brightness &amp; Idle Dimming</span><span class="lbl-bright-summary" style="color:#38bdf8;font-size:0.95rem;">85% ➔ 15% (2m)</span></div>
+          <div class="settings-sub" style="margin-bottom:4px;">Normal (Awake) Brightness:</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('awakeBrightness', [[40,'40%'],[60,'60%'],[85,'85%'],[100,'100%']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Dimmed Brightness Level (Idle on Home, Chat &amp; Radio):</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('dimBrightness', [[5,'5% (Dark)'],[15,'15% (Soft)'],[30,'30% (Low)'],[50,'50% (Med)']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Time Until Dimming Happens:</div>
+          <div class="opt-row">${optBtns('dimDelaySec', [[30,'30s'],[60,'1m'],[120,'2m'],[300,'5m'],[600,'10m'],[0,'Never']])}</div>
+        </div>
+        <div class="settings-card">
+          <div class="settings-label"><span>🌙 Do Not Disturb (Night Mode)</span><span class="lbl-night-window" style="color:#38bdf8;">21:00 – 08:00</span></div>
+          <div class="opt-row" style="margin-bottom:8px;">
+            ${optBtns('nightModeEnabled', [[true,'🌙 Night Mode ON'],[false,'☀️ Always Awake']])}
+            <button class="opt-btn" data-skey="nightBlockCalls" data-sval="true" onclick="toggleSetting('nightBlockCalls')">🔕 Block Night Rings</button>
+          </div>
+          <div class="settings-sub" style="margin-bottom:4px;">Evening Start Time:</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('nightStartHour', [[20,'20:00'],[21,'21:00'],[22,'22:00'],[23,'23:00']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Morning Wake Time:</div>
+          <div class="opt-row">${optBtns('nightEndHour', [[6,'06:00'],[7,'07:00'],[8,'08:00'],[9,'09:00']])}</div>
+        </div>
       </div>
-    </div>
-    ${isAdminFamilyMember ? `<div class="settings-card">
-      <div class="settings-label"><span>👥 Family Members &amp; Call Grid</span></div>
-      <div class="settings-sub" style="margin-bottom:6px;">Add new family members, edit names &amp; face-cropped photos, and copy personal links (top 8 recent Telegram-connected appear on Nana's grid).</div>
-      <button class="opt-btn" style="width:100%;background:#0f766e;border-color:#5eead4;color:#fff;" onclick="closeSettingsModal(); openFamilyMembersModal();">👥 Add / Manage Family Members</button>
-    </div>` : ''}
-    <div class="settings-card">
-      <div class="settings-label"><span>🎨 High-Contrast Visibility Theme</span></div>
-      <div class="opt-row">${optBtns('colorTheme', [['classic-dark','🌙 Classic Dark'],['yellow-black','👁️ Yellow on Black'],['white-black','🤍 White on Black'],['black-cream','☀️ Black on Cream']])}</div>
-    </div>
-    <div class="settings-card">
-      <div class="settings-label"><span>⌨️ Nana's Keyboard Layout & Auto-Hide</span><span class="lbl-kb-summary" style="color:#38bdf8;font-size:0.95rem;">QWERTY • 1m</span></div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('keyboardLayout', [['qwerty','⌨️ QWERTY Layout'],['abcdef','🔤 ABCDEF Layout']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">Hide Keyboard After Inactivity:</div>
-      <div class="opt-row">${optBtns('keyboardTimeoutSec', [[30,'30s'],[60,'1m'],[120,'2m'],[180,'3m']])}</div>
-      <div class="settings-sub" style="margin:8px 0 4px 0;">🖐️ Same-Key Repeat Guard (ignores accidental double-taps on the same letter):</div>
-      <div class="opt-row">${optBtns('keyGuardMs', [[0,'Off'],[350,'Normal'],[600,'Strong'],[900,'Max']])}</div>
-    </div>
-    <div class="settings-card">
-      <div class="settings-label"><span>🔆 Screen Brightness & Idle Dimming</span><span class="lbl-bright-summary" style="color:#38bdf8;font-size:0.95rem;">85% ➔ 15% (2m)</span></div>
-      <div class="settings-sub" style="margin-bottom:4px;">Normal (Awake) Brightness:</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('awakeBrightness', [[40,'40%'],[60,'60%'],[85,'85%'],[100,'100%']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">Dimmed Brightness Level (Idle on Home, Chat & Radio):</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('dimBrightness', [[5,'5% (Dark)'],[15,'15% (Soft)'],[30,'30% (Low)'],[50,'50% (Med)']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">Time Until Dimming Happens:</div>
-      <div class="opt-row">${optBtns('dimDelaySec', [[30,'30s'],[60,'1m'],[120,'2m'],[300,'5m'],[600,'10m'],[0,'Never']])}</div>
-    </div>
-    <div class="settings-card">
-      <div class="settings-label"><span>🔊 Tablet Volumes</span><span class="lbl-vol-summary" style="color:#38bdf8;font-size:0.92rem;"></span></div>
-      <div class="settings-sub" style="margin-bottom:4px;">📹 Video Call Voice Volume (On Nana's Tablet Speaker):</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('callVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">🎻 Classic FM Radio Volume:</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('radioVolume', [[25,'25%'],[45,'45%'],[60,'60%'],[75,'75%'],[90,'90%'],[100,'100%']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">🔔 Incoming Call Ringing Volume:</div>
-      <div class="opt-row">${optBtns('ringVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
-    </div>
-    <div class="settings-card">
-      <div class="settings-label"><span>⚡ Nana's Low Power Mode Controls</span><span class="lbl-lowpower-summary" style="color:#38bdf8;font-size:0.9rem;">Auto</span></div>
-      <div class="settings-sub" style="margin-bottom:6px;">Lowers brightness, dims sooner, reduces background updates, and skips Radio/Video prompts (Unread Family Chat prompts stay active).</div>
-      <div class="settings-sub" style="margin-bottom:4px;">Activation Mode:</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('lowPowerModeSetting', [['auto','🔋 Auto (Unplugged)'],['on','⚡ Force ON'],['off','🔌 Off']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">Video Playback in Low Power Mode:</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('lowPowerBlockVideo', [[true,'🚫 Block Videos'],[false,'🎬 Allow Videos']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">Max Awake Brightness in Low Power Mode:</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('lowPowerMaxBrightness', [[30,'30%'],[40,'40%'],[50,'50%'],[70,'70%']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">Dim Screen After Inactivity in Low Power Mode:</div>
-      <div class="opt-row">${optBtns('lowPowerDimDelaySec', [[20,'20s'],[30,'30s'],[45,'45s'],[60,'1m']])}</div>
-    </div>
-    <div class="settings-card">
-      <div class="settings-label"><span>🔋 Battery Unplugged Banner & Voice Alerts</span><span class="lbl-battery-summary" style="color:#38bdf8;font-size:0.92rem;"></span></div>
-      <div class="settings-sub lbl-battery-mute">Top banner always shows when unplugged. Voice alerts stay silent during Night Mode.</div>
-      <div class="settings-sub" style="margin-bottom:4px;">🗣️ Speak Voice Alert When Unplugged At or Below:</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceThresholdPct', [[0,'Off'],[15,'15%'],[25,'25%'],[30,'30%'],[50,'50%'],[80,'80%'],[99,'Whenever Unplugged']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">⏱️ Voice Alert Frequency (Dynamic speeds up as battery drops: >50%=20m, 31-50%=10m, 16-30%=5m, ≤15%=2m):</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceIntervalMin', [[0,'⚡ Dynamic'],[3,'3m'],[5,'5m'],[10,'10m'],[15,'15m'],[30,'30m']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">🔊 Unplugged Voice Alert Volume:</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">💬 Post Battery-Out &amp; Back-Online Messages to Family Chat:</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryChatAlertsEnabled', [[true,'🔋 Chat Alerts ON'],[false,'🔕 Off']])}</div>
-      <div class="opt-row" style="margin-bottom:8px;">
-        <button class="opt-btn" style="background:#dc2626;border-color:#fff;color:#fff;" onclick="clearAllMissedCalls()">🧹 Clear Missed Calls</button>
-        <button class="opt-btn" onclick="muteBatteryVoiceForHours(0)">🔊 Unmute Battery Voice</button>
+    </details>
+
+    <details class="controls-accordion">
+      <summary><span>🔋 Low Power &amp; Battery Alerts</span><span class="controls-acc-meta lbl-lowpower-summary">Auto</span></summary>
+      <div class="controls-acc-body">
+        <div class="settings-card">
+          <div class="settings-label"><span>⚡ Nana's Low Power Mode Controls</span><span class="lbl-lowpower-summary" style="color:#38bdf8;font-size:0.9rem;">Auto</span></div>
+          <div class="settings-sub" style="margin-bottom:6px;">Lowers brightness, dims sooner, reduces background updates, and skips Radio/Video prompts (Unread Family Chat prompts stay active).</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Activation Mode:</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('lowPowerModeSetting', [['auto','🔋 Auto (Unplugged)'],['on','⚡ Force ON'],['off','🔌 Off']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Video Playback in Low Power Mode:</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('lowPowerBlockVideo', [[true,'🚫 Block Videos'],[false,'🎬 Allow Videos']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Max Awake Brightness in Low Power Mode:</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('lowPowerMaxBrightness', [[30,'30%'],[40,'40%'],[50,'50%'],[70,'70%']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Dim Screen After Inactivity in Low Power Mode:</div>
+          <div class="opt-row">${optBtns('lowPowerDimDelaySec', [[20,'20s'],[30,'30s'],[45,'45s'],[60,'1m']])}</div>
+        </div>
+        <div class="settings-card">
+          <div class="settings-label"><span>🔋 Battery Unplugged Banner &amp; Voice Alerts</span><span class="lbl-battery-summary" style="color:#38bdf8;font-size:0.92rem;"></span></div>
+          <div class="settings-sub lbl-battery-mute">Top banner always shows when unplugged. Voice alerts stay silent during Night Mode.</div>
+          <div class="settings-sub" style="margin-bottom:4px;">🗣️ Speak Voice Alert When Unplugged At or Below:</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceThresholdPct', [[0,'Off'],[15,'15%'],[25,'25%'],[30,'30%'],[50,'50%'],[80,'80%'],[99,'Whenever Unplugged']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">⏱️ Voice Alert Frequency (Dynamic speeds up as battery drops: &gt;50%=20m, 31-50%=10m, 16-30%=5m, ≤15%=2m):</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceIntervalMin', [[0,'⚡ Dynamic'],[3,'3m'],[5,'5m'],[10,'10m'],[15,'15m'],[30,'30m']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">🔊 Unplugged Voice Alert Volume:</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryVoiceVolume', [[30,'30%'],[50,'50%'],[70,'70%'],[85,'85%'],[100,'100%']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">💬 Post Battery-Out &amp; Back-Online Messages to Family Chat:</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryChatAlertsEnabled', [[true,'🔋 Chat Alerts ON'],[false,'🔕 Off']])}</div>
+          <div class="opt-row" style="margin-bottom:8px;">
+            <button class="opt-btn" style="background:#dc2626;border-color:#fff;color:#fff;" onclick="clearAllMissedCalls()">🧹 Clear Missed Calls</button>
+            <button class="opt-btn" onclick="muteBatteryVoiceForHours(0)">🔊 Unmute Battery Voice</button>
+          </div>
+          <div class="opt-row">
+            ${[1,4,12,24].map(h => `<button class="opt-btn" onclick="muteBatteryVoiceForHours(${h})">🔇 Mute ${h}h</button>`).join('')}
+          </div>
+        </div>
       </div>
-      <div class="opt-row">
-        ${[1,4,12,24].map(h => `<button class="opt-btn" onclick="muteBatteryVoiceForHours(${h})">🔇 Mute ${h}h</button>`).join('')}
+    </details>
+
+    <details class="controls-accordion">
+      <summary><span>💬 Family Chat, Voice &amp; Keyboard</span><span class="controls-acc-meta lbl-kb-summary">QWERTY • 1m</span></summary>
+      <div class="controls-acc-body">
+        <div class="settings-card">
+          <div class="settings-label"><span>💬 Family Notes Alert Bar, Voice &amp; Read Aloud</span></div>
+          <div class="opt-row" style="margin-bottom:6px;">
+            ${optBtns('showBulletinBar', [[true,'💬 Show Alert Bar'],[false,'🙈 Hide Alert Bar']])}
+            <button class="opt-btn" style="background:#0284c7;border-color:#fff;color:#fff;" onclick="dismissCurrentBulletinBar(true)">🧹 Mark All Read</button>
+          </div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('showReadAloud', [[false,'🙈 Hide "Read Aloud"'],[true,'🔊 Show "Read Aloud"']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">🎙️ Voice Messaging (Listen to Telegram voice notes &amp; let Nana speak replies):</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('voiceMessagingEnabled', [[true,'🎙️ Voice Messaging ON'],[false,'🚫 Off (Text Only)']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">💬 Tapping Message Box on Nana's Tablet Opens:</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('nanaMessageEntryMode', [['choice','💬 Choice Screen'],['keyboard','⌨️ Keyboard'],['voice','🎙️ Voice Message']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">⏱️ Voice Recording Max Time (auto-sends at 0):</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('voiceMessageMaxSec', [[15,'15s'],[20,'20s'],[30,'30s'],[45,'45s'],[60,'60s']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">🤫 Auto-Send Once Nana Stops Talking (silence timeout):</div>
+          <div class="opt-row">${optBtns('voiceAutoSendSilenceSec', [[0,'Off (Tap Done)'],[3,'3s'],[5,'5s'],[8,'8s']])}</div>
+        </div>
+        <div class="settings-card">
+          <div class="settings-label"><span>⌨️ Nana's Keyboard Layout &amp; Auto-Hide</span><span class="lbl-kb-summary" style="color:#38bdf8;font-size:0.95rem;">QWERTY • 1m</span></div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('keyboardLayout', [['qwerty','⌨️ QWERTY Layout'],['abcdef','🔤 ABCDEF Layout']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Hide Keyboard After Inactivity:</div>
+          <div class="opt-row">${optBtns('keyboardTimeoutSec', [[30,'30s'],[60,'1m'],[120,'2m'],[180,'3m']])}</div>
+          <div class="settings-sub" style="margin:8px 0 4px 0;">🖐️ Same-Key Repeat Guard (ignores accidental double-taps on the same letter):</div>
+          <div class="opt-row">${optBtns('keyGuardMs', [[0,'Off'],[350,'Normal'],[600,'Strong'],[900,'Max']])}</div>
+        </div>
       </div>
-    </div>
-    <div class="settings-card">
-      <div class="settings-label"><span>🌙 Do Not Disturb (Night Mode)</span><span class="lbl-night-window" style="color:#38bdf8;">21:00 – 08:00</span></div>
-      <div class="opt-row" style="margin-bottom:8px;">
-        ${optBtns('nightModeEnabled', [[true,'🌙 Night Mode ON'],[false,'☀️ Always Awake']])}
-        <button class="opt-btn" data-skey="nightBlockCalls" data-sval="true" onclick="toggleSetting('nightBlockCalls')">🔕 Block Night Rings</button>
+    </details>
+
+    <details class="controls-accordion">
+      <summary><span>💚 Today's Calls &amp; Scheduled Prompts</span><span class="controls-acc-meta" id="lbl-periodic-summary">Active</span></summary>
+      <div class="controls-acc-body">
+        <div class="settings-card">
+          <div class="settings-label"><span>💚 Today's Calls Memory Banner &amp; Scheduled Prompts</span></div>
+          <div class="settings-sub">Reassures Nana with a summary of who she has spoken to today, and offers scheduled entertainment prompts (in Low Power Mode, Radio &amp; Video prompts stay off while Unread Chat reminders remain active).</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('showTodaysCallsBanner', [[true,"💚 Show Today's Calls Banner"],[false,"🙈 Hide Today's Calls Banner"]])}</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('periodicPopupsEnabled', [[true,'✅ Scheduled Pop-Ups ON'],[false,'🔕 Scheduled Pop-Ups OFF']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">🎻 Classic FM Radio Prompt Times (Tap times to toggle on/off):</div>
+          <div class="opt-row" style="margin-bottom:8px;">
+            ${hourToggles('radioPromptHours', radioTimeSlots)}
+            <button class="opt-btn" style="background:#7f1d1d;color:#fff;min-width:62px;" onclick="clearScheduledPromptHours('radioPromptHours')">Off</button>
+          </div>
+          <div class="settings-sub" style="margin-bottom:4px;">🎬 Judge John Deed Video Prompt Times (Tap times to toggle on/off):</div>
+          <div class="opt-row" style="margin-bottom:8px;">
+            ${hourToggles('videoPromptHours', videoTimeSlots)}
+            <button class="opt-btn" style="background:#7f1d1d;color:#fff;min-width:62px;" onclick="clearScheduledPromptHours('videoPromptHours')">Off</button>
+          </div>
+          <div class="settings-sub" style="margin-bottom:4px;">💬 Unread Family Chat Reminder ("You have unread messages, would you like to read them?"):</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('unreadChatPopupMin', [[0,'Off'],[15,'15m'],[30,'30m'],[60,'1h'],[120,'2h']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">🗣️ Pop-Up Question &amp; Prompt Voice:</div>
+          <div class="opt-row">${optBtns('speakQuestions', [[true,'🔊 Read Prompts Aloud'],[false,'🔇 Silent Pop-Ups Only']], 'setGlobalQuestionSpeak')}</div>
+        </div>
       </div>
-      <div class="settings-sub" style="margin-bottom:4px;">Evening Start Time:</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('nightStartHour', [[20,'20:00'],[21,'21:00'],[22,'22:00'],[23,'23:00']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">Morning Wake Time:</div>
-      <div class="opt-row">${optBtns('nightEndHour', [[6,'06:00'],[7,'07:00'],[8,'08:00'],[9,'09:00']])}</div>
-    </div>
-    <div class="settings-card">
-      <div class="settings-label"><span>💬 Family Notes Alert Bar, Voice &amp; Read Aloud</span></div>
-      <div class="opt-row" style="margin-bottom:6px;">
-        ${optBtns('showBulletinBar', [[true,'💬 Show Alert Bar'],[false,'🙈 Hide Alert Bar']])}
-        <button class="opt-btn" style="background:#0284c7;border-color:#fff;color:#fff;" onclick="dismissCurrentBulletinBar(true)">🧹 Mark All Read</button>
-      </div>
-      <div class="opt-row" style="margin-bottom:6px;">${optBtns('showReadAloud', [[false,'🙈 Hide "Read Aloud"'],[true,'🔊 Show "Read Aloud"']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">🎙️ Voice Messaging (Listen to Telegram voice notes &amp; let Nana speak replies):</div>
-      <div class="opt-row" style="margin-bottom:6px;">${optBtns('voiceMessagingEnabled', [[true,'🎙️ Voice Messaging ON'],[false,'🚫 Off (Text Only)']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">💬 Tapping Message Box on Nana's Tablet Opens:</div>
-      <div class="opt-row" style="margin-bottom:6px;">${optBtns('nanaMessageEntryMode', [['choice','💬 Choice Screen'],['keyboard','⌨️ Keyboard'],['voice','🎙️ Voice Message']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">⏱️ Voice Recording Max Time (auto-sends at 0):</div>
-      <div class="opt-row">${optBtns('voiceMessageMaxSec', [[15,'15s'],[20,'20s'],[30,'30s'],[45,'45s'],[60,'60s']])}</div>
-    </div>
-    <div class="settings-card">
-      <div class="settings-label"><span>🎵 Nana's Ringtone, Auto-Answer & Duration</span></div>
-      <div class="opt-row" style="margin-bottom:8px;">
-        ${[['uk-phone','☎️ Phone'],['westminster','🕰️ Chime'],['marimba','🎵 Marimba'],['bell','🔔 Bell'],['nana_song1.mp3','🎶 Song 1'],['nana_song2.mp3','🎶 Song 2']].map(([t,l]) => `<button class="opt-btn" data-skey="ringtone" data-sval="${t}" onclick="previewAndSetTone('${t}')">${l}</button>`).join('')}
-      </div>
-      <div class="opt-row" style="margin-bottom:8px;">
-        ${optBtns('autoAnswer', [[false,'👆 Tap to Answer'],[true,'⚡ Auto-Answer (10s)']])}
-        ${optBtns('voicePrompts', [[true,'🗣️ Voice ID On'],[false,'🔇 Voice ID Off']])}
-      </div>
-      <div class="opt-row">${optBtns('ringDurationSec', [[30,'30s'],[45,'45s'],[60,'60s'],[90,'90s'],[120,'2m']])}</div>
-    </div>
-    <div class="settings-card">
-      <div class="settings-label"><span>🔧 Telegram Bot Sync & Webhook</span><span id="lbl-sync-status" style="font-size:0.9rem;color:#38bdf8;"></span></div>
-      <button class="opt-btn" style="width:100%;background:#0284c7;border-color:#38bdf8;color:#fff;" onclick="forceWebhookAndMemberSync()">🔄 Flush Telegram Queue & Sync Contacts Now</button>
-    </div>
-    <div class="settings-card">
-      <div class="settings-label">
-        <span>💚 Today's Calls Memory Banner & Scheduled Prompts</span>
-        <span id="lbl-periodic-summary" style="color:#38bdf8;font-size:0.88rem;">Active</span>
-      </div>
-      <div class="settings-sub">Reassures Nana with a summary of who she has spoken to today, and offers scheduled entertainment prompts (in Low Power Mode, Radio &amp; Video prompts stay off while Unread Chat reminders remain active).</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('showTodaysCallsBanner', [[true,"💚 Show Today's Calls Banner"],[false,"🙈 Hide Today's Calls Banner"]])}</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('periodicPopupsEnabled', [[true,'✅ Scheduled Pop-Ups ON'],[false,'🔕 Scheduled Pop-Ups OFF']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">🎻 Classic FM Radio Prompt Times (Tap times to toggle on/off):</div>
-      <div class="opt-row" style="margin-bottom:8px;">
-        ${hourToggles('radioPromptHours', radioTimeSlots)}
-        <button class="opt-btn" style="background:#7f1d1d;color:#fff;min-width:62px;" onclick="clearScheduledPromptHours('radioPromptHours')">Off</button>
-      </div>
-      <div class="settings-sub" style="margin-bottom:4px;">🎬 Judge John Deed Video Prompt Times (Tap times to toggle on/off):</div>
-      <div class="opt-row" style="margin-bottom:8px;">
-        ${hourToggles('videoPromptHours', videoTimeSlots)}
-        <button class="opt-btn" style="background:#7f1d1d;color:#fff;min-width:62px;" onclick="clearScheduledPromptHours('videoPromptHours')">Off</button>
-      </div>
-      <div class="settings-sub" style="margin-bottom:4px;">💬 Unread Family Chat Reminder ("You have unread messages, would you like to read them?"):</div>
-      <div class="opt-row" style="margin-bottom:8px;">${optBtns('unreadChatPopupMin', [[0,'Off'],[15,'15m'],[30,'30m'],[60,'1h'],[120,'2h']])}</div>
-      <div class="settings-sub" style="margin-bottom:4px;">🗣️ Pop-Up Question & Prompt Voice:</div>
-      <div class="opt-row">${optBtns('speakQuestions', [[true,'🔊 Read Prompts Aloud'],[false,'🔇 Silent Pop-Ups Only']], 'setGlobalQuestionSpeak')}</div>
-    </div>
+    </details>
   `;
 })();
 
