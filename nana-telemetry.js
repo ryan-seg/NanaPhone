@@ -118,14 +118,14 @@ function evaluateNanaBatteryChatAlerts() {
   }
 
   // 2. Critically low battery alert before tablet powers off (<= 5% and unplugged)
-  if (!charging && level <= 5 && !alerts.batteryOutActive && (now - (Number(alerts.backOnlineSentAt) || 0) > 300000)) {
+  if (!charging && level <= 5 && !alerts.batteryOutActive && (now - (Number(alerts.backOnlineSentAt) || 0) > 120000)) {
     batteryAlertTxInFlight = true;
     let shouldPost = false;
     runTransaction(refs.alerts, current => {
       shouldPost = false;
       const cur = (current && typeof current === 'object') ? { ...current } : {};
       if (cur.batteryOutActive) return;
-      if (Date.now() - (Number(cur.backOnlineSentAt) || 0) < 300000) return;
+      if (Date.now() - (Number(cur.backOnlineSentAt) || 0) < 120000) return;
       shouldPost = true;
       return {
         ...cur,
@@ -154,14 +154,16 @@ function evaluateFamilyBatteryChatAlerts() {
   if (!lastPing) return;
 
   const now = Date.now();
-  const silenceSec = Math.floor((now - lastPing) / 1000);
+  const lastSeenMs = Math.max(lastPing, Number(p.lastConnectedAt || 0));
+  const silenceSec = Math.floor((now - lastSeenMs) / 1000);
   const isOffline = (p.online === false) || (silenceSec > 75);
+  const sustainedDeadOffline = silenceSec >= 180 && (p.online === false || silenceSec >= 300);
   const batt = p.batteryLevel != null ? Number(p.batteryLevel) : null;
   const charging = !!p.isCharging;
   const alerts = state.alertsSnap || {};
 
-  // 1. Tablet is offline with dead/critically low unplugged battery
-  if (isOffline && batt !== null && !charging && (batt <= 6 || (batt <= 14 && silenceSec > 600))) {
+  // 1. Tablet is sustainably offline with dead/critically low unplugged battery
+  if (isOffline && sustainedDeadOffline && batt !== null && !charging && (batt <= 6 || (batt <= 14 && silenceSec > 600))) {
     if (!alerts.batteryOutActive && (now - (Number(alerts.backOnlineSentAt) || 0) > 300000)) {
       batteryAlertTxInFlight = true;
       let shouldPost = false;
@@ -816,8 +818,8 @@ function recordBackgroundHeartbeat(force = false) {
   const { batteryLevel, isCharging } = readTabletBatteryStatus();
   if (!prevPresenceReady) return;
   const now = Date.now();
-  // In Low Power Mode write every ~50s (safely under the 75s offline threshold) instead of every 20s
-  const minHeartbeatGapMs = NanaCore.isLowPowerMode() ? 48000 : 18000;
+  // In Low Power Mode write every ~40s (well under the 75s offline threshold) instead of every 20s
+  const minHeartbeatGapMs = NanaCore.isLowPowerMode() ? 38000 : 18000;
   if (!force && (now - lastHeartbeatWriteMs < minHeartbeatGapMs)) return;
   lastHeartbeatWriteMs = now;
 
@@ -1186,14 +1188,28 @@ function renderRyanControlsInsights() {
   const mount = $('family-settings-mount');
   if (!mount) return;
 
+  let acc = $('ryan-insights-accordion');
   let card = $('ryan-media-insights-card');
-  if (!card) {
-    card = document.createElement('div');
-    card.id = 'ryan-media-insights-card';
-    card.className = 'settings-card';
-    card.style.marginBottom = '10px';
-    mount.prepend(card);
+  if (!acc) {
+    acc = document.createElement('details');
+    acc.id = 'ryan-insights-accordion';
+    acc.className = 'controls-accordion';
+    acc.innerHTML = `
+      <summary><span>📊 Usage Stats &amp; Video Alerts</span><span id="ryan-insights-acc-meta" class="controls-acc-meta"></span></summary>
+      <div class="controls-acc-body"><div id="ryan-media-insights-card" class="settings-card"></div></div>
+    `;
+    const shared = $('shared-settings-cards');
+    const toolbar = shared?.querySelector?.('.controls-toolbar');
+    if (toolbar && toolbar.parentNode) {
+      toolbar.after(acc);
+    } else if (shared) {
+      shared.prepend(acc);
+    } else {
+      mount.prepend(acc);
+    }
+    card = $('ryan-media-insights-card');
   }
+  if (!card) return;
 
   const usage = state.dailyUsageSnap || {};
   const todayKey = getUsageDateKey();
@@ -1221,6 +1237,13 @@ function renderRyanControlsInsights() {
         </div>`;
       }).join('')
     : `<div style="color:#4ade80;font-size:0.82rem;">✅ No broken video alerts</div>`;
+
+  const metaEl = $('ryan-insights-acc-meta');
+  if (metaEl) {
+    const warnPart = issueList.length ? ` • ⚠️ ${issueList.length}` : '';
+    metaEl.innerText = `🎬 ${formatMediaDurationNearest5m(todayRec.videoSec)} • 🎻 ${formatMediaDurationNearest5m(todayRec.radioSec)}${warnPart}`;
+    metaEl.style.color = issueList.length ? '#fca5a5' : '#38bdf8';
+  }
 
   card.innerHTML = `
     <div style="font-weight:900;color:#fef08a;margin-bottom:6px;">📊 Nana's Daily Video &amp; Radio Use (nearest 5m)</div>
