@@ -376,24 +376,41 @@
       </div>
     </div>
 
-    <!-- Tab 2: Ask Nana a Yes/No Question + Last 5 Questions History -->
+    <!-- Tab 2: Ask Nana a Yes/No Question + Quick Media Prompts + Last 5 Questions History -->
     <div id="fam-pane-ask" class="fam-tab-pane">
       <div class="settings-card" style="width:100%;margin-bottom:0;padding:12px;">
         <div class="settings-label" style="font-size:1.02rem;">
           <span>❓ Pop-Up Yes/No Question on Nana's Screen</span>
           <span id="fam-q-status" style="font-size:0.85rem;color:#38bdf8;">Idle</span>
         </div>
-        <div class="settings-sub" style="margin-bottom:8px;">Pops up a giant Yes/No question on Nana's screen and posts her answer to Family Chat.</div>
+        <div class="settings-sub" style="margin-bottom:8px;">Pops up a giant Yes/No question on Nana's screen and auto-clears if it times out before she answers.</div>
         <input id="fam-q-input" class="family-input-box" type="text" placeholder="Type a Yes/No question for Nana..." />
+        <div class="settings-sub" style="margin-bottom:4px;font-weight:800;color:#cbd5e1;">⏱️ Auto-Expire Pop-Up After:</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button type="button" class="opt-btn fam-q-timeout-btn" data-qtimeout="5" style="padding:6px 4px;font-size:0.8rem;" onclick="setFamilyQuestionTimeout(5)">5m</button>
+          <button type="button" class="opt-btn fam-q-timeout-btn" data-qtimeout="10" style="padding:6px 4px;font-size:0.8rem;" onclick="setFamilyQuestionTimeout(10)">10m</button>
+          <button type="button" class="opt-btn fam-q-timeout-btn selected" data-qtimeout="30" style="padding:6px 4px;font-size:0.8rem;" onclick="setFamilyQuestionTimeout(30)">30m</button>
+          <button type="button" class="opt-btn fam-q-timeout-btn" data-qtimeout="60" style="padding:6px 4px;font-size:0.8rem;" onclick="setFamilyQuestionTimeout(60)">1h</button>
+          <button type="button" class="opt-btn fam-q-timeout-btn" data-qtimeout="120" style="padding:6px 4px;font-size:0.8rem;" onclick="setFamilyQuestionTimeout(120)">2h</button>
+          <button type="button" class="opt-btn fam-q-timeout-btn" data-qtimeout="1440" style="padding:6px 4px;font-size:0.8rem;" onclick="setFamilyQuestionTimeout(1440)">1d</button>
+          <button type="button" class="opt-btn fam-q-timeout-btn" data-qtimeout="0" style="padding:6px 4px;font-size:0.8rem;" onclick="setFamilyQuestionTimeout(0)">No limit</button>
+        </div>
         <div class="opt-row" style="margin-bottom:8px;">
           <button id="btn-q-voice-loud" class="opt-btn selected" style="padding:7px 8px;font-size:0.86rem;" onclick="setFamilyQuestionSilentMode(false)">🔊 Read Aloud</button>
           <button id="btn-q-voice-silent" class="opt-btn" style="padding:7px 8px;font-size:0.86rem;" onclick="setFamilyQuestionSilentMode(true)">🔇 Silent Pop-Up</button>
         </div>
-        <div class="opt-row">
+        <div class="opt-row" style="margin-bottom:10px;">
           <button class="opt-btn" style="background:#059669;border-color:#4ade80;color:#fff;" onclick="sendQuestionToNana()">📤 Send Pop-Up</button>
           <button class="opt-btn" style="background:#7f1d1d;border-color:#f87171;color:#fff;flex:0.45;" onclick="clearQuestionOnNana()">✖ Clear</button>
         </div>
-        <div style="margin-top:12px;border-top:2px solid #334155;padding-top:10px;width:100%;">
+        <div style="border-top:2px solid #334155;padding-top:8px;margin-bottom:10px;width:100%;">
+          <div class="settings-sub" style="margin-bottom:5px;font-weight:800;color:#7dd3fc;">✨ Quick Prompts (Starts Automatically if Nana Taps YES):</div>
+          <div class="opt-row">
+            <button type="button" class="opt-btn" style="background:#0c4a6e;border-color:#38bdf8;color:#fff;font-size:0.86rem;padding:8px 6px;" onclick="sendQuickMediaPromptToNana('radio')">🎻 Ask: Listen to Radio?</button>
+            <button type="button" class="opt-btn" style="background:#4c1d95;border-color:#a78bfa;color:#fff;font-size:0.86rem;padding:8px 6px;" onclick="sendQuickMediaPromptToNana('video')">🎬 Ask: Watch Judge John Deed?</button>
+          </div>
+        </div>
+        <div style="border-top:2px solid #334155;padding-top:10px;width:100%;">
           <div class="settings-sub" style="margin-bottom:4px;font-weight:800;color:#fef08a;">🕘 Last 5 Questions Asked by Family:</div>
           <div id="fam-q-history-box" class="fam-q-history-list"></div>
         </div>
