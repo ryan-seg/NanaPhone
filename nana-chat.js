@@ -1443,8 +1443,12 @@ let activeRecStream = null;
 let activeRecChunks = [];
 let recTimerInterval = null;
 let recCallWatchInterval = null;
+let recVadInterval = null;
+let recMicSource = null;
+let recMicAnalyser = null;
 let recStartedAtMs = 0;
 let recDeadlineMs = 0;
+let recLastSpeechAtMs = 0;
 let recCancelled = false;
 
 function playVoiceChime() {
@@ -1468,8 +1472,18 @@ function playVoiceChime() {
 function stopRecStreams() {
   clearInterval(recTimerInterval);
   clearInterval(recCallWatchInterval);
+  clearInterval(recVadInterval);
   recTimerInterval = null;
   recCallWatchInterval = null;
+  recVadInterval = null;
+  if (recMicSource) {
+    try { recMicSource.disconnect(); } catch (_) {}
+    recMicSource = null;
+  }
+  if (recMicAnalyser) {
+    try { recMicAnalyser.disconnect(); } catch (_) {}
+    recMicAnalyser = null;
+  }
   if (activeRecStream) {
     try { activeRecStream.getTracks().forEach(t => t.stop()); } catch (_) {}
     activeRecStream = null;
@@ -1499,9 +1513,10 @@ function ensureVoiceRecordOverlay() {
   ov.innerHTML = `
     <div style="font-size:clamp(2.4rem,6vw,3.8rem);font-weight:900;color:#4ade80;letter-spacing:2px;margin-bottom:10px;">🎙️ SPEAK NOW</div>
     <div id="nana-rec-countdown" style="font-size:clamp(1.8rem,4.5vw,2.6rem);font-weight:900;color:#fef08a;margin-bottom:14px;">30s left</div>
-    <div style="width:min(520px,88vw);height:18px;background:#1e293b;border-radius:999px;overflow:hidden;border:2px solid #475569;margin-bottom:26px;">
+    <div style="width:min(520px,88vw);height:18px;background:#1e293b;border-radius:999px;overflow:hidden;border:2px solid #475569;margin-bottom:12px;">
       <div id="nana-rec-progress" style="width:100%;height:100%;background:#22c55e;transition:width 0.25s linear;"></div>
     </div>
+    <div id="nana-rec-auto-status" style="font-size:1.1rem;font-weight:800;color:#bae6fd;min-height:1.5em;margin-bottom:18px;"></div>
     <button type="button" id="nana-rec-done-btn" style="width:min(520px,90vw);padding:22px 18px;border-radius:18px;border:3px solid #fff;background:#16a34a;color:#fff;font-size:1.6rem;font-weight:900;margin-bottom:14px;cursor:pointer;">✅ DONE — SEND NOW</button>
     <div style="display:flex;gap:12px;width:min(520px,90vw);">
       <button type="button" id="nana-rec-more-btn" style="flex:1;padding:16px;border-radius:14px;border:2px solid #38bdf8;background:#0f172a;color:#bae6fd;font-size:1.25rem;font-weight:800;cursor:pointer;">➕ +15s</button>
@@ -1520,6 +1535,7 @@ function ensureVoiceRecordOverlay() {
   };
   $('nana-rec-more-btn').onclick = () => {
     recDeadlineMs += 15000;
+    recLastSpeechAtMs = Date.now();
   };
   $('nana-rec-cancel-btn').onclick = () => {
     if (Date.now() - recStartedAtMs < VOICE_TAP_GUARD_MS) return;
@@ -1682,6 +1698,88 @@ window.startNanaVoiceRecording = async () => {
       setTimeout(() => { if ($('tg-send-status')) $('tg-send-status').innerText = '🟢 Connected to Family Group'; }, 4000);
     }
     return;
+  }
+
+  const autoStatusEl = $('nana-rec-auto-status');
+  const autoSilenceSec = Math.max(0, Number(settings.voiceAutoSendSilenceSec ?? 5) || 0);
+  const autoSilenceMs = autoSilenceSec * 1000;
+  recLastSpeechAtMs = Date.now();
+
+  if (autoStatusEl) {
+    autoStatusEl.innerText = autoSilenceMs > 0
+      ? `🎙️ Start speaking — sends ${autoSilenceSec}s after you finish`
+      : 'Tap ✅ DONE — SEND NOW when finished';
+    autoStatusEl.style.color = '#bae6fd';
+  }
+
+  if (autoSilenceMs > 0) {
+    try {
+      const ctx = NanaCore.audioCtx;
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      recMicSource = ctx.createMediaStreamSource(activeRecStream);
+      recMicAnalyser = ctx.createAnalyser();
+      recMicAnalyser.fftSize = 1024;
+      recMicAnalyser.smoothingTimeConstant = 0.25;
+      recMicSource.connect(recMicAnalyser);
+
+      const vadBuf = new Uint8Array(recMicAnalyser.fftSize);
+      let hasSpoken = false;
+      let speechStreak = 0;
+      let noiseFloor = 0.01;
+      let calSamples = 0;
+
+      recVadInterval = setInterval(() => {
+        if (!recMicAnalyser || recorder?.state !== 'recording') return;
+        recMicAnalyser.getByteTimeDomainData(vadBuf);
+        let sumSq = 0;
+        for (let i = 0; i < vadBuf.length; i++) {
+          const d = (vadBuf[i] - 128) / 128;
+          sumSq += d * d;
+        }
+        const rms = Math.sqrt(sumSq / vadBuf.length);
+        const now = Date.now();
+        const elapsedMs = now - recStartedAtMs;
+
+        if (calSamples < 5) {
+          noiseFloor = Math.min(0.035, calSamples === 0 ? rms : (noiseFloor * 0.7 + rms * 0.3));
+          calSamples++;
+        }
+        const speechThreshold = Math.max(0.018, Math.min(0.075, noiseFloor * 2.4));
+        if (rms < speechThreshold) {
+          noiseFloor = Math.min(0.035, noiseFloor * 0.96 + rms * 0.04);
+        }
+
+        if (elapsedMs >= 350 && rms >= speechThreshold) {
+          speechStreak++;
+          if (hasSpoken || speechStreak >= 2) {
+            hasSpoken = true;
+            recLastSpeechAtMs = now;
+          }
+        } else {
+          speechStreak = 0;
+        }
+
+        if (hasSpoken) {
+          const silentForMs = Math.max(0, now - recLastSpeechAtMs);
+          const remSilenceMs = Math.max(0, autoSilenceMs - silentForMs);
+          if (autoStatusEl) {
+            if (silentForMs >= 1200) {
+              autoStatusEl.innerText = `⏳ Sending automatically in ${Math.ceil(remSilenceMs / 1000)}s...`;
+              autoStatusEl.style.color = '#fef08a';
+            } else {
+              autoStatusEl.innerText = `🗣️ Listening... (sends ${autoSilenceSec}s after you stop)`;
+              autoStatusEl.style.color = '#bbf7d0';
+            }
+          }
+          if (silentForMs >= autoSilenceMs && recorder?.state === 'recording') {
+            try { recorder.stop(); } catch (_) { cancelNanaVoiceRecording(true); }
+          }
+        }
+      }, 100);
+    } catch (vadErr) {
+      console.warn('Voice silence detector unavailable:', vadErr);
+      if (autoStatusEl) autoStatusEl.innerText = 'Tap ✅ DONE — SEND NOW when finished';
+    }
   }
 
   recTimerInterval = setInterval(() => {
