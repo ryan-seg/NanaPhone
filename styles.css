@@ -904,4 +904,77 @@ body.role-family #bulletin-modal .tg-sender-name { font-size: 0.95rem; }
 body.role-family #bulletin-modal .tg-msg-time { font-size: 0.8rem; }
 body.role-family #bulletin-modal .tg-msg-text { font-size: 1.05rem; line-height: 1.38; font-weight: 600; }
 
+/* Collapsible Sections for Remote Tablet Controls */
+.controls-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 92vw;
+  max-width: 680px;
+  margin-bottom: 10px;
+}
+.controls-accordion {
+  width: 92vw;
+  max-width: 680px;
+  background: #162032;
+  border: 2px solid #334155;
+  border-radius: 18px;
+  margin-bottom: 10px;
+  text-align: left;
+  overflow: hidden;
+}
+.controls-accordion[open] {
+  border-color: #38bdf8;
+}
+.controls-accordion > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 13px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #fef08a;
+  background: #1e293b;
+  user-select: none;
+}
+.controls-accordion > summary::-webkit-details-marker { display: none; }
+.controls-accordion > summary::after {
+  content: '▾';
+  color: #94a3b8;
+  font-size: 1.1rem;
+  transition: transform 0.18s ease;
+  flex-shrink: 0;
+}
+.controls-accordion[open] > summary::after {
+  transform: rotate(180deg);
+  color: #38bdf8;
+}
+.controls-acc-meta {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #38bdf8;
+  margin-left: auto;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 52%;
+}
+.controls-acc-body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.controls-acc-body .settings-card {
+  width: 100%;
+  margin-bottom: 0;
+  background: #0f172a;
+  border-color: #334155;
+}
+
+
 
