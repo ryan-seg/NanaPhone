@@ -9,6 +9,79 @@ let activeQuestionData = null;
 let lastUnreadChatPromptMs = Date.now();
 let lastAnyPeriodicPromptMs = 0;
 let lastHandledQuestionId = null;
+let selectedQuestionTimeoutMin = 30;
+let questionExpireTimer = null;
+const expiredQuestionIdsSent = new Set();
+
+function formatTimeoutLabel(mins) {
+  const m = Number(mins) || 0;
+  if (m <= 0) return 'No limit';
+  if (m < 60) return `${m}m`;
+  if (m === 1440) return '1d';
+  return `${Math.round(m / 60)}h`;
+}
+
+function formatRemainingTime(expiresAt) {
+  const remMs = Math.max(0, Number(expiresAt || 0) - Date.now());
+  if (remMs <= 0) return 'Expired';
+  const totalMin = Math.ceil(remMs / 60000);
+  if (totalMin < 60) return `${totalMin}m`;
+  const hrs = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  return mins ? `${hrs}h ${mins}m` : `${hrs}h`;
+}
+
+function isQuestionExpired(q) {
+  return !!(q && q.status === 'pending' && Number(q.expiresAt) > 0 && Date.now() >= Number(q.expiresAt));
+}
+
+async function expireQuestionIfNeeded(q) {
+  if (!isQuestionExpired(q)) return false;
+  const qKey = q.id || `${q.askedAt || 0}`;
+  if (expiredQuestionIdsSent.has(qKey)) return true;
+  expiredQuestionIdsSent.add(qKey);
+  if (expiredQuestionIdsSent.size > 30) {
+    expiredQuestionIdsSent.delete(expiredQuestionIdsSent.values().next().value);
+  }
+  const now = Date.now();
+  if (q.historyKey) {
+    update(ref(db, `${basePath}/questionHistory/${q.historyKey}`), {
+      status: 'expired',
+      expiredAt: now
+    }).catch(() => {});
+  }
+  await update(refs.quickQuestion, {
+    status: 'expired',
+    expiredAt: now
+  }).catch(() => {});
+  return true;
+}
+
+function scheduleQuestionExpiryTimer(q) {
+  clearTimeout(questionExpireTimer);
+  questionExpireTimer = null;
+  if (!q || q.status !== 'pending' || !(Number(q.expiresAt) > 0)) return;
+  const delayMs = Math.max(0, Number(q.expiresAt) - Date.now());
+  if (delayMs === 0) {
+    expireQuestionIfNeeded(q);
+    return;
+  }
+  // Cap single setTimeout delay to 24h max safe timer; re-checks automatically on wake
+  questionExpireTimer = setTimeout(() => {
+    if (isQuestionExpired(activeQuestionData)) {
+      if (role === 'nana' && $('nana-question-modal')) $('nana-question-modal').style.display = 'none';
+      expireQuestionIfNeeded(activeQuestionData);
+      if (role === 'family') refreshFamilyQuestionStatusUI();
+    }
+  }, Math.min(delayMs + 250, 2147483000));
+}
+
+window.setFamilyQuestionTimeout = (mins) => {
+  selectedQuestionTimeoutMin = Math.max(0, Number(mins) || 0);
+  document.querySelectorAll('.fam-q-timeout-btn').forEach(btn => {
+    btn.classList.toggle('selected', Number(btn.dataset.qtimeout) === selectedQuestionTimeoutMin);
+  });
+};
 
 // --- 1. RENDER LAST 5 FAMILY QUESTIONS LOG & ASK AGAIN ---
 function formatQuestionTimestamp(ms) {
@@ -38,12 +111,16 @@ function renderFamilyQuestionHistory() {
   box.innerHTML = '';
   entries.forEach(item => {
     const askedStr = formatQuestionTimestamp(item.askedAt);
+    const tLabel = Number(item.timeoutMin) > 0 ? ` • ⏱️ ${formatTimeoutLabel(item.timeoutMin)}` : '';
+    const effectiveExpired = item.status === 'expired' || isQuestionExpired(item);
     let ansBadge = `<span style="color:#facc15;">⏳ Waiting for answer</span>`;
     if (item.status === 'answered') {
       const ansTime = item.answeredAt ? new Date(item.answeredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       ansBadge = item.answer === 'YES'
         ? `<span style="color:#4ade80;">✅ Answered YES${ansTime ? ' at ' + ansTime : ''}</span>`
         : `<span style="color:#f87171;">✖ Answered NO${ansTime ? ' at ' + ansTime : ''}</span>`;
+    } else if (effectiveExpired) {
+      ansBadge = `<span style="color:#94a3b8;">⌛ Timed out</span>`;
     } else if (item.status === 'cleared') {
       ansBadge = `<span style="color:#94a3b8;">✖ Cleared</span>`;
     }
@@ -53,11 +130,14 @@ function renderFamilyQuestionHistory() {
     row.innerHTML = `
       <div class="fam-q-hist-info">
         <div class="fam-q-hist-text">"${esc(item.question)}"</div>
-        <div class="fam-q-hist-meta">👤 ${esc(item.askedBy || 'Family')} • ${askedStr} • ${ansBadge}</div>
+        <div class="fam-q-hist-meta">👤 ${esc(item.askedBy || 'Family')} • ${askedStr}${tLabel} • ${ansBadge}</div>
       </div>
       <button class="fam-q-mini-btn" style="background:#059669;border-color:#4ade80;padding:6px 10px;white-space:nowrap;" title="Send this question to Nana's screen again">🔄 Ask Again</button>
     `;
-    row.querySelector('button').onclick = () => window.askFamilyQuestionAgain(item.question);
+    row.querySelector('button').onclick = () => dispatchFamilyQuestionPopup(item.question, {
+      type: item.type || 'family_question',
+      manualPrompt: !!(item.manualPrompt || item.type === 'idle_radio_prompt' || item.type === 'idle_video_prompt')
+    });
     box.appendChild(row);
   });
 }
@@ -73,7 +153,12 @@ function hasUnreadFamilyChatMessages() {
 }
 
 async function evaluateScheduledPopupsOnNana() {
-  if (role !== 'nana' || !settings.periodicPopupsEnabled || NanaCore.isCurrentlyInNightWindow?.()) return;
+  if (role !== 'nana') return;
+  if (isQuestionExpired(activeQuestionData)) {
+    if ($('nana-question-modal')) $('nana-question-modal').style.display = 'none';
+    await expireQuestionIfNeeded(activeQuestionData);
+  }
+  if (!settings.periodicPopupsEnabled || NanaCore.isCurrentlyInNightWindow?.()) return;
   if (state.callSnap?.status && state.callSnap.status !== 'idle') return;
   if (activeQuestionData?.status === 'pending') return;
   if ($('nana-question-modal')?.style.display === 'flex' || $('confirm-modal')?.style.display === 'flex') return;
@@ -134,28 +219,67 @@ async function evaluateScheduledPopupsOnNana() {
 
 if (role === 'nana') setInterval(evaluateScheduledPopupsOnNana, 20000);
 
-// --- 3. QUESTION DISPATCH, CLEAR & NANA YES/NO ANSWER ---
-async function dispatchFamilyQuestionPopup(questionText) {
+// --- 3. QUESTION DISPATCH, QUICK MEDIA PROMPTS, EXPIRY & NANA YES/NO ANSWER ---
+async function dispatchFamilyQuestionPopup(questionText, opts = {}) {
   const text = (questionText || '').trim();
   if (!text) return alert("Please type a question for Nana first.");
+  const qType = opts.type || 'family_question';
+  const manualPrompt = opts.manualPrompt !== undefined ? !!opts.manualPrompt : (qType !== 'family_question');
+  const timeoutMin = Math.max(0, Number(opts.timeoutMin ?? selectedQuestionTimeoutMin ?? 30));
   const now = Date.now();
+  const expiresAt = timeoutMin > 0 ? (now + timeoutMin * 60000) : 0;
+
   const histNode = await push(refs.questionHistory, {
+    type: qType,
+    manualPrompt,
     question: text,
     askedBy: senderName,
     silent: state.familyComposerSilent,
+    timeoutMin,
+    expiresAt,
     status: 'pending',
     answer: null,
     askedAt: now
   });
-  await askNana('family_question', text, senderName, { historyKey: histNode.key, silent: state.familyComposerSilent });
+  await askNana(qType, text, senderName, {
+    historyKey: histNode.key,
+    silent: state.familyComposerSilent,
+    manualPrompt,
+    timeoutMin,
+    expiresAt
+  });
 }
 
 window.sendQuestionToNana = async () => {
   const input = $('fam-q-input');
   const text = (input?.value || '').trim();
   if (!text) return alert("Please type a question for Nana first.");
-  await dispatchFamilyQuestionPopup(text);
+  await dispatchFamilyQuestionPopup(text, { type: 'family_question', manualPrompt: false });
   if (input) input.value = '';
+};
+
+window.sendQuickMediaPromptToNana = async (kind) => {
+  if (role !== 'family') return;
+  if (kind === 'radio') {
+    await dispatchFamilyQuestionPopup('Would you like to listen to Classic FM Radio?', {
+      type: 'idle_radio_prompt',
+      manualPrompt: true
+    });
+    return;
+  }
+  if (kind === 'video') {
+    const lpMode = settings.lowPowerModeSetting || 'auto';
+    const lpActive = lpMode === 'on' || (lpMode === 'auto' && (state.presenceSnap?.isCharging === false || !!state.presenceSnap?.lowPowerMode));
+    if (lpActive && settings.lowPowerBlockVideo !== false) {
+      if (!confirm("Nana's tablet appears to be unplugged / in Low Power Mode (which blocks video playback). Send the Judge John Deed pop-up anyway?")) {
+        return;
+      }
+    }
+    await dispatchFamilyQuestionPopup('Would you like to watch Judge John Deed?', {
+      type: 'idle_video_prompt',
+      manualPrompt: true
+    });
+  }
 };
 
 window.askFamilyQuestionAgain = (questionText) => dispatchFamilyQuestionPopup(questionText);
@@ -174,8 +298,13 @@ window.clearQuestionOnNana = async () => {
 window.submitNanaQuestionAnswer = async (choice) => {
   if (!activeQuestionData) return;
   const qData = activeQuestionData;
-  const isSilent = !!(qData.silent || !settings.speakQuestions);
   $('nana-question-modal').style.display = 'none';
+  if (isQuestionExpired(qData)) {
+    await expireQuestionIfNeeded(qData);
+    return;
+  }
+
+  const isSilent = !!(qData.silent || !settings.speakQuestions);
   state.lastActivityOrCallMs = Date.now();
   window.wakeScreenAndResetDimTimer?.();
 
@@ -275,9 +404,14 @@ function showNanaQuestionPopup() {
   const modal = $('nana-question-modal');
   if (!modal) return;
   const q = activeQuestionData;
+  if (isQuestionExpired(q)) {
+    modal.style.display = 'none';
+    expireQuestionIfNeeded(q);
+    return;
+  }
   const inCall = !!state.currentState && state.currentState !== 'idle';
   if (q && q.status === 'pending' && q.question && !inCall) {
-    if (NanaCore.isLowPowerMode?.() && (q.type === 'idle_radio_prompt' || q.type === 'idle_video_prompt')) {
+    if (!q.manualPrompt && NanaCore.isLowPowerMode?.() && (q.type === 'idle_radio_prompt' || q.type === 'idle_video_prompt')) {
       modal.style.display = 'none';
       return;
     }
@@ -312,24 +446,46 @@ function showNanaQuestionPopup() {
 }
 window.refreshNanaQuestionPopup = showNanaQuestionPopup;
 
+function refreshFamilyQuestionStatusUI() {
+  if (role !== 'family') return;
+  const st = $('fam-q-status');
+  if (!st) return;
+  const q = activeQuestionData;
+  if (isQuestionExpired(q)) {
+    expireQuestionIfNeeded(q);
+  }
+  if (!q || q.status === 'cleared') {
+    st.innerText = 'No active popup';
+    st.style.color = '#94a3b8';
+  } else if (q.status === 'expired' || isQuestionExpired(q)) {
+    st.innerText = '⌛ Pop-up timed out (not answered)';
+    st.style.color = '#94a3b8';
+  } else if (q.status === 'pending') {
+    const modeTag = (q.silent || !settings.speakQuestions) ? '🔇 Silent' : '🔊 Spoken';
+    const remTag = Number(q.expiresAt) > 0 ? ` • ⏱️ ${formatRemainingTime(q.expiresAt)} left` : '';
+    st.innerText = `⏳ Showing (${modeTag}${remTag}): "${q.question}"`;
+    st.style.color = '#facc15';
+  } else if (q.status === 'answered') {
+    const ansTime = q.answeredAt ? new Date(q.answeredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    st.innerText = `Nana answered: ${q.answer === 'YES' ? '✅ YES' : '✖ NO'} (${ansTime})`;
+    st.style.color = q.answer === 'YES' ? '#4ade80' : '#f87171';
+  }
+}
+
+if (role === 'family') {
+  setInterval(() => {
+    if (activeQuestionData?.status === 'pending' && Number(activeQuestionData.expiresAt) > 0) {
+      refreshFamilyQuestionStatusUI();
+    }
+  }, 15000);
+}
+
 onValue(refs.quickQuestion, snap => {
   const q = snap.val();
   activeQuestionData = q;
+  scheduleQuestionExpiryTimer(q);
   if (role === 'family') {
-    const st = $('fam-q-status');
-    if (!st) return;
-    if (!q || q.status === 'cleared') {
-      st.innerText = 'No active popup';
-      st.style.color = '#94a3b8';
-    } else if (q.status === 'pending') {
-      const modeTag = (q.silent || !settings.speakQuestions) ? '🔇 Silent' : '🔊 Spoken';
-      st.innerText = `⏳ Showing (${modeTag}): "${q.question}"`;
-      st.style.color = '#facc15';
-    } else if (q.status === 'answered') {
-      const ansTime = q.answeredAt ? new Date(q.answeredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-      st.innerText = `Nana answered: ${q.answer === 'YES' ? '✅ YES' : '✖ NO'} (${ansTime})`;
-      st.style.color = q.answer === 'YES' ? '#4ade80' : '#f87171';
-    }
+    refreshFamilyQuestionStatusUI();
   } else if (role === 'nana') {
     showNanaQuestionPopup();
   }
