@@ -267,12 +267,13 @@ body.theme-black-cream .staff-pill { background: #e0f2fe; color: #000; border-co
 @keyframes pulseMissed { 0%, 100% { background: #7f1d1d; } 50% { background: #b91c1c; } }
 
 /* Today's Completed Calls Reassurance Banner */
-#todays-calls-reassurance-banner { display: none; flex: 1 1 50%; min-width: 0; background: #064e3b; border: 3px solid #4ade80; border-radius: 14px; padding: 6px 14px; align-items: center; justify-content: flex-start; gap: 10px; flex-shrink: 0; color: #ffffff; font-size: clamp(1.05rem, 1.7vw, 1.3rem); font-weight: 900; text-align: left; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+#todays-calls-reassurance-banner { display: none; flex: 1 1 50%; min-width: 0; background: #064e3b; border: 3px solid #4ade80; border-radius: 14px; padding: 5px 10px; align-items: center; justify-content: flex-start; gap: 7px; flex-shrink: 0; color: #ffffff; font-size: clamp(0.95rem, 1.45vw, 1.15rem); font-weight: 900; text-align: left; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
 body.theme-yellow-black #todays-calls-reassurance-banner { background: #000; border-color: #ff0; color: #ff0; }
 body.theme-white-black #todays-calls-reassurance-banner { background: #121212; border-color: #fff; color: #fff; }
 body.theme-black-cream #todays-calls-reassurance-banner { background: #dcfce7; border-color: #000; color: #000; }
-.todays-calls-chips { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 8px; align-items: center; }
-.todays-call-pill { background: rgba(15, 23, 42, 0.75); border: 2px solid #fef08a; color: #fef08a; padding: 2px 10px; border-radius: 10px; font-size: clamp(1rem, 1.55vw, 1.25rem); font-weight: 900; white-space: nowrap; }
+.todays-calls-chips { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px; align-items: center; min-width: 0; flex: 1; scrollbar-width: none; }
+.todays-calls-chips::-webkit-scrollbar { display: none; }
+.todays-call-pill { background: rgba(15, 23, 42, 0.78); border: 2px solid #fef08a; color: #fef08a; padding: 2px 8px; border-radius: 9px; font-size: clamp(0.9rem, 1.35vw, 1.1rem); font-weight: 900; white-space: nowrap; flex-shrink: 0; }
 body.theme-black-cream .todays-call-pill { background: #fff; border-color: #000; color: #000; }
 
 .family-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; flex: 1; min-height: 0; padding-top: 4px; }
