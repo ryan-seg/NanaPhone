@@ -1052,7 +1052,6 @@ async function startCallFromNana(member) {
   outboundTimeout = setTimeout(async () => {
     if (state.currentState === 'calling_family') {
       speakMsg(`Sorry, ${member.spokenName} could not answer right now.`);
-      await incrementMissedCallForMember(member.id);
       await executeEndCallCleanup();
     }
   }, (Number(settings.ringDurationSec) || 60) * 1000);
