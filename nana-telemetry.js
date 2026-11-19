@@ -991,10 +991,35 @@ export function getTodaysCompletedCallsList() {
     .sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
 }
 
+function getCondensedTodaysCallsSummary(callsToday = getTodaysCompletedCallsList()) {
+  const byPerson = new Map();
+  callsToday.forEach(c => {
+    const key = c.partnerId || (c.partnerName || 'Family').toLowerCase();
+    const name = FAMILY_NAMES[c.partnerId] || c.partnerName || 'Family';
+    const durSec = Math.max(0, Number(c.durationSec) || 0);
+    const startedAt = Number(c.startedAt || c.endedAt || 0);
+    const prev = byPerson.get(key);
+    if (!prev) {
+      byPerson.set(key, { key, name, count: 1, totalSec: durSec, lastStartedAt: startedAt });
+    } else {
+      prev.count += 1;
+      prev.totalSec += durSec;
+      if (startedAt >= prev.lastStartedAt) {
+        prev.lastStartedAt = startedAt;
+        prev.name = name;
+      }
+    }
+  });
+  return Array.from(byPerson.values())
+    .sort((a, b) => b.lastStartedAt - a.lastStartedAt)
+    .map(g => ({ ...g, totalMin: Math.max(1, Math.round(g.totalSec / 60)) }));
+}
+
 let lastCallsRenderSig = null;
 export function renderTodaysCallsBanner() {
   const banner = $('todays-calls-reassurance-banner');
   const chipsBox = $('todays-calls-chips-container');
+  const labelEl = $('todays-calls-label');
   if (!banner || !chipsBox) return;
 
   if (settings.showTodaysCallsBanner === false) {
@@ -1010,18 +1035,25 @@ export function renderTodaysCallsBanner() {
     return;
   }
 
-  const sig = callsToday.map(c => `${c.partnerId || ''}_${c.startedAt || 0}_${c.durationSec || 0}`).join('|');
+  const grouped = getCondensedTodaysCallsSummary(callsToday);
+  const sig = `${callsToday.length}|` + grouped.map(g => `${g.key}_${g.count}_${g.lastStartedAt}_${g.totalMin}`).join('|');
   if (sig === lastCallsRenderSig && banner.style.display === 'flex') return;
   lastCallsRenderSig = sig;
 
+  if (labelEl) {
+    labelEl.textContent = callsToday.length > 1 ? `💚 Today (${callsToday.length}):` : '💚 Today:';
+  }
+
   chipsBox.innerHTML = '';
-  callsToday.forEach(c => {
-    const name = FAMILY_NAMES[c.partnerId] || c.partnerName || 'Family';
-    const timeStr = c.startedAt ? new Date(c.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
-    const mins = Math.max(1, Math.round((Number(c.durationSec) || 60) / 60));
+  grouped.forEach(g => {
+    const timeStr = g.lastStartedAt
+      ? new Date(g.lastStartedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+      : '';
     const pill = document.createElement('span');
     pill.className = 'todays-call-pill';
-    pill.textContent = `✓ ${name} at ${timeStr} (${mins}m chat)`;
+    pill.textContent = g.count > 1
+      ? `✓ ${g.name} ×${g.count} • ${timeStr} (${g.totalMin}m)`
+      : `✓ ${g.name} ${timeStr} (${g.totalMin}m)`;
     chipsBox.appendChild(pill);
   });
   banner.style.display = 'flex';
@@ -1132,13 +1164,16 @@ export function updateFamilyPresenceBanner() {
   const callsToday = getTodaysCompletedCallsList();
   let todayLineHtml = '';
   if (callsToday.length) {
-    const summaryItems = callsToday.map(c => {
-      const name = esc(FAMILY_NAMES[c.partnerId] || c.partnerName || 'Family');
-      const t = c.startedAt ? new Date(c.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
-      const m = Math.max(1, Math.round((Number(c.durationSec) || 60) / 60));
-      return `${name} (${t}, ${m}m)`;
+    const grouped = getCondensedTodaysCallsSummary(callsToday);
+    const summaryItems = grouped.map(g => {
+      const name = esc(g.name);
+      const t = g.lastStartedAt ? new Date(g.lastStartedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+      return g.count > 1
+        ? `${name} ×${g.count} (${t}, ${g.totalMin}m)`
+        : `${name} (${t}, ${g.totalMin}m)`;
     }).join(' • ');
-    todayLineHtml = `<br><span class="fam-today-calls-line" style="color:#86efac;font-size:0.84rem;font-weight:800;">💚 Connected calls today: ${summaryItems}</span>`;
+    const countTag = callsToday.length > 1 ? ` (${callsToday.length})` : '';
+    todayLineHtml = `<br><span class="fam-today-calls-line" style="color:#86efac;font-size:0.84rem;font-weight:800;">💚 Today${countTag}: ${summaryItems}</span>`;
   }
 
   const tgConnected = state.connectedMemberIds.includes(activeFamilyMember.id);
