@@ -90,9 +90,12 @@ const fmtDelay = (sec) => {
       <div class="controls-acc-body">
         <div class="settings-card">
           <div class="settings-label"><span>📞 Video Calling on Nana's Tablet</span><span class="calling-status-lbl" style="font-size:0.95rem;"></span></div>
-          <div class="opt-row">
+          <div class="opt-row" style="margin-bottom:6px;">
             <button class="opt-btn calling-off-btn" onclick="setCallingEnabled(false)">📵 Turn OFF (hide)</button>
             <button class="opt-btn calling-on-btn" onclick="setCallingEnabled(true)">✅ Turn ON</button>
+          </div>
+          <div class="opt-row">
+            <button class="opt-btn" style="background:#dc2626;border-color:#fff;color:#fff;" onclick="clearAllMissedCalls()">🧹 Clear Missed Calls</button>
           </div>
         </div>
         ${isAdminFamilyMember ? `<div class="settings-card">
@@ -206,7 +209,6 @@ const fmtDelay = (sec) => {
           <div class="settings-sub" style="margin-bottom:4px;">💬 Post Battery-Out &amp; Back-Online Messages to Family Chat:</div>
           <div class="opt-row" style="margin-bottom:8px;">${optBtns('batteryChatAlertsEnabled', [[true,'🔋 Chat Alerts ON'],[false,'🔕 Off']])}</div>
           <div class="opt-row" style="margin-bottom:8px;">
-            <button class="opt-btn" style="background:#dc2626;border-color:#fff;color:#fff;" onclick="clearAllMissedCalls()">🧹 Clear Missed Calls</button>
             <button class="opt-btn" onclick="muteBatteryVoiceForHours(0)">🔊 Unmute Battery Voice</button>
           </div>
           <div class="opt-row">
@@ -453,15 +455,41 @@ window.switchGuideTab = (os) => {
   if ($('guide-content-android')) $('guide-content-android').style.display = os === 'ios' ? 'none' : 'block';
 };
 
+let adminPinCountdownTimer = null;
+let adminPinSecondsLeft = 5;
+
+function clearAdminPinTimer() {
+  clearInterval(adminPinCountdownTimer);
+  adminPinCountdownTimer = null;
+}
+
 window.openAdminPinModal = () => {
+  clearAdminPinTimer();
   enteredPin = "";
+  adminPinSecondsLeft = 5;
   if ($('pin-dots-display')) $('pin-dots-display').innerText = "";
   if ($('admin-modal-title')) $('admin-modal-title').innerText = `⚙️ Supervisor & Controls (v${CONFIG.appVersion})`;
+  if ($('admin-modal-sub')) $('admin-modal-sub').innerText = `Enter 4-digit Supervisor PIN — closes in ${adminPinSecondsLeft}s`;
   if ($('pin-keypad-section')) $('pin-keypad-section').style.display = 'flex';
   if ($('admin-actions-section')) $('admin-actions-section').style.display = 'none';
   $('admin-pin-modal').style.display = 'flex';
+
+  adminPinCountdownTimer = setInterval(() => {
+    adminPinSecondsLeft -= 1;
+    if (adminPinSecondsLeft <= 0) {
+      window.closeAdminPinModal();
+      return;
+    }
+    if ($('admin-modal-sub')) {
+      $('admin-modal-sub').innerText = `Enter 4-digit Supervisor PIN — closes in ${adminPinSecondsLeft}s`;
+    }
+  }, 1000);
 };
-window.closeAdminPinModal = () => { enteredPin = ""; $('admin-pin-modal').style.display = 'none'; };
+window.closeAdminPinModal = () => {
+  clearAdminPinTimer();
+  enteredPin = "";
+  $('admin-pin-modal').style.display = 'none';
+};
 window.clearPinDigits = () => { enteredPin = ""; if ($('pin-dots-display')) $('pin-dots-display').innerText = ""; };
 
 window.pressPinDigit = async (d) => {
@@ -471,10 +499,12 @@ window.pressPinDigit = async (d) => {
   if (enteredPin.length === 4) {
     const candidateHash = await sha256Hex("nana-pin-salt:" + enteredPin);
     if (candidateHash === EXPECTED_PIN_HASH) {
+      clearAdminPinTimer();
       window.AndroidBridge?.unlockAdminForFiveMinutes?.();
       const cards = $('shared-settings-cards'), mount = $('gear-settings-mount');
       if (cards && mount && cards.parentElement !== mount) mount.appendChild(cards);
       if ($('admin-modal-title')) $('admin-modal-title').innerText = `🔓 Unlocked (v${CONFIG.appVersion})`;
+      if ($('admin-modal-sub')) $('admin-modal-sub').innerText = 'Supervisor controls unlocked';
       if ($('pin-keypad-section')) $('pin-keypad-section').style.display = 'none';
       if ($('admin-actions-section')) $('admin-actions-section').style.display = 'flex';
       refreshSettingsUI();
