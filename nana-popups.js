@@ -50,10 +50,12 @@ async function expireQuestionIfNeeded(q) {
       expiredAt: now
     }).catch(() => {});
   }
-  await update(refs.quickQuestion, {
-    status: 'expired',
-    expiredAt: now
-  }).catch(() => {});
+  if (!activeQuestionData || activeQuestionData.id === q.id) {
+    await update(refs.quickQuestion, {
+      status: 'expired',
+      expiredAt: now
+    }).catch(() => {});
+  }
   return true;
 }
 
@@ -134,10 +136,15 @@ function renderFamilyQuestionHistory() {
       </div>
       <button class="fam-q-mini-btn" style="background:#059669;border-color:#4ade80;padding:6px 10px;white-space:nowrap;" title="Send this question to Nana's screen again">🔄 Ask Again</button>
     `;
-    row.querySelector('button').onclick = () => dispatchFamilyQuestionPopup(item.question, {
-      type: item.type || 'family_question',
-      manualPrompt: !!(item.manualPrompt || item.type === 'idle_radio_prompt' || item.type === 'idle_video_prompt')
-    });
+    row.querySelector('button').onclick = () => {
+      if (item.type === 'idle_video_prompt') {
+        return window.sendQuickMediaPromptToNana('video');
+      }
+      return dispatchFamilyQuestionPopup(item.question, {
+        type: item.type || 'family_question',
+        manualPrompt: !!(item.manualPrompt || item.type === 'idle_radio_prompt')
+      });
+    };
     box.appendChild(row);
   });
 }
