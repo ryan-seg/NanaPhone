@@ -24,6 +24,27 @@ let lastVideoProgressMs = 0;
 let lastWorkingProgressStartMs = 0;
 const failedVideoIdsInRun = new Set();
 const notifiedBrokenVideoIds = new Set();
+const retriedVideoIdsInRun = new Set();
+let videoRetryTimer = null;
+
+function resetVideoWatchdog(initialTime = -1) {
+  lastObservedVideoTime = initialTime;
+  lastVideoProgressMs = Date.now();
+  lastWorkingProgressStartMs = 0;
+}
+
+function describeMediaError(err) {
+  if (!err) return 'media load error';
+  const codeMap = {
+    1: 'MEDIA_ERR_ABORTED (aborted)',
+    2: 'MEDIA_ERR_NETWORK (network/connection error)',
+    3: 'MEDIA_ERR_DECODE (decode/codec error)',
+    4: 'MEDIA_ERR_SRC_NOT_SUPPORTED (unsupported format/codec or HTTP error)'
+  };
+  const base = codeMap[err.code] || `media error code ${err.code}`;
+  const detail = err.message ? `: ${err.message}` : '';
+  return `${base}${detail}`;
+}
 
 // --- 1. WAKE LOCK & ACTIVE PLAYBACK HELPERS ---
 export function isNanaVideoActivelyPlaying() {
@@ -166,10 +187,18 @@ async function attachSubtitleTrack(subUrl, forceReload = false) {
 function loadQueueItemIntoVideoElement(item, forceSubReload = false) {
   if (!videoEl || !item || !item.url) return;
   if (lastLoadedVideoUrl !== item.url || loadedVideoItemId !== item.id || !videoEl.getAttribute('src')) {
+    clearTimeout(videoRetryTimer);
+    videoRetryTimer = null;
+    if (lastLoadedVideoUrl !== item.url && item.id) {
+      notifiedBrokenVideoIds.delete(item.id);
+      failedVideoIdsInRun.delete(item.id);
+      retriedVideoIdsInRun.delete(item.id);
+    }
     isHandlingVideoEnd = false;
     loadedVideoItemId = item.id;
     lastLoadedVideoUrl = item.url;
     lastSavedTimeSec = 0;
+    resetVideoWatchdog(-1);
     videoEl.src = item.url;
     attachSubtitleTrack(item.subtitleUrl || '', true);
   } else if (forceSubReload) {
@@ -531,16 +560,17 @@ async function handleBrokenOrStalledVideo(reason = 'view time not advancing') {
   if (!curItem || state.streamData.state !== 'playing') return;
   if (state.currentState && state.currentState !== 'idle') return;
 
+  clearTimeout(videoRetryTimer);
+  videoRetryTimer = null;
   isHandlingVideoEnd = true;
   failedVideoIdsInRun.add(curItem.item.id);
   notifyRyanBrokenVideo(curItem.item, curItem.index, reason);
 
-  lastObservedVideoTime = -1;
-  lastVideoProgressMs = Date.now();
-  lastWorkingProgressStartMs = 0;
+  resetVideoWatchdog(-1);
 
   if (curItem.total <= 1 || failedVideoIdsInRun.size >= curItem.total) {
     state.streamData.state = 'paused';
+    try { videoEl?.pause(); } catch (_) {}
     await update(refs.videoStream, {
       state: 'paused',
       pauseReason: 'video_failed',
@@ -583,21 +613,19 @@ if (role === 'nana' && videoEl) {
       state.streamData.state === 'playing' &&
       $('video-screen')?.classList.contains('active') &&
       (!state.currentState || state.currentState === 'idle') &&
-      !isHandlingVideoEnd
+      !isHandlingVideoEnd &&
+      !videoRetryTimer
     );
     if (!shouldBePlaying) {
-      lastObservedVideoTime = -1;
-      lastVideoProgressMs = Date.now();
-      lastWorkingProgressStartMs = 0;
+      resetVideoWatchdog(-1);
       return;
     }
 
     const curT = Number(videoEl.currentTime) || 0;
     const now = Date.now();
-    if (lastObservedVideoTime < 0) {
-      lastObservedVideoTime = curT;
-      lastVideoProgressMs = now;
-      lastWorkingProgressStartMs = 0;
+    // If episode restarted or seeked backward, re-baseline instead of treating it as stalled
+    if (lastObservedVideoTime < 0 || curT < lastObservedVideoTime - 0.5) {
+      resetVideoWatchdog(curT);
       return;
     }
 
@@ -605,17 +633,35 @@ if (role === 'nana' && videoEl) {
       lastObservedVideoTime = curT;
       lastVideoProgressMs = now;
       if (!lastWorkingProgressStartMs) lastWorkingProgressStartMs = now;
-      else if (now - lastWorkingProgressStartMs >= 3000) failedVideoIdsInRun.clear();
-    } else if (now - lastVideoProgressMs >= 15000) {
-      handleBrokenOrStalledVideo('playback stalled / view time not increasing');
+      else if (now - lastWorkingProgressStartMs >= 3000) {
+        failedVideoIdsInRun.clear();
+        retriedVideoIdsInRun.clear();
+      }
+    } else {
+      const activelyBuffering = videoEl.readyState < 3 && videoEl.networkState === 2;
+      const stallLimitMs = activelyBuffering ? 30000 : 18000;
+      if (now - lastVideoProgressMs >= stallLimitMs) {
+        const stallWhy = activelyBuffering
+          ? `buffering timed out (${Math.round(stallLimitMs / 1000)}s, readyState=${videoEl.readyState})`
+          : `playback stalled (readyState=${videoEl.readyState}, networkState=${videoEl.networkState})`;
+        handleBrokenOrStalledVideo(stallWhy);
+      }
     }
   }, 3000);
 }
 
 if (videoEl) {
+  videoEl.addEventListener('loadstart', () => {
+    resetVideoWatchdog(-1);
+  });
+  videoEl.addEventListener('seeking', () => {
+    resetVideoWatchdog(Number(videoEl.currentTime) || 0);
+  });
   videoEl.addEventListener('timeupdate', () => {
     const curT = Number(videoEl.currentTime) || 0;
-    if (curT > lastObservedVideoTime + 0.4) {
+    if (lastObservedVideoTime < 0 || curT < lastObservedVideoTime - 0.5) {
+      resetVideoWatchdog(curT);
+    } else if (curT > lastObservedVideoTime + 0.4) {
       lastObservedVideoTime = curT;
       lastVideoProgressMs = Date.now();
       if (!lastWorkingProgressStartMs) lastWorkingProgressStartMs = lastVideoProgressMs;
@@ -623,6 +669,8 @@ if (videoEl) {
     saveCurrentVideoTime(false);
   });
   videoEl.addEventListener('playing', () => {
+    clearTimeout(videoRetryTimer);
+    videoRetryTimer = null;
     isHandlingVideoEnd = false;
     lastVideoProgressMs = Date.now();
     syncVideoUI();
@@ -644,9 +692,27 @@ if (videoEl) {
   });
   videoEl.addEventListener('ended', () => { if (role === 'nana') handleVideoEndedOnNana(); });
   videoEl.addEventListener('error', () => {
+    const errReason = describeMediaError(videoEl.error);
+    const curItem = getCurrentQueueItem();
+    if (role === 'nana' && state.streamData.state === 'playing' && curItem && !retriedVideoIdsInRun.has(curItem.item.id)) {
+      retriedVideoIdsInRun.add(curItem.item.id);
+      syncVideoUI('⏳ Connection hiccup — retrying video...');
+      clearTimeout(videoRetryTimer);
+      videoRetryTimer = setTimeout(() => {
+        videoRetryTimer = null;
+        const stillSame = getCurrentQueueItem();
+        if (!stillSame || stillSame.item.id !== curItem.item.id || state.streamData.state !== 'playing') return;
+        resetVideoWatchdog(-1);
+        try {
+          videoEl.load();
+        } catch (_) {}
+        startOrResumeVideo();
+      }, 2500);
+      return;
+    }
     syncVideoUI('⚠️ Could not load video file — check video URL or format');
     if (role === 'nana' && state.streamData.state === 'playing') {
-      handleBrokenOrStalledVideo('media load error');
+      handleBrokenOrStalledVideo(errReason);
     }
   });
 }
