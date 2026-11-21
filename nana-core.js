@@ -258,7 +258,7 @@ export const settings = {
   batteryChatAlertsEnabled: true,
   lowPowerModeSetting: 'auto', lowPowerBlockVideo: true, lowPowerMaxBrightness: 50, lowPowerDimDelaySec: 45,
   showBulletinBar: true, showReadAloud: false, colorTheme: 'classic-dark',
-  voiceMessagingEnabled: true, voiceMessageMaxSec: 30, voiceAutoSendSilenceSec: 5, nanaMessageEntryMode: 'choice',
+  voiceMessagingEnabled: true, voiceMessageMaxSec: 30, voiceAutoExtendEnabled: true, voiceHardCapSec: 120, voiceAutoSendSilenceSec: 5, voiceNoSpeechCancelSec: 15, voiceNoiseSuppression: true, voiceTvGuardMode: 'normal', nanaMessageEntryMode: 'choice',
   keyboardLayout: 'qwerty', keyboardTimeoutSec: 60, keyGuardMs: 350, bulletinClearedAt: 0,
   callingEnabled: TEST_MODE,
   showTodaysCallsBanner: true, periodicPopupsEnabled: true, unreadChatPopupMin: 30,
