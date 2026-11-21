@@ -2232,3 +2232,221 @@ window.toggleChatVideoMessage = async (msgKey) => {
     if (statusEl) statusEl.textContent = '⚠️ Could not load video';
   }
 };
+
+// --- 7. PLUGGED-IN FAMILY PHOTO FRAME SCREENSAVER (BURN-IN SAFE) ---
+let screensaverSlideTimer = null;
+let screensaverGuardInterval = null;
+let screensaverPhotos = [];
+let screensaverIndex = 0;
+let screensaverDriftToggle = false;
+const SS_CORNERS = ['corner-bl', 'corner-br', 'corner-tl', 'corner-tr'];
+
+function formatScreensaverDayAndAgo(tsMs) {
+  const ts = Number(tsMs) || 0;
+  if (!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfPhotoDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.max(0, Math.round((startOfToday - startOfPhotoDay) / 86400000));
+
+  const dayStr = d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' });
+  let agoStr = 'Today';
+  if (diffDays === 1) agoStr = 'Yesterday';
+  else if (diffDays > 1 && diffDays < 7) agoStr = `${diffDays} days ago`;
+  else if (diffDays >= 7 && diffDays < 30) {
+    const wks = Math.floor(diffDays / 7);
+    agoStr = wks === 1 ? '1 week ago' : `${wks} weeks ago`;
+  } else if (diffDays >= 30) {
+    const mos = Math.max(1, Math.round(diffDays / 30));
+    agoStr = mos === 1 ? '1 month ago' : `${mos} months ago`;
+  }
+  return `${dayStr} • ${agoStr}`;
+}
+
+function getRecentScreensaverPhotos() {
+  const maxPhotos = Math.max(5, Math.min(50, Number(settings.photoScreensaverMaxPhotos ?? 20) || 20));
+  return Object.entries(state.bulletinSnap || {})
+    .map(([key, item]) => ({ key, ...(item || {}) }))
+    .filter(item => {
+      if (!item || item.systemAlert) return false;
+      const direct = resolveChatPhotoUrl(item);
+      const fid = item.fileId || item.photoFileId || item.telegramFileId;
+      return !!(direct || fid);
+    })
+    .sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0))
+    .slice(0, maxPhotos);
+}
+
+function isScreensaverAllowedNow() {
+  if (role !== 'nana') return false;
+  if (settings.photoScreensaverEnabled === false) return false;
+  if (state.isCharging !== true || state.isTabletUnplugged) return false;
+  if (state.isBatteryDecreasingWhilePlugged) return false;
+  if (NanaCore.isLowPowerMode?.() || NanaCore.isCurrentlyInNightWindow?.()) return false;
+  if (state.currentState && state.currentState !== 'idle') return false;
+  if (NanaCore.isNanaVideoActivelyPlaying?.() || NanaCore.isChatVideoActivelyPlaying?.()) return false;
+
+  const blockingModals = [
+    'nana-question-modal', 'confirm-modal', 'admin-pin-modal',
+    'care-home-staff-modal', 'bulletin-modal', 'nana-voice-record-overlay',
+    'nana-reply-chooser-overlay', 'chat-video-overlay'
+  ];
+  for (const id of blockingModals) {
+    const el = $(id);
+    if (el && el.style.display === 'flex') return false;
+  }
+  return true;
+}
+
+function ensurePhotoScreensaverOverlay() {
+  let ov = $('nana-photo-screensaver');
+  if (ov) return ov;
+  ov = document.createElement('div');
+  ov.id = 'nana-photo-screensaver';
+  ov.innerHTML = `
+    <div class="nana-ss-stage">
+      <img id="nana-ss-img" class="nana-ss-img" alt="Family Photo" referrerpolicy="no-referrer">
+      <div id="nana-ss-caption" class="nana-ss-caption corner-bl">
+        <div id="nana-ss-meta" class="nana-ss-meta"></div>
+        <div id="nana-ss-text" class="nana-ss-text"></div>
+        <div class="nana-ss-hint">Tap anywhere to wake screen</div>
+      </div>
+    </div>
+  `;
+  const wakeFromScreensaver = (ev) => {
+    ev?.stopPropagation?.();
+    stopPhotoScreensaver('tap');
+    window.wakeScreenAndResetDimTimer?.();
+  };
+  ov.addEventListener('pointerdown', wakeFromScreensaver);
+  ov.addEventListener('click', wakeFromScreensaver);
+  document.body.appendChild(ov);
+  return ov;
+}
+
+function showScreensaverSlide(idx) {
+  if (!state.isPhotoScreensaverActive || !screensaverPhotos.length) return;
+  const item = screensaverPhotos[idx % screensaverPhotos.length];
+  const img = $('nana-ss-img');
+  const cap = $('nana-ss-caption');
+  const metaEl = $('nana-ss-meta');
+  const textEl = $('nana-ss-text');
+  if (!img || !cap || !metaEl || !textEl) return;
+
+  img.classList.remove('visible');
+  cap.style.opacity = '0';
+
+  const reveal = () => {
+    if (!state.isPhotoScreensaverActive) return;
+    screensaverDriftToggle = !screensaverDriftToggle;
+    img.classList.remove('drift-a', 'drift-b');
+    void img.offsetWidth;
+    img.classList.add(screensaverDriftToggle ? 'drift-a' : 'drift-b', 'visible');
+
+    // Rotate caption corner + subtle pixel shift each slide to prevent burn-in
+    const corner = SS_CORNERS[idx % SS_CORNERS.length];
+    cap.className = `nana-ss-caption ${corner}`;
+    const shiftX = Math.round((Math.random() - 0.5) * 18);
+    const shiftY = Math.round((Math.random() - 0.5) * 14);
+    cap.style.transform = `translate(${shiftX}px, ${shiftY}px)`;
+
+    const sender = item.fromNana ? 'Nana' : (item.author || 'Family');
+    const when = formatScreensaverDayAndAgo(item.timestamp);
+    metaEl.textContent = when ? `📷 ${sender} • ${when}` : `📷 ${sender}`;
+
+    const showCaption = settings.photoScreensaverShowCaption !== false;
+    const rawCaption = String(item.text || '').trim();
+    if (showCaption && rawCaption) {
+      textEl.textContent = rawCaption;
+      textEl.style.display = 'block';
+    } else {
+      textEl.textContent = '';
+      textEl.style.display = 'none';
+    }
+    cap.style.opacity = '1';
+  };
+
+  setTimeout(() => {
+    if (!state.isPhotoScreensaverActive) return;
+    const direct = resolveChatPhotoUrl(item);
+    const legacyFid = item.fileId || item.photoFileId || item.telegramFileId;
+    img.onload = () => reveal();
+    img.onerror = () => {
+      if (legacyFid && !img.dataset.ssRetried) {
+        img.dataset.ssRetried = '1';
+        loadLegacyPhotoIntoImg(legacyFid, img);
+      }
+    };
+    delete img.dataset.ssRetried;
+    if (direct) {
+      img.src = direct;
+    } else if (legacyFid) {
+      loadLegacyPhotoIntoImg(legacyFid, img);
+    }
+  }, 280);
+}
+
+function stopPhotoScreensaver(reason = 'manual') {
+  clearInterval(screensaverSlideTimer);
+  clearInterval(screensaverGuardInterval);
+  screensaverSlideTimer = null;
+  screensaverGuardInterval = null;
+  const wasActive = state.isPhotoScreensaverActive;
+  state.isPhotoScreensaverActive = false;
+  const ov = $('nana-photo-screensaver');
+  if (ov) ov.style.display = 'none';
+  if (wasActive && (reason === 'unplugged' || reason === 'battery_decreasing' || reason === 'night_mode')) {
+    const dimTarget = NanaCore.isLowPowerMode?.() ? 5 : (settings.dimBrightness ?? 15);
+    NanaCore.applyScreenBrightness?.(dimTarget, true);
+  }
+}
+
+function tryStartPhotoScreensaver() {
+  if (!isScreensaverAllowedNow()) return false;
+  const photos = getRecentScreensaverPhotos();
+  if (!photos.length) return false;
+
+  screensaverPhotos = photos;
+  screensaverIndex = 0;
+  state.isPhotoScreensaverActive = true;
+
+  const ov = ensurePhotoScreensaverOverlay();
+  ov.style.display = 'flex';
+
+  // Cap brightness below full (max 55%) for burn-in & battery protection
+  const ssBright = Math.max(15, Math.min(55, Number(settings.photoScreensaverBrightness ?? 40) || 40));
+  NanaCore.applyScreenBrightness?.(ssBright, true);
+
+  showScreensaverSlide(screensaverIndex);
+
+  const intervalMs = Math.max(10, Number(settings.photoScreensaverIntervalSec ?? 30) || 30) * 1000;
+  clearInterval(screensaverSlideTimer);
+  screensaverSlideTimer = setInterval(() => {
+    if (!isScreensaverAllowedNow()) {
+      stopPhotoScreensaver('guard');
+      return;
+    }
+    const fresh = getRecentScreensaverPhotos();
+    if (!fresh.length) {
+      stopPhotoScreensaver('no_photos');
+      return;
+    }
+    screensaverPhotos = fresh;
+    screensaverIndex = (screensaverIndex + 1) % screensaverPhotos.length;
+    showScreensaverSlide(screensaverIndex);
+  }, intervalMs);
+
+  clearInterval(screensaverGuardInterval);
+  screensaverGuardInterval = setInterval(() => {
+    if (!isScreensaverAllowedNow()) {
+      stopPhotoScreensaver(state.isBatteryDecreasingWhilePlugged ? 'battery_decreasing' : 'guard');
+    }
+  }, 5000);
+
+  return true;
+}
+
+hooks.tryStartPhotoScreensaver = tryStartPhotoScreensaver;
+hooks.stopPhotoScreensaver = stopPhotoScreensaver;
+
