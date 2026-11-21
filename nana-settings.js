@@ -169,6 +169,20 @@ const fmtDelay = (sec) => {
           <div class="opt-row">${optBtns('dimDelaySec', [[30,'30s'],[60,'1m'],[120,'2m'],[300,'5m'],[600,'10m'],[0,'Never']])}</div>
         </div>
         <div class="settings-card">
+          <div class="settings-label"><span>🖼️ Family Photo Frame Screensaver</span><span class="lbl-screensaver-summary" style="color:#38bdf8;font-size:0.9rem;">Plugged In Only</span></div>
+          <div class="settings-sub" style="margin-bottom:6px;">Cycles recent Family Chat photos with burn-in protection. Only runs when plugged in and battery is not dropping.</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverEnabled', [[true,'🖼️ Photo Frame ON'],[false,'🚫 Off (Normal Dim)']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Start After Inactivity:</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverDelaySec', [[60,'1m'],[120,'2m'],[180,'3m'],[300,'5m']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Change Photo Every:</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverIntervalSec', [[15,'15s'],[30,'30s'],[60,'1m'],[120,'2m']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Screensaver Brightness (capped below full for burn-in safety):</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverBrightness', [[25,'25%'],[35,'35%'],[40,'40%'],[55,'55%']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Show Family Captions &amp; Recent Photo Pool:</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverShowCaption', [[true,'💬 Show Captions'],[false,'🙈 Hide Captions']])}</div>
+          <div class="opt-row">${optBtns('photoScreensaverMaxPhotos', [[10,'Last 10'],[20,'Last 20'],[30,'Last 30']])}</div>
+        </div>
+        <div class="settings-card">
           <div class="settings-label"><span>🌙 Do Not Disturb (Night Mode)</span><span class="lbl-night-window" style="color:#38bdf8;">21:00 – 08:00</span></div>
           <div class="opt-row" style="margin-bottom:8px;">
             ${optBtns('nightModeEnabled', [[true,'🌙 Night Mode ON'],[false,'☀️ Always Awake']])}
@@ -336,9 +350,11 @@ export function applyScreenBrightness(targetPercent, dimmed = false) {
     );
   }
 }
+NanaCore.applyScreenBrightness = applyScreenBrightness;
 
 window.wakeScreenAndResetDimTimer = function () {
   if (role !== 'nana') return;
+  hooks.stopPhotoScreensaver?.('wake');
   if (state.currentState === 'ringing_nana' || (state.currentState && state.currentState !== 'idle')) {
     applyScreenBrightness(100, false);
     clearTimeout(idleDimTimer);
@@ -346,12 +362,16 @@ window.wakeScreenAndResetDimTimer = function () {
   }
   applyScreenBrightness(settings.awakeBrightness ?? 85, false);
   clearTimeout(idleDimTimer);
-  const delaySec = getEffectiveDimDelaySec();
+  const usePhotoDelay = settings.photoScreensaverEnabled !== false && state.isCharging === true && !NanaCore.isLowPowerMode?.();
+  const delaySec = usePhotoDelay
+    ? Math.max(30, Number(settings.photoScreensaverDelaySec ?? 120) || 120)
+    : getEffectiveDimDelaySec();
   const anyVideoPlaying = () => !!(NanaCore.isNanaVideoActivelyPlaying?.() || NanaCore.isChatVideoActivelyPlaying?.());
   if (delaySec > 0 && state.currentState === 'idle' && !anyVideoPlaying()) {
     idleDimTimer = setTimeout(() => {
       if (state.currentState === 'idle' && !anyVideoPlaying()) {
         window.closeSeniorKeyboard?.(true);
+        if (hooks.tryStartPhotoScreensaver?.()) return;
         const dimTarget = NanaCore.isLowPowerMode?.() ? 5 : (settings.dimBrightness ?? 15);
         applyScreenBrightness(dimTarget, true);
       }
@@ -384,6 +404,7 @@ export function updateClock() {
   if ($('night-dimmer')) {
     const anyVideoPlaying = !!(NanaCore.isNanaVideoActivelyPlaying?.() || NanaCore.isChatVideoActivelyPlaying?.());
     const showNight = isCurrentlyInNightWindow() && state.currentState === 'idle' && !anyVideoPlaying && Date.now() > nightDismissedUntilMs;
+    if (showNight) hooks.stopPhotoScreensaver?.('night_mode');
     const disp = showNight ? 'flex' : 'none';
     if (disp !== lastNightDimDisplay) {
       lastNightDimDisplay = disp;
@@ -658,6 +679,14 @@ export function refreshSettingsUI() {
   if ($('nana-vol-display')) $('nana-vol-display').innerText = `${radVol}%`;
 
   document.querySelectorAll('.lbl-bright-summary').forEach(e => { e.innerText = `${awakeB}% ➔ ${dimB}% (${fmtDelay(dimSec)})`; });
+  const ssOn = settings.photoScreensaverEnabled !== false;
+  const ssDelay = Number(settings.photoScreensaverDelaySec ?? 120);
+  const ssInt = Number(settings.photoScreensaverIntervalSec ?? 30);
+  const ssBright = Math.max(15, Math.min(55, Number(settings.photoScreensaverBrightness ?? 40)));
+  document.querySelectorAll('.lbl-screensaver-summary').forEach(e => {
+    e.innerText = ssOn ? `ON • ${fmtDelay(ssDelay)} / ${fmtDelay(ssInt)} • ${ssBright}%` : 'Off';
+    e.style.color = ssOn ? '#4ade80' : '#94a3b8';
+  });
   document.querySelectorAll('.lbl-kb-summary').forEach(e => { e.innerText = `${kbLayout.toUpperCase()} • ${fmtDelay(kbHideSec)}`; });
   document.querySelectorAll('.lbl-vol-summary').forEach(e => {
     e.innerText = `Call ${callVol}% • Radio ${radVol}% • Ring ${ringVol}%`;
