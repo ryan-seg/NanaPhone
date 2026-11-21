@@ -827,15 +827,51 @@ window.closeSeniorKeyboard = (restoreScroll = true) => {
         if (restoreScroll && savedChatScrollTop !== null) feed.scrollTop = savedChatScrollTop;
         else if (!restoreScroll) feed.scrollTop = feed.scrollHeight;
         setupNanaChatReadObserver();
+        scheduleNanaScrollPhotoUpdate(feed);
       }
     }, 30);
   }
   hooks.broadcastScreen?.();
 };
 
+let chatPhotoScaleRaf = null;
+function updateNanaScrollPhotoSizes(feedEl = $('bulletin-posts-container')) {
+  if (role !== 'nana' || !feedEl || $('bulletin-modal')?.classList.contains('kb-fullscreen')) return;
+  const stages = feedEl.querySelectorAll('.tg-photo-stage');
+  if (!stages.length) return;
+  const feedRect = feedEl.getBoundingClientRect();
+  if (!feedRect.height) return;
+  const feedCenterY = feedRect.top + feedRect.height * 0.48;
+  const maxDist = Math.max(180, feedRect.height * 0.58);
+
+  stages.forEach(stage => {
+    const img = stage.querySelector('.tg-chat-photo.nana-scroll-photo');
+    if (!img) return;
+    const r = stage.getBoundingClientRect();
+    const photoCenterY = r.top + r.height / 2;
+    const dist = Math.abs(photoCenterY - feedCenterY);
+    const p = Math.max(0, Math.min(1, 1 - dist / maxDist));
+    const eased = p * p * (3 - 2 * p);
+    const scale = 0.66 + eased * 0.34;
+    const opacity = 0.82 + eased * 0.18;
+    img.style.setProperty('--photo-scale', scale.toFixed(3));
+    img.style.setProperty('--photo-opacity', opacity.toFixed(3));
+    img.classList.toggle('is-photo-focused', eased >= 0.7);
+  });
+}
+
+function scheduleNanaScrollPhotoUpdate(feedEl = $('bulletin-posts-container')) {
+  if (role !== 'nana' || chatPhotoScaleRaf) return;
+  chatPhotoScaleRaf = requestAnimationFrame(() => {
+    chatPhotoScaleRaf = null;
+    updateNanaScrollPhotoSizes(feedEl);
+  });
+}
+
 window.handleChatScroll = (el) => {
   if (role === 'nana' && el && !$('bulletin-modal')?.classList.contains('kb-fullscreen')) {
     savedChatScrollTop = el.scrollTop;
+    scheduleNanaScrollPhotoUpdate(el);
     const feedRect = el.getBoundingClientRect();
     el.querySelectorAll('.tg-bubble.unread-msg[data-msg-key]').forEach(bubble => {
       const r = bubble.getBoundingClientRect();
@@ -1114,10 +1150,13 @@ export function renderBulletinFeed(forceInitialScroll = false) {
       const legacyFid = item.fileId || item.photoFileId || item.telegramFileId;
       if (photoSrc || legacyFid) {
         const img = document.createElement('img');
-        img.className = 'tg-chat-photo';
+        img.className = role === 'nana' ? 'tg-chat-photo nana-scroll-photo' : 'tg-chat-photo';
         img.referrerPolicy = 'no-referrer';
         img.loading = 'eager';
         img.alt = 'Family Photo';
+        if (role === 'nana') {
+          img.onload = () => scheduleNanaScrollPhotoUpdate(container);
+        }
         if (photoSrc) {
           img.src = photoSrc;
           img.onerror = () => {
@@ -1129,7 +1168,15 @@ export function renderBulletinFeed(forceInitialScroll = false) {
         } else {
           loadLegacyPhotoIntoImg(legacyFid, img);
         }
-        b.appendChild(img);
+        if (role === 'nana') {
+          b.classList.add('nana-photo-bubble');
+          const stage = document.createElement('div');
+          stage.className = 'tg-photo-stage';
+          stage.appendChild(img);
+          b.appendChild(stage);
+        } else {
+          b.appendChild(img);
+        }
       }
 
       if (hasVoice && !isOut && settings.voiceMessagingEnabled !== false) {
@@ -1199,7 +1246,10 @@ export function renderBulletinFeed(forceInitialScroll = false) {
     if (forceInitialScroll) setTimeout(scrollToFirstUnreadOrBottom, 60);
     else {
       container.scrollTop = (shouldScrollBottom || wasAtBottom) ? container.scrollHeight : previousScroll;
-      setTimeout(setupNanaChatReadObserver, 60);
+      setTimeout(() => {
+        setupNanaChatReadObserver();
+        scheduleNanaScrollPhotoUpdate(container);
+      }, 60);
     }
   }
 }
