@@ -1,6 +1,6 @@
 import {
   $, NanaCore, esc, update, remove, push, onValue, runTransaction, onDisconnect, query, limitToLast
-} from "./nana-core.js?v=2.9.5";
+} from "./nana-core.js?v=2.9.6";
 
 const {
   CONFIG, SERVICE_TOKEN, PORTAL_NODE_ID,

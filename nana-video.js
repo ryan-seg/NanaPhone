@@ -1,4 +1,4 @@
-import { $, NanaCore, esc, askNana, update, push, onValue } from "./nana-core.js?v=2.9.5";
+import { $, NanaCore, esc, askNana, update, push, onValue } from "./nana-core.js?v=2.9.6";
 
 const { role, isAdminFamilyMember, senderName, refs, settings, state, hooks, showScreen, CONFIG, SERVICE_TOKEN, PORTAL_NODE_ID } = NanaCore;
 // Strictly limit queue editing/adding/deleting/sorting to Admin (Ryan); other family members can only Play, Pause & Make Active

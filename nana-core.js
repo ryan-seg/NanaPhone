@@ -1,7 +1,7 @@
 import { getApps, getApp, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, update, push, onValue, remove, runTransaction, onDisconnect, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-export const APP_VERSION = "2.9.5";
+export const APP_VERSION = "2.9.6";
 export const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export { ref, set, update, push, onValue, remove, runTransaction, onDisconnect, query, limitToLast };

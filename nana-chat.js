@@ -1,6 +1,6 @@
 import {
   $, NanaCore, esc, ref, update, push, onValue, query, limitToLast
-} from "./nana-core.js?v=2.9.5";
+} from "./nana-core.js?v=2.9.6";
 
 const {
   CONFIG, SERVICE_TOKEN, PORTAL_NODE_ID, role, activeFamilyMember,
@@ -1198,6 +1198,15 @@ export function renderBulletinFeed(forceInitialScroll = false) {
         b.appendChild(p);
       }
 
+      if (role === 'family' && !isSys && (photoSrc || legacyFid)) {
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'tg-edit-caption-btn';
+        editBtn.textContent = item.text ? '✏️ Edit Caption' : '➕ Add Caption';
+        editBtn.onclick = () => window.editChatPhotoCaption?.(k);
+        b.appendChild(editBtn);
+      }
+
       if (role === 'family' && !isOut && !isSys) {
         const rc = document.createElement('div');
         if (hasVoice) {
@@ -2239,7 +2248,27 @@ let screensaverGuardInterval = null;
 let screensaverPhotos = [];
 let screensaverIndex = 0;
 let screensaverDriftToggle = false;
-const SS_CORNERS = ['corner-bl', 'corner-br', 'corner-tl', 'corner-tr'];
+const SS_ALIGNS = ['align-left', 'align-center', 'align-right'];
+
+window.editChatPhotoCaption = async (msgKey) => {
+  if (role !== 'family' || !msgKey) return;
+  const item = state.bulletinSnap?.[msgKey];
+  if (!item) return;
+  const current = String(item.text || '');
+  const next = prompt('Edit photo caption for Nana (leave blank to remove caption):', current);
+  if (next === null) return;
+  const trimmed = next.trim();
+  try {
+    await update(ref(db, `${basePath}/bulletin/${msgKey}`), {
+      text: trimmed,
+      captionEditedBy: activeFamilyMember?.name || 'Family',
+      captionEditedAt: Date.now()
+    });
+  } catch (err) {
+    console.warn('Could not update photo caption:', err);
+    alert('Could not save caption right now. Please try again.');
+  }
+};
 
 function formatScreensaverDayAndAgo(tsMs) {
   const ts = Number(tsMs) || 0;
@@ -2305,9 +2334,11 @@ function ensurePhotoScreensaverOverlay() {
   ov = document.createElement('div');
   ov.id = 'nana-photo-screensaver';
   ov.innerHTML = `
-    <div class="nana-ss-stage">
-      <img id="nana-ss-img" class="nana-ss-img" alt="Family Photo" referrerpolicy="no-referrer">
-      <div id="nana-ss-caption" class="nana-ss-caption corner-bl">
+    <div id="nana-ss-stage" class="nana-ss-stage">
+      <div class="nana-ss-photo-wrap">
+        <img id="nana-ss-img" class="nana-ss-img" alt="Family Photo" referrerpolicy="no-referrer">
+      </div>
+      <div id="nana-ss-caption" class="nana-ss-caption align-center">
         <div id="nana-ss-meta" class="nana-ss-meta"></div>
         <div id="nana-ss-text" class="nana-ss-text"></div>
         <div class="nana-ss-hint">Tap anywhere to wake screen</div>
@@ -2328,11 +2359,12 @@ function ensurePhotoScreensaverOverlay() {
 function showScreensaverSlide(idx) {
   if (!state.isPhotoScreensaverActive || !screensaverPhotos.length) return;
   const item = screensaverPhotos[idx % screensaverPhotos.length];
+  const stage = $('nana-ss-stage');
   const img = $('nana-ss-img');
   const cap = $('nana-ss-caption');
   const metaEl = $('nana-ss-meta');
   const textEl = $('nana-ss-text');
-  if (!img || !cap || !metaEl || !textEl) return;
+  if (!stage || !img || !cap || !metaEl || !textEl) return;
 
   img.classList.remove('visible');
   cap.style.opacity = '0';
@@ -2344,12 +2376,12 @@ function showScreensaverSlide(idx) {
     void img.offsetWidth;
     img.classList.add(screensaverDriftToggle ? 'drift-a' : 'drift-b', 'visible');
 
-    // Rotate caption corner + subtle pixel shift each slide to prevent burn-in
-    const corner = SS_CORNERS[idx % SS_CORNERS.length];
-    cap.className = `nana-ss-caption ${corner}`;
-    const shiftX = Math.round((Math.random() - 0.5) * 18);
-    const shiftY = Math.round((Math.random() - 0.5) * 14);
-    cap.style.transform = `translate(${shiftX}px, ${shiftY}px)`;
+    // Alternate caption band top/bottom + alignment + subtle pixel shift to prevent burn-in without overlapping the photo
+    stage.classList.toggle('cap-top', idx % 2 === 1);
+    const alignCls = SS_ALIGNS[idx % SS_ALIGNS.length];
+    cap.className = `nana-ss-caption ${alignCls}`;
+    const shiftX = Math.round((Math.random() - 0.5) * 14);
+    cap.style.transform = `translateX(${shiftX}px)`;
 
     const sender = item.fromNana ? 'Nana' : (item.author || 'Family');
     const when = formatScreensaverDayAndAgo(item.timestamp);

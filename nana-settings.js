@@ -1,7 +1,7 @@
 import {
   $, NanaCore, EXPECTED_PIN_HASH, sha256Hex,
   ref, set, update, onValue, remove
-} from "./nana-core.js?v=2.9.5";
+} from "./nana-core.js?v=2.9.6";
 
 const {
   CONFIG, SERVICE_TOKEN, role, callerId, activeFamilyMember, isAdminFamilyMember,

@@ -1,6 +1,6 @@
 import {
   $, NanaCore, esc, ref, set, update, remove
-} from "./nana-core.js?v=2.9.5";
+} from "./nana-core.js?v=2.9.6";
 
 const {
   CONFIG, SERVICE_TOKEN, role, activeFamilyMember, isAdminFamilyMember,
