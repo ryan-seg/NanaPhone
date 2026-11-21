@@ -232,10 +232,20 @@ const fmtDelay = (sec) => {
           <div class="opt-row" style="margin-bottom:6px;">${optBtns('voiceMessagingEnabled', [[true,'🎙️ Voice Messaging ON'],[false,'🚫 Off (Text Only)']])}</div>
           <div class="settings-sub" style="margin-bottom:4px;">💬 Tapping Message Box on Nana's Tablet Opens:</div>
           <div class="opt-row" style="margin-bottom:6px;">${optBtns('nanaMessageEntryMode', [['choice','💬 Choice Screen'],['keyboard','⌨️ Keyboard'],['voice','🎙️ Voice Message']])}</div>
-          <div class="settings-sub" style="margin-bottom:4px;">⏱️ Voice Recording Max Time (auto-sends at 0):</div>
+          <div class="settings-sub" style="margin-bottom:4px;">⏱️ Voice Recording Base Time:</div>
           <div class="opt-row" style="margin-bottom:6px;">${optBtns('voiceMessageMaxSec', [[15,'15s'],[20,'20s'],[30,'30s'],[45,'45s'],[60,'60s']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">➕ Auto-Extend While Nana Is Still Talking (+15s automatically):</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('voiceAutoExtendEnabled', [[true,'✅ Auto-Extend ON'],[false,'🚫 Off (Hard Stop at Base)']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">🛑 Hard Safety Limit (maximum recording length when Auto-Extend is ON):</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('voiceHardCapSec', [[60,'1m'],[90,'1m 30s'],[120,'2m'],[180,'3m']])}</div>
           <div class="settings-sub" style="margin-bottom:4px;">🤫 Auto-Send Once Nana Stops Talking (silence timeout):</div>
-          <div class="opt-row">${optBtns('voiceAutoSendSilenceSec', [[0,'Off (Tap Done)'],[3,'3s'],[5,'5s'],[8,'8s']])}</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('voiceAutoSendSilenceSec', [[0,'Off (Tap Done)'],[3,'3s'],[5,'5s'],[8,'8s']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">🔇 Auto-Cancel If No Voice Heard (prevents silent messages):</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('voiceNoSpeechCancelSec', [[0,'Off'],[10,'10s'],[15,'15s'],[20,'20s']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">🛡️ Mic Noise Suppression &amp; Echo Cancel (turn Off if Nana's voice sounds clipped):</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('voiceNoiseSuppression', [[true,'🛡️ ON (Reduces TV/Radio)'],[false,'🎤 Off (Raw Mic)']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">📺 TV / Radio Background Guard (voice detector sensitivity &amp; anti-runaway):</div>
+          <div class="opt-row">${optBtns('voiceTvGuardMode', [['off','🔓 Off (Simple)'],['normal','📺 Normal'],['strict','🛡️ Strict (Loud TV)']])}</div>
         </div>
         <div class="settings-card">
           <div class="settings-label"><span>⌨️ Nana's Keyboard Layout &amp; Auto-Hide</span><span class="lbl-kb-summary" style="color:#38bdf8;font-size:0.95rem;">QWERTY • 1m</span></div>
