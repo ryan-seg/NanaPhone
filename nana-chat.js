@@ -1445,10 +1445,15 @@ let recTimerInterval = null;
 let recCallWatchInterval = null;
 let recVadInterval = null;
 let recMicSource = null;
+let recMicFilter = null;
 let recMicAnalyser = null;
 let recStartedAtMs = 0;
 let recDeadlineMs = 0;
+let recHardDeadlineMs = 0;
 let recLastSpeechAtMs = 0;
+let recTotalSpeechMs = 0;
+let recVadAvailable = false;
+let recManualDone = false;
 let recCancelled = false;
 
 function playVoiceChime() {
@@ -1479,6 +1484,10 @@ function stopRecStreams() {
   if (recMicSource) {
     try { recMicSource.disconnect(); } catch (_) {}
     recMicSource = null;
+  }
+  if (recMicFilter) {
+    try { recMicFilter.disconnect(); } catch (_) {}
+    recMicFilter = null;
   }
   if (recMicAnalyser) {
     try { recMicAnalyser.disconnect(); } catch (_) {}
@@ -1527,6 +1536,7 @@ function ensureVoiceRecordOverlay() {
 
   $('nana-rec-done-btn').onclick = () => {
     if (Date.now() - recStartedAtMs < VOICE_TAP_GUARD_MS) return;
+    recManualDone = true;
     if (activeRecorder && activeRecorder.state === 'recording') {
       try { activeRecorder.stop(); } catch (_) { cancelNanaVoiceRecording(true); }
     } else {
@@ -1535,6 +1545,7 @@ function ensureVoiceRecordOverlay() {
   };
   $('nana-rec-more-btn').onclick = () => {
     recDeadlineMs += 15000;
+    if (recDeadlineMs > recHardDeadlineMs) recHardDeadlineMs = recDeadlineMs;
     recLastSpeechAtMs = Date.now();
   };
   $('nana-rec-cancel-btn').onclick = () => {
@@ -1555,33 +1566,66 @@ window.startNanaVoiceRecording = async () => {
   hooks.pauseVideo?.('voice_recording');
   window.wakeScreenAndResetDimTimer?.();
 
+  const useNoiseSupp = settings.voiceNoiseSuppression !== false;
+  const audioConstraint = useNoiseSupp
+    ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }
+    : true;
   try {
-    activeRecStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    activeRecStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint });
   } catch (err) {
-    console.warn('Mic access denied:', err);
-    if ($('tg-send-status')) {
-      $('tg-send-status').innerText = '⚠️ Microphone unavailable';
-      setTimeout(() => { if ($('tg-send-status')) $('tg-send-status').innerText = '🟢 Connected to Family Group'; }, 4000);
+    if (useNoiseSupp) {
+      try {
+        activeRecStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (fallbackErr) {
+        console.warn('Mic access denied:', fallbackErr);
+        activeRecStream = null;
+      }
+    } else {
+      console.warn('Mic access denied:', err);
+      activeRecStream = null;
     }
-    return;
+    if (!activeRecStream) {
+      if ($('tg-send-status')) {
+        $('tg-send-status').innerText = '⚠️ Microphone unavailable';
+        setTimeout(() => { if ($('tg-send-status')) $('tg-send-status').innerText = '🟢 Connected to Family Group'; }, 4000);
+      }
+      return;
+    }
   }
 
   const mimeCandidates = ['audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'];
   const chosenMime = mimeCandidates.find(m => window.MediaRecorder?.isTypeSupported?.(m)) || '';
   activeRecChunks = [];
   recCancelled = false;
+  recManualDone = false;
+  recTotalSpeechMs = 0;
+  recVadAvailable = false;
 
   let recorder;
   try {
-    recorder = chosenMime
-      ? new MediaRecorder(activeRecStream, { mimeType: chosenMime })
-      : new MediaRecorder(activeRecStream);
+    const recOpts = chosenMime
+      ? { mimeType: chosenMime, audioBitsPerSecond: 24000 }
+      : { audioBitsPerSecond: 24000 };
+    recorder = new MediaRecorder(activeRecStream, recOpts);
   } catch (_) {
-    recorder = new MediaRecorder(activeRecStream);
+    try {
+      recorder = chosenMime
+        ? new MediaRecorder(activeRecStream, { mimeType: chosenMime })
+        : new MediaRecorder(activeRecStream);
+    } catch (__) {
+      recorder = new MediaRecorder(activeRecStream);
+    }
   }
   activeRecorder = recorder;
 
-  const maxSec = Math.max(10, Number(settings.voiceMessageMaxSec) || 30);
+  const baseSec = Math.max(10, Number(settings.voiceMessageMaxSec) || 30);
+  const autoExtendEnabled = settings.voiceAutoExtendEnabled !== false;
+  const hardCapSec = autoExtendEnabled
+    ? Math.max(baseSec, Number(settings.voiceHardCapSec) || 120)
+    : baseSec;
+  const noSpeechCancelSec = Math.max(0, Number(settings.voiceNoSpeechCancelSec ?? 15) || 0);
+  const noSpeechCancelMs = noSpeechCancelSec * 1000;
+  const tvGuardMode = String(settings.voiceTvGuardMode || 'normal').toLowerCase();
 
   const ov = ensureVoiceRecordOverlay();
   ov.style.display = 'flex';
@@ -1600,7 +1644,8 @@ window.startNanaVoiceRecording = async () => {
   }
 
   recStartedAtMs = Date.now();
-  recDeadlineMs = recStartedAtMs + maxSec * 1000;
+  recDeadlineMs = recStartedAtMs + baseSec * 1000;
+  recHardDeadlineMs = recStartedAtMs + hardCapSec * 1000;
   setTimeout(() => {
     if (doneBtn) doneBtn.disabled = false;
     if (cancelBtn) cancelBtn.disabled = false;
@@ -1622,7 +1667,8 @@ window.startNanaVoiceRecording = async () => {
     const blob = new Blob(activeRecChunks, { type: mimeType });
     activeRecChunks = [];
 
-    if (rawElapsedSec < 1.5 || blob.size < 1000) {
+    const noSpeechDetected = !recManualDone && recVadAvailable && noSpeechCancelMs > 0 && recTotalSpeechMs < 700;
+    if (rawElapsedSec < 1.5 || blob.size < 1000 || noSpeechDetected) {
       if ($('tg-send-status')) {
         $('tg-send-status').innerText = '🎙️ Didn’t hear anything — tap to try again';
         setTimeout(() => { if ($('tg-send-status')) $('tg-send-status').innerText = '🟢 Connected to Family Group'; }, 3500);
@@ -1712,7 +1758,11 @@ window.startNanaVoiceRecording = async () => {
     autoStatusEl.style.color = '#bae6fd';
   }
 
-  if (autoSilenceMs > 0) {
+  let hasSpoken = false;
+  let continuousTvNoise = false;
+  const needVad = autoSilenceMs > 0 || autoExtendEnabled || noSpeechCancelMs > 0;
+
+  if (needVad) {
     try {
       const ctx = NanaCore.audioCtx;
       if (ctx.state === 'suspended') ctx.resume().catch(() => {});
@@ -1720,13 +1770,28 @@ window.startNanaVoiceRecording = async () => {
       recMicAnalyser = ctx.createAnalyser();
       recMicAnalyser.fftSize = 1024;
       recMicAnalyser.smoothingTimeConstant = 0.25;
-      recMicSource.connect(recMicAnalyser);
 
+      // Voice-band filter (300–3400 Hz) feeds ONLY the detector — recording stays natural
+      if (tvGuardMode !== 'off' && typeof ctx.createBiquadFilter === 'function') {
+        recMicFilter = ctx.createBiquadFilter();
+        recMicFilter.type = 'bandpass';
+        recMicFilter.frequency.value = 1100;
+        recMicFilter.Q.value = 0.7;
+        recMicSource.connect(recMicFilter);
+        recMicFilter.connect(recMicAnalyser);
+      } else {
+        recMicSource.connect(recMicAnalyser);
+      }
+
+      recVadAvailable = true;
       const vadBuf = new Uint8Array(recMicAnalyser.fftSize);
-      let hasSpoken = false;
+      const recentRms = [];
       let speechStreak = 0;
       let noiseFloor = 0.01;
       let calSamples = 0;
+      let totalFrames = 0;
+      let activeFrames = 0;
+      const floorCap = tvGuardMode === 'off' ? 0.035 : 0.16;
 
       recVadInterval = setInterval(() => {
         if (!recMicAnalyser || recorder?.state !== 'recording') return;
@@ -1740,13 +1805,41 @@ window.startNanaVoiceRecording = async () => {
         const now = Date.now();
         const elapsedMs = now - recStartedAtMs;
 
-        if (calSamples < 5) {
-          noiseFloor = Math.min(0.035, calSamples === 0 ? rms : (noiseFloor * 0.7 + rms * 0.3));
+        const calTarget = tvGuardMode === 'off' ? 5 : 8;
+        if (calSamples < calTarget) {
+          noiseFloor = Math.min(floorCap, calSamples === 0 ? rms : (noiseFloor * 0.7 + rms * 0.3));
           calSamples++;
         }
-        const speechThreshold = Math.max(0.018, Math.min(0.075, noiseFloor * 2.4));
+
+        if (tvGuardMode !== 'off') {
+          recentRms.push(rms);
+          if (recentRms.length > 30) recentRms.shift();
+          if (recentRms.length >= 10) {
+            const sorted = recentRms.slice().sort((a, b) => a - b);
+            const p20 = sorted[Math.floor(sorted.length * 0.2)];
+            noiseFloor = Math.min(floorCap, noiseFloor * 0.94 + p20 * 0.06);
+          }
+        }
+
+        let speechThreshold;
+        if (tvGuardMode === 'off') {
+          speechThreshold = Math.max(0.018, Math.min(0.075, noiseFloor * 2.4));
+        } else if (tvGuardMode === 'strict') {
+          speechThreshold = Math.max(0.022, Math.min(0.26, noiseFloor * 2.8 + 0.015));
+        } else {
+          speechThreshold = Math.max(0.016, Math.min(0.22, noiseFloor * 2.2 + 0.010));
+        }
+
         if (rms < speechThreshold) {
-          noiseFloor = Math.min(0.035, noiseFloor * 0.96 + rms * 0.04);
+          noiseFloor = Math.min(floorCap, noiseFloor * 0.96 + rms * 0.04);
+        }
+
+        if (elapsedMs >= 500) {
+          totalFrames++;
+          if (rms >= speechThreshold) activeFrames++;
+          const dutyCycle = totalFrames >= 40 ? (activeFrames / totalFrames) : 0;
+          continuousTvNoise = (tvGuardMode === 'normal' && dutyCycle > 0.92) ||
+                              (tvGuardMode === 'strict' && dutyCycle > 0.82);
         }
 
         if (elapsedMs >= 350 && rms >= speechThreshold) {
@@ -1754,12 +1847,22 @@ window.startNanaVoiceRecording = async () => {
           if (hasSpoken || speechStreak >= 2) {
             hasSpoken = true;
             recLastSpeechAtMs = now;
+            recTotalSpeechMs += 100;
           }
         } else {
           speechStreak = 0;
         }
 
-        if (hasSpoken) {
+        if (!hasSpoken && noSpeechCancelMs > 0 && elapsedMs >= noSpeechCancelMs) {
+          cancelNanaVoiceRecording(true);
+          if ($('tg-send-status')) {
+            $('tg-send-status').innerText = '🎙️ Didn’t hear anything — tap Speak to try again';
+            setTimeout(() => { if ($('tg-send-status')) $('tg-send-status').innerText = '🟢 Connected to Family Group'; }, 3500);
+          }
+          return;
+        }
+
+        if (hasSpoken && autoSilenceMs > 0) {
           const silentForMs = Math.max(0, now - recLastSpeechAtMs);
           const remSilenceMs = Math.max(0, autoSilenceMs - silentForMs);
           if (autoStatusEl) {
@@ -1778,18 +1881,51 @@ window.startNanaVoiceRecording = async () => {
       }, 100);
     } catch (vadErr) {
       console.warn('Voice silence detector unavailable:', vadErr);
+      recVadAvailable = false;
       if (autoStatusEl) autoStatusEl.innerText = 'Tap ✅ DONE — SEND NOW when finished';
     }
   }
 
   recTimerInterval = setInterval(() => {
-    const remMs = Math.max(0, recDeadlineMs - Date.now());
+    const now = Date.now();
+    let remMs = Math.max(0, recDeadlineMs - now);
+    const hardRemMs = Math.max(0, recHardDeadlineMs - now);
+
+    // Smart auto-extend: if Nana is still talking near the deadline, add +15s up to hard cap
+    if (autoExtendEnabled && hasSpoken && !continuousTvNoise && remMs <= 5000 &&
+        (now - recLastSpeechAtMs) < 2500 && recDeadlineMs < recHardDeadlineMs) {
+      recDeadlineMs = Math.min(recHardDeadlineMs, recDeadlineMs + 15000);
+      remMs = Math.max(0, recDeadlineMs - now);
+    }
+
+    const elapsedSec = Math.floor((now - recStartedAtMs) / 1000);
     const remSec = Math.ceil(remMs / 1000);
     const totalMs = Math.max(1000, recDeadlineMs - recStartedAtMs);
-    if ($('nana-rec-countdown')) $('nana-rec-countdown').innerText = `${remSec}s left`;
-    if ($('nana-rec-progress')) $('nana-rec-progress').style.width = `${Math.max(0, Math.min(100, (remMs / totalMs) * 100))}%`;
+    const cdEl = $('nana-rec-countdown');
+    const progEl = $('nana-rec-progress');
+
+    if (autoExtendEnabled && hardRemMs > 15000 && !continuousTvNoise) {
+      if (cdEl) cdEl.innerText = hasSpoken ? `🎙️ Listening... (${elapsedSec}s)` : `🎙️ Ready (${elapsedSec}s)`;
+      if (progEl) {
+        const usedPct = Math.min(100, ((now - recStartedAtMs) / Math.max(1000, recHardDeadlineMs - recStartedAtMs)) * 100);
+        progEl.style.width = `${Math.max(8, 100 - usedPct)}%`;
+        progEl.style.background = '#22c55e';
+      }
+    } else {
+      if (cdEl) cdEl.innerText = remSec <= 10 ? `⏳ Finishing soon (${remSec}s)` : `${remSec}s left`;
+      if (progEl) {
+        progEl.style.width = `${Math.max(0, Math.min(100, (remMs / totalMs) * 100))}%`;
+        progEl.style.background = remSec <= 10 ? '#f59e0b' : '#22c55e';
+      }
+    }
+
     if (remMs <= 0 && recorder?.state === 'recording') {
-      try { recorder.stop(); } catch (_) { cancelNanaVoiceRecording(true); }
+      // Natural-pause grace (up to 5s past hard cap) so she isn't cut off mid-word
+      const inPauseGrace = autoExtendEnabled && hasSpoken && !continuousTvNoise &&
+                           (now - recLastSpeechAtMs) < 1200 && (now - recHardDeadlineMs) < 5000;
+      if (!inPauseGrace) {
+        try { recorder.stop(); } catch (_) { cancelNanaVoiceRecording(true); }
+      }
     }
   }, 250);
 
