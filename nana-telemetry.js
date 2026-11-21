@@ -688,13 +688,31 @@ function applyPowerModeFromChargingState(isCharging, level) {
   }
 }
 
+let pluggedPeakBatteryLevel = null;
+
 function syncUnpluggedBannerAndVoice(level, isCharging) {
   if (role !== 'nana') return;
+  if (typeof level === 'number' && !Number.isNaN(level)) state.batteryLevel = level;
   if (typeof isCharging === 'boolean') {
+    state.isCharging = isCharging;
     if (isCharging) {
       unplugVoicePending = false;
-    } else if (prevObservedCharging === true) {
-      unplugVoicePending = true;
+      if (typeof level === 'number' && !Number.isNaN(level)) {
+        if (pluggedPeakBatteryLevel === null || level >= pluggedPeakBatteryLevel) {
+          pluggedPeakBatteryLevel = level;
+          state.isBatteryDecreasingWhilePlugged = false;
+        } else if (level < pluggedPeakBatteryLevel) {
+          state.isBatteryDecreasingWhilePlugged = true;
+          hooks.stopPhotoScreensaver?.('battery_decreasing');
+        }
+      }
+    } else {
+      pluggedPeakBatteryLevel = null;
+      state.isBatteryDecreasingWhilePlugged = false;
+      hooks.stopPhotoScreensaver?.('unplugged');
+      if (prevObservedCharging === true) {
+        unplugVoicePending = true;
+      }
     }
     prevObservedCharging = isCharging;
   }
