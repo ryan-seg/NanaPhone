@@ -262,7 +262,9 @@ export const settings = {
   keyboardLayout: 'qwerty', keyboardTimeoutSec: 60, keyGuardMs: 350, bulletinClearedAt: 0,
   callingEnabled: TEST_MODE,
   showTodaysCallsBanner: true, periodicPopupsEnabled: true, unreadChatPopupMin: 30,
-  radioPromptHours: [10, 15], videoPromptHours: [14, 19], speakQuestions: true
+  radioPromptHours: [10, 15], videoPromptHours: [14, 19], speakQuestions: true,
+  photoScreensaverEnabled: true, photoScreensaverDelaySec: 120, photoScreensaverIntervalSec: 30,
+  photoScreensaverBrightness: 40, photoScreensaverShowCaption: true, photoScreensaverMaxPhotos: 20
 };
 
 export function askNana(type, question, askedBy, extra = {}) {
@@ -279,6 +281,10 @@ export const state = {
   currentState: 'idle',
   isRadioPlaying: false,
   isTabletUnplugged: false,
+  batteryLevel: null,
+  isCharging: null,
+  isBatteryDecreasingWhilePlugged: false,
+  isPhotoScreensaverActive: false,
   returnToVideoAfterCall: false,
   callSnap: { status: 'idle' },
   presenceSnap: {},
@@ -316,7 +322,9 @@ export const hooks = {
   startNormalDimCountdownOnPause: null,
   renderContacts: null,
   renderBulletinFeed: null,
-  updateBulletinTicker: null
+  updateBulletinTicker: null,
+  tryStartPhotoScreensaver: null,
+  stopPhotoScreensaver: null
 };
 
 export const isLowPowerMode = () => {
