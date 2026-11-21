@@ -1,7 +1,7 @@
 import {
   $, NanaCore, esc, ref, set, update, push, onValue, remove, runTransaction
-} from "./nana-core.js?v=2.9.5";
-import { updateClock, isCurrentlyInNightWindow, isHiddenFromNana } from "./nana-settings.js?v=2.9.5";
+} from "./nana-core.js?v=2.9.6";
+import { updateClock, isCurrentlyInNightWindow, isHiddenFromNana } from "./nana-settings.js?v=2.9.6";
 
 const {
   CONFIG, SERVICE_TOKEN, TEST_MODE, PORTAL_NODE_ID,
