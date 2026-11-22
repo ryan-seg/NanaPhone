@@ -1,0 +1,850 @@
+/* ==========================================================================
+   NanaPhone Standalone Spider Solitaire (MobilityWare-Inspired Layout)
+   All selectors are scoped under .nana-spider-root so this file can later be
+   integrated into NanaPhone without colliding with styles.css.
+   ========================================================================== */
+
+.nana-spider-root,
+.nana-spider-root * {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.nana-spider-root {
+  --ss-felt-center: #247b3a;
+  --ss-felt-mid: #165e29;
+  --ss-felt-edge: #0a3616;
+  --ss-card-radius: clamp(6px, 0.9vw, 12px);
+  --ss-card-border: #cbd5e1;
+  --ss-ink-black: #111827;
+  --ss-ink-red: #dc2626;
+  --ss-gold: #fde047;
+  --ss-gold-strong: #facc15;
+  --ss-panel-bg: rgba(7, 30, 14, 0.84);
+  --ss-panel-border: rgba(255, 255, 255, 0.22);
+
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #f8fafc;
+  background:
+    radial-gradient(ellipse 82% 72% at 50% 42%, var(--ss-felt-center) 0%, var(--ss-felt-mid) 56%, var(--ss-felt-edge) 100%);
+  touch-action: none;
+}
+
+/* Subtle woven felt texture overlay */
+.nana-spider-root::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.08;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.35) 0.6px, transparent 0.6px),
+    radial-gradient(rgba(0, 0, 0, 0.45) 0.6px, transparent 0.6px);
+  background-size: 6px 6px;
+  background-position: 0 0, 3px 3px;
+  z-index: 0;
+}
+
+/* --- TOP SLIM STATUS BAR (HIGH-CONTRAST LARGE PRINT) --- */
+.nana-spider-root .ss-topbar {
+  position: relative;
+  z-index: 5;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: linear-gradient(180deg, rgba(4, 22, 10, 0.9) 0%, rgba(7, 30, 14, 0.72) 100%);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.24);
+}
+
+.nana-spider-root .ss-top-left,
+.nana-spider-root .ss-top-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.nana-spider-root .ss-exit-btn {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 6px 18px;
+  border-radius: 14px;
+  border: 3px solid #ffffff;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: clamp(1.15rem, 1.9vw, 1.45rem);
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nana-spider-root .ss-exit-btn.visible { display: inline-flex; }
+.nana-spider-root .ss-exit-btn:active { transform: scale(0.96); }
+
+.nana-spider-root .ss-title {
+  font-size: clamp(1.15rem, 1.95vw, 1.5rem);
+  font-weight: 900;
+  color: #fef08a;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nana-spider-root .ss-mode-pill {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 2px solid rgba(255, 255, 255, 0.38);
+  font-size: clamp(0.92rem, 1.45vw, 1.12rem);
+  font-weight: 900;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.nana-spider-root .ss-stat-group {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 1.8vw, 22px);
+  font-size: clamp(1.05rem, 1.7vw, 1.35rem);
+  font-weight: 900;
+  color: #ffffff;
+}
+
+.nana-spider-root .ss-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  white-space: nowrap;
+}
+.nana-spider-root .ss-stat-lbl {
+  color: #bbf7d0;
+  font-size: 0.85em;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.nana-spider-root .ss-stat-val {
+  color: #fef08a;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+}
+
+.nana-spider-root .ss-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 2.5px solid #ffffff;
+  background: rgba(15, 23, 42, 0.65);
+  color: #ffffff;
+  font-size: clamp(1rem, 1.5vw, 1.2rem);
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nana-spider-root .ss-icon-btn:active { transform: scale(0.95); }
+
+/* --- MAIN TABLEAU (10 FULL-WIDTH COLUMNS) --- */
+.nana-spider-root .ss-board {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: clamp(8px, 1.1vh, 14px) clamp(6px, 1.1vw, 16px) 6px;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: clamp(4px, 0.8vw, 11px);
+}
+
+.nana-spider-root .ss-col {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+}
+
+/* Empty column slot (MobilityWare clean white-bordered green rectangle) */
+.nana-spider-root .ss-slot-outline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  aspect-ratio: 1 / 1.38;
+  border-radius: var(--ss-card-radius);
+  border: 2.5px solid rgba(255, 255, 255, 0.68);
+  background: rgba(5, 36, 15, 0.34);
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.nana-spider-root .ss-col.is-drop-target .ss-slot-outline,
+.nana-spider-root .ss-col.is-hint-dest .ss-slot-outline {
+  border-color: var(--ss-gold);
+  background: rgba(250, 204, 21, 0.24);
+  box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.65), inset 0 0 18px rgba(250, 204, 21, 0.3);
+}
+
+/* --- PLAYING CARD (MOBILITYWARE JUMBO LARGE-PRINT ANATOMY) --- */
+.nana-spider-root .ss-card {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  aspect-ratio: 1 / 1.38;
+  border-radius: var(--ss-card-radius);
+  overflow: hidden;
+  transition: box-shadow 0.14s ease, filter 0.14s ease;
+  will-change: transform, top;
+  cursor: default;
+}
+
+/* Face-up crisp white card */
+.nana-spider-root .ss-card.face-up {
+  background: #ffffff;
+  border: 2px solid #94a3b8;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.98);
+  display: flex;
+  flex-direction: column;
+}
+
+.nana-spider-root .ss-card.face-up.movable {
+  cursor: grab;
+}
+
+/* Subtle muted shading in 2/4-suit games for face-up cards currently locked under an off-suit card */
+.nana-spider-root .ss-card.face-up.locked {
+  background: #e2e8f0;
+  border-color: #64748b;
+}
+.nana-spider-root .ss-card.face-up.locked .ss-card-head,
+.nana-spider-root .ss-card.face-up.locked .ss-card-body {
+  opacity: 0.82;
+}
+
+/* Top header strip: EXTRA-LARGE bold rank top-left + crisp suit pip top-right */
+.nana-spider-root .ss-card-head {
+  width: 100%;
+  padding: 3.5% 6% 0 6%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.nana-spider-root .ss-rank {
+  font-size: clamp(18px, 2.75vw, 38px);
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  line-height: 0.95;
+}
+
+.nana-spider-root .ss-suit-mini {
+  width: clamp(15px, 2.25vw, 30px);
+  height: clamp(15px, 2.25vw, 30px);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nana-spider-root .ss-suit-mini svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.nana-spider-root .ss-card.suit-black .ss-rank,
+.nana-spider-root .ss-card.suit-black .ss-suit-mini,
+.nana-spider-root .ss-card.suit-black .ss-card-body {
+  color: #000000;
+  fill: #000000;
+}
+.nana-spider-root .ss-card.suit-red .ss-rank,
+.nana-spider-root .ss-card.suit-red .ss-suit-mini,
+.nana-spider-root .ss-card.suit-red .ss-card-body {
+  color: var(--ss-ink-red);
+  fill: var(--ss-ink-red);
+}
+
+/* Main lower face: Giant centerpiece suit pip OR illustrated royal portrait for J / Q / K */
+.nana-spider-root .ss-card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2% 10% 8% 10%;
+}
+
+.nana-spider-root .ss-center-pip {
+  width: 68%;
+  max-height: 82%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nana-spider-root .ss-center-pip svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.nana-spider-root .ss-court-art {
+  width: 92%;
+  height: 92%;
+  border-radius: 6px;
+  border: 1.5px solid rgba(180, 130, 35, 0.55);
+  background: linear-gradient(180deg, #fffdf5 0%, #fef3c7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 2px;
+}
+.nana-spider-root .ss-court-art svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Face-down classic MobilityWare Red Spider Card Back */
+.nana-spider-root .ss-card.face-down {
+  background: #ffffff;
+  border: 1.5px solid #9ca3af;
+  padding: clamp(2px, 0.35vw, 4px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.42);
+}
+
+.nana-spider-root .ss-back-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: calc(var(--ss-card-radius) - 3px);
+  background:
+    radial-gradient(circle at 50% 42%, #e02d2d 0%, #b91c1c 62%, #8c1212 100%);
+  border: 1.5px solid rgba(255, 224, 178, 0.48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.nana-spider-root .ss-back-inner::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: calc(var(--ss-card-radius) - 5px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  pointer-events: none;
+}
+
+.nana-spider-root .ss-back-spider {
+  width: 68%;
+  height: 68%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.9;
+}
+.nana-spider-root .ss-back-spider svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Highlighting for drop target, hint source/dest, and gentle invalid wiggle */
+.nana-spider-root .ss-card.is-drop-highlight {
+  box-shadow: 0 0 0 3.5px var(--ss-gold), 0 8px 20px rgba(250, 204, 21, 0.5) !important;
+}
+
+.nana-spider-root .ss-card.is-hint-src {
+  box-shadow: 0 0 0 4px #38bdf8, 0 0 22px rgba(56, 189, 248, 0.85) !important;
+  animation: ssPulseHintSrc 0.85s ease-in-out infinite alternate;
+}
+
+.nana-spider-root .ss-card.is-hint-dest {
+  box-shadow: 0 0 0 4px var(--ss-gold), 0 0 22px rgba(250, 204, 21, 0.9) !important;
+  animation: ssPulseHintDest 0.85s ease-in-out infinite alternate;
+}
+
+@keyframes ssPulseHintSrc {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-4px); }
+}
+
+@keyframes ssPulseHintDest {
+  from { filter: brightness(1); }
+  to   { filter: brightness(1.08); }
+}
+
+.nana-spider-root .ss-card.is-dragging-hidden {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.nana-spider-root .ss-card.is-shake {
+  animation: ssCardShake 0.34s ease-in-out;
+}
+@keyframes ssCardShake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-7px); }
+  45%      { transform: translateX(7px); }
+  70%      { transform: translateX(-5px); }
+  88%      { transform: translateX(4px); }
+}
+
+/* Floating drag & flight animation layers */
+.nana-spider-root .ss-drag-layer,
+.nana-spider-root .ss-flight-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+}
+.nana-spider-root .ss-flight-layer { z-index: 55; }
+
+.nana-spider-root .ss-drag-stack {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  will-change: transform;
+  filter: drop-shadow(0 18px 22px rgba(0, 0, 0, 0.55));
+}
+.nana-spider-root .ss-drag-stack .ss-card {
+  cursor: grabbing;
+  border-color: #fde047;
+}
+
+.nana-spider-root .ss-flying-stack {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.45));
+}
+
+/* --- BOTTOM DOCK (LARGE HIGH-CONTRAST SENIOR CONTROLS) --- */
+.nana-spider-root .ss-dock {
+  position: relative;
+  z-index: 6;
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: 8px clamp(8px, 1.4vw, 18px) clamp(10px, 1.5vh, 16px);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(8px, 1.5vw, 18px);
+  background: linear-gradient(0deg, rgba(4, 22, 10, 0.92) 0%, rgba(7, 34, 15, 0.52) 85%, transparent 100%);
+}
+
+/* Unified Big Tappable Deal Cards Button (fanned Red Spider backs + large label) */
+.nana-spider-root .ss-stock-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.nana-spider-root .ss-stock-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: clamp(64px, 9.2vh, 88px);
+  padding: 6px 16px 6px 8px;
+  border-radius: 18px;
+  border: 3.5px solid #fef08a;
+  background: linear-gradient(180deg, #991b1b 0%, #7f1d1d 100%);
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 0.1s ease, filter 0.15s ease, box-shadow 0.18s ease;
+}
+.nana-spider-root .ss-stock-btn:not(:disabled):active {
+  transform: scale(0.96);
+  filter: brightness(1.1);
+}
+.nana-spider-root .ss-stock-btn:disabled {
+  cursor: default;
+  opacity: 0.48;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.nana-spider-root .ss-stock-cards {
+  position: relative;
+  width: clamp(64px, 8.2vw, 108px);
+  height: clamp(54px, 7.6vh, 76px);
+  flex-shrink: 0;
+}
+
+.nana-spider-root .ss-stock-pile-card {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  aspect-ratio: 1 / 1.38;
+  border-radius: clamp(5px, 0.7vw, 8px);
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  padding: 2px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+}
+
+.nana-spider-root .ss-stock-btn.is-hint-deal {
+  box-shadow: 0 0 0 5px var(--ss-gold), 0 0 28px rgba(250, 204, 21, 0.95);
+  animation: ssPulseHintSrc 0.75s ease-in-out infinite alternate;
+}
+
+.nana-spider-root .ss-stock-empty-slot {
+  height: 100%;
+  aspect-ratio: 1 / 1.38;
+  border-radius: clamp(5px, 0.7vw, 8px);
+  border: 2px dashed rgba(255, 255, 255, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.nana-spider-root .ss-stock-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+  text-align: left;
+}
+.nana-spider-root .ss-stock-title {
+  font-size: clamp(1.15rem, 1.9vw, 1.5rem);
+  font-weight: 900;
+  color: #fef08a;
+  white-space: nowrap;
+}
+.nana-spider-root .ss-stock-sub {
+  font-size: clamp(0.95rem, 1.4vw, 1.15rem);
+  font-weight: 800;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+/* Center Action Buttons — Extra-Large, Ultra High-Contrast for Low Vision */
+.nana-spider-root .ss-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 1.4vw, 16px);
+  flex-wrap: nowrap;
+}
+
+.nana-spider-root .ss-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: clamp(58px, 8.2vh, 76px);
+  padding: 0 clamp(18px, 2.3vw, 30px);
+  border-radius: 18px;
+  border: 3.5px solid #ffffff;
+  background: #14532d;
+  color: #ffffff;
+  font-size: clamp(1.22rem, 2.05vw, 1.62rem);
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  transition: transform 0.1s ease, filter 0.15s ease, opacity 0.15s ease;
+}
+.nana-spider-root .ss-btn:active:not(:disabled) {
+  transform: scale(0.95);
+  filter: brightness(1.12);
+}
+.nana-spider-root .ss-btn:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.nana-spider-root .ss-btn-undo {
+  background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+  border-color: #ffffff;
+  color: #ffffff;
+}
+.nana-spider-root .ss-btn-hint {
+  background: linear-gradient(180deg, #fde047 0%, #facc15 100%);
+  border-color: #ffffff;
+  color: #000000;
+}
+.nana-spider-root .ss-btn-new {
+  background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+/* Right Completed Suit Foundations (8 fanned stacks) */
+.nana-spider-root .ss-foundations {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.nana-spider-root .ss-found-tray {
+  position: relative;
+  height: clamp(64px, 9.2vh, 88px);
+  min-width: clamp(106px, 13.5vw, 174px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.nana-spider-root .ss-found-placeholder {
+  height: calc(100% - 6px);
+  aspect-ratio: 1 / 1.38;
+  border-radius: clamp(5px, 0.7vw, 9px);
+  border: 2.5px solid rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.24);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 900;
+  font-size: clamp(0.88rem, 1.25vw, 1.05rem);
+}
+
+.nana-spider-root .ss-found-card {
+  position: absolute;
+  top: 3px;
+  height: calc(100% - 6px);
+  aspect-ratio: 1 / 1.38;
+  border-radius: clamp(5px, 0.7vw, 9px);
+  background: #ffffff;
+  border: 2px solid #cbd5e1;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.48);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 5px;
+  font-weight: 900;
+}
+.nana-spider-root .ss-found-card.suit-black { color: #000000; fill: #000000; }
+.nana-spider-root .ss-found-card.suit-red { color: var(--ss-ink-red); fill: var(--ss-ink-red); }
+.nana-spider-root .ss-found-top {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: clamp(0.9rem, 1.35vw, 1.15rem);
+  line-height: 1;
+}
+.nana-spider-root .ss-found-pip {
+  width: 58%;
+  aspect-ratio: 1 / 1;
+}
+.nana-spider-root .ss-found-pip svg { width: 100%; height: 100%; display: block; }
+
+/* Gentle floating toast notification (large print, auto-fades) */
+.nana-spider-root .ss-toast {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(92px, 13.5vh, 132px);
+  transform: translateX(-50%) translateY(10px);
+  z-index: 45;
+  padding: 14px 28px;
+  border-radius: 999px;
+  background: rgba(5, 20, 10, 0.96);
+  border: 3.5px solid var(--ss-gold);
+  color: #fef08a;
+  font-size: clamp(1.2rem, 2.1vw, 1.65rem);
+  font-weight: 900;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
+}
+.nana-spider-root .ss-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* --- MODALS (NEW GAME / SETTINGS & VICTORY — EXTRA LARGE PRINT) --- */
+.nana-spider-root .ss-modal-backdrop {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  background: rgba(2, 14, 7, 0.86);
+  backdrop-filter: blur(4px);
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+.nana-spider-root .ss-modal-backdrop.open { display: flex; }
+
+.nana-spider-root .ss-modal-card {
+  width: min(650px, 95vw);
+  background: linear-gradient(180deg, #10381e 0%, #092513 100%);
+  border: 4px solid #fef08a;
+  border-radius: 26px;
+  padding: 26px 24px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.78);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nana-spider-root .ss-modal-title {
+  margin: 0;
+  font-size: clamp(1.8rem, 3.2vw, 2.4rem);
+  font-weight: 900;
+  color: #fef08a;
+}
+
+.nana-spider-root .ss-modal-sub {
+  margin: 0;
+  font-size: clamp(1.15rem, 1.9vw, 1.42rem);
+  color: #ffffff;
+  font-weight: 800;
+  line-height: 1.38;
+}
+
+.nana-spider-root .ss-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.nana-spider-root .ss-choice-btn {
+  padding: 18px 10px;
+  border-radius: 18px;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: clamp(1.18rem, 1.95vw, 1.5rem);
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.1s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.nana-spider-root .ss-choice-btn span.ss-choice-sub {
+  font-size: 0.78em;
+  font-weight: 800;
+  color: #fef08a;
+}
+.nana-spider-root .ss-choice-btn.selected {
+  border-color: var(--ss-gold);
+  background: #15803d;
+  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.65);
+}
+.nana-spider-root .ss-choice-btn:active { transform: scale(0.96); }
+
+.nana-spider-root .ss-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.34);
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  text-align: left;
+}
+.nana-spider-root .ss-toggle-text {
+  font-size: clamp(1.08rem, 1.7vw, 1.3rem);
+  font-weight: 900;
+  color: #ffffff;
+}
+.nana-spider-root .ss-toggle-sub {
+  font-size: clamp(0.92rem, 1.35vw, 1.08rem);
+  font-weight: 700;
+  color: #bbf7d0;
+}
+.nana-spider-root .ss-toggle-pill {
+  min-height: 50px;
+  padding: 8px 18px;
+  border-radius: 14px;
+  border: 3px solid #ffffff;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 1.15rem;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nana-spider-root .ss-toggle-pill.off {
+  border-color: #cbd5e1;
+  background: #334155;
+  color: #ffffff;
+}
+
+.nana-spider-root .ss-modal-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 4px;
+}
+.nana-spider-root .ss-modal-actions .ss-btn {
+  flex: 1;
+  min-height: 64px;
+}
+
+/* Victory celebration confetti canvas */
+.nana-spider-root .ss-confetti-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 75;
+}
+
+/* Compact phone / narrow screen adjustments */
+@media (max-width: 780px) {
+  .nana-spider-root .ss-topbar { padding: 6px 10px; }
+  .nana-spider-root .ss-mode-pill { display: none; }
+  .nana-spider-root .ss-board { padding: 6px 4px 4px; gap: 3px; }
+  .nana-spider-root .ss-dock {
+    grid-template-columns: auto 1fr;
+    padding: 6px 8px 10px;
+  }
+  .nana-spider-root .ss-foundations { display: none; }
+  .nana-spider-root .ss-stock-cards { display: none; }
+  .nana-spider-root .ss-stock-btn { padding: 6px 12px; min-height: 54px; }
+  .nana-spider-root .ss-btn {
+    min-height: 54px;
+    padding: 0 14px;
+    font-size: 1.08rem;
+  }
+}
