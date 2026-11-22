@@ -2,6 +2,7 @@ import {
   $, NanaCore, esc, ref, set, update, push, onValue, remove, runTransaction
 } from "./nana-core.js?v=2.9.6";
 import { updateClock, isCurrentlyInNightWindow, isHiddenFromNana } from "./nana-settings.js?v=2.9.6";
+import { createSpiderSolitaire } from "./games/spider-solitaire.js?v=2.9.6";
 
 const {
   CONFIG, SERVICE_TOKEN, TEST_MODE, PORTAL_NODE_ID,
@@ -272,31 +273,89 @@ function renderMissedCallsBanner() {
   banner.style.display = 'flex';
 }
 
+const PATIENCE_TILE_SVG = `
+<svg viewBox="0 0 180 150" aria-hidden="true">
+  <g transform="translate(22 18) rotate(-14 40 55)">
+    <rect x="0" y="0" width="76" height="106" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
+    <rect x="5" y="5" width="66" height="96" rx="7" fill="#b91c1c"/>
+    <ellipse cx="38" cy="58" rx="9" ry="12" fill="#160909"/>
+    <circle cx="38" cy="43" r="6" fill="#160909"/>
+    <path d="M32 46 L18 36 M44 46 L58 36 M30 53 L14 50 M46 53 L62 50 M30 60 L15 70 M46 60 L61 70 M33 67 L22 82 M43 67 L54 82" stroke="#160909" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(76 14) rotate(10 40 55)">
+    <rect x="0" y="0" width="78" height="108" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="2.5"/>
+    <text x="11" y="29" font-family="Arial,sans-serif" font-size="24" font-weight="900" fill="#111827">A</text>
+    <path d="M61 12 C56 18 50 23 50 29 C50 33 53 35 56 35 C58 35 59.5 34 60.5 32.5 C60 35 59 37 57 38 L65 38 C63 37 62 35 61.5 32.5 C62.5 34 64 35 66 35 C69 35 72 33 72 29 C72 23 66 18 61 12 Z" fill="#111827"/>
+    <path d="M39 42 C30 55 18 66 18 77 C18 85 24 90 31 90 C35 90 37.5 87.5 38.5 85 C38 90 36 94 31 97 L47 97 C42 94 40 90 39.5 85 C40.5 87.5 43 90 47 90 C54 90 60 85 60 77 C60 66 48 55 39 42 Z" fill="#111827"/>
+  </g>
+</svg>`;
+
+let patienceGameInstance = null;
+window.openPatienceScreen = () => {
+  showScreen('patience-screen');
+  const mount = $('patience-game-mount');
+  if (mount && !patienceGameInstance) {
+    patienceGameInstance = createSpiderSolitaire(mount, {
+      defaultSuits: 1,
+      relaxedDeal: true,
+      soundEnabled: true,
+      onActivity: () => {
+        state.lastPatienceActivityMs = Date.now();
+        window.wakeScreenAndResetDimTimer?.();
+        NanaCore.recordTouchActivity?.('Playing Patience');
+      },
+      onGameStarted: () => {
+        hooks.onPatienceGameStarted?.();
+      }
+    });
+  } else {
+    requestAnimationFrame(() => patienceGameInstance?.relayout?.());
+  }
+  state.lastPatienceActivityMs = Date.now();
+  window.wakeScreenAndResetDimTimer?.();
+  NanaCore.recordTouchActivity?.('Opened Patience');
+  hooks.broadcastScreen?.();
+};
+hooks.openPatienceScreen = window.openPatienceScreen;
+
 let lastContactsRenderSig = null;
 export function renderContacts(connectedList = []) {
   const grid = $('family-grid');
   if (!grid) return;
   const connected = CONFIG.familyMembers.filter(m => connectedList.includes(m.id));
   const available = connected.filter(m => !isHiddenFromNana(m.id));
+  // Slot 1 is Patience (Spider Solitaire); remaining 7 slots show the 7 most recent family callers
   const display = [...available]
     .map((m, idx) => ({ m, idx, lastTs: getLastCalledTimestamp(m.id) }))
     .sort((a, b) => (b.lastTs - a.lastTs) || (a.idx - b.idx))
-    .slice(0, 8)
+    .slice(0, 7)
     .map(x => x.m);
 
-  const sig = display.length
+  const sig = 'patience|' + (display.length
     ? display.map(m => `${m.id}:${m.name}:${m.photo?.length || 0}:${Number(state.missedCallsByMember[m.id]?.count) || 0}`).join('|')
-    : `empty:${connected.length}`;
+    : `empty:${connected.length}`);
   if (sig === lastContactsRenderSig && grid.children.length > 0) return;
   lastContactsRenderSig = sig;
 
   grid.innerHTML = "";
+
+  // Slot 1: Patience (Spider Solitaire) tile
+  const patienceCard = document.createElement('div');
+  patienceCard.className = 'family-card patience-card';
+  patienceCard.innerHTML = `<div class="patience-logo-wrap">${PATIENCE_TILE_SVG}</div><div class="contact-nameplate">Patience</div>`;
+  patienceCard.onclick = () => window.switchNanaMainTab('patience');
+  grid.appendChild(patienceCard);
+
   if (!display.length) {
-    grid.innerHTML = connected.length
-      ? `<div style="grid-column:1/-1;grid-row:1/-1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:1.8rem;font-weight:700;padding:20px;">😴 Nobody is available to call right now.<br>Try again later or send a Family Chat message.</div>`
-      : `<div style="grid-column:1/-1;grid-row:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);font-size:1.6rem;font-weight:700;padding:20px;"><p>⏳ Waiting for family members to connect Telegram...</p><button class="tone-btn" style="font-size:1.2rem;background:#0284c7;" onclick="syncConnectedFamilyFromTelegram()">🔄 Check Now</button></div>`;
+    const emptyNote = document.createElement('div');
+    emptyNote.style.cssText = 'grid-column:2/-1;grid-row:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);font-size:1.6rem;font-weight:700;padding:20px;text-align:center;';
+    emptyNote.innerHTML = connected.length
+      ? `😴 Nobody is available to call right now.<br>Try again later or play Patience!`
+      : `<p>⏳ Waiting for family members to connect Telegram...</p><button class="tone-btn" style="font-size:1.2rem;background:#0284c7;" onclick="syncConnectedFamilyFromTelegram()">🔄 Check Now</button>`;
+    grid.appendChild(emptyNote);
     return;
   }
+
   display.forEach(m => {
     const missed = Number(state.missedCallsByMember[m.id]?.count) || 0;
     const card = document.createElement('div');
