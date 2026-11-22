@@ -295,8 +295,8 @@ function ensureCornerStaffAccessBtn() {
     headerPills.insertBefore(btn, gear || null);
   }
 
-  // Also ensure a tappable "🏥 Staff" pill is available on Radio, Video, and Family Chat headers (all >= 68px from top)
-  ['#radio-screen .nana-top-nav', '#video-screen .nana-top-nav', '#bulletin-modal .tg-header'].forEach(sel => {
+  // Also ensure a tappable "🏥 Staff" pill is available on Radio, Video, Patience, and Family Chat headers (all >= 68px from top)
+  ['#radio-screen .nana-top-nav', '#video-screen .nana-top-nav', '#patience-screen .nana-top-nav', '#bulletin-modal .tg-header'].forEach(sel => {
     const nav = document.querySelector(sel);
     if (nav && !nav.querySelector('.staff-pill')) {
       const b = document.createElement('button');
@@ -323,6 +323,7 @@ function positionUnpluggedBannerOverRadioAndVideo() {
   if ($('bulletin-modal')?.style.display === 'flex') navSel = '#bulletin-modal .tg-header';
   else if ($('radio-screen')?.classList.contains('active')) navSel = '#radio-screen .nana-top-nav';
   else if ($('video-screen')?.classList.contains('active')) navSel = '#video-screen .nana-top-nav';
+  else if ($('patience-screen')?.classList.contains('active')) navSel = '#patience-screen .nana-top-nav';
 
   const nav = document.querySelector(navSel);
   const chatBtn = nav?.querySelector('.chat-pill-x');
@@ -882,6 +883,8 @@ export function broadcastNanaCurrentScreen() {
     screenState = isPlayingVideo ? 'video_playing' : 'video_paused';
   } else if ($('radio-screen')?.classList.contains('active')) {
     screenState = 'radio';
+  } else if ($('patience-screen')?.classList.contains('active')) {
+    screenState = 'patience';
   }
   const appState = document.visibilityState === 'hidden' ? 'backgrounded' : 'foreground';
   const sig = `${screenState}|${appState}`;
@@ -1157,6 +1160,7 @@ function getSimpleNanaStatusSummary() {
 
   if (scr === 'chat_typing') return { border: '#38bdf8', text: `⌨️ On the family chat (typing)` };
   if (scr === 'chat') return { border: '#38bdf8', text: `✈️ On the family chat (reading)` };
+  if (scr === 'patience') return { border: '#22c55e', text: `🕷️ Playing Patience` };
 
   return { border: '#22c55e', text: `🟢 Not doing anything` };
 }
@@ -1266,12 +1270,24 @@ function renderRyanControlsInsights() {
 
   const usage = state.dailyUsageSnap || {};
   const todayKey = getUsageDateKey();
-  const todayRec = usage[todayKey] || { videoSec: 0, radioSec: 0 };
+  const todayRec = usage[todayKey] || { videoSec: 0, radioSec: 0, patienceSec: 0, patienceGames: 0 };
+  const fmtPatienceMin = (sec) => {
+    const s = Math.max(0, Number(sec) || 0);
+    if (s < 30) return '0m';
+    const mins = Math.max(1, Math.round(s / 60));
+    const hrs = Math.floor(mins / 60);
+    const remM = mins % 60;
+    return hrs > 0 ? `${hrs}h ${remM}m` : `${mins}m`;
+  };
+  const fmtGames = (n) => {
+    const c = Math.max(0, Number(n) || 0);
+    return c === 1 ? '1 game' : `${c} games`;
+  };
   const dayKeys = Object.keys(usage).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort().reverse().slice(0, 14);
   const historyRows = dayKeys.length
     ? dayKeys.map(k => {
         const d = usage[k] || {};
-        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px solid rgba(148,163,184,0.15);"><span>${esc(k)}</span><span>🎬 ${formatMediaDurationNearest5m(d.videoSec)} &nbsp;|&nbsp; 🎻 ${formatMediaDurationNearest5m(d.radioSec)}</span></div>`;
+        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px solid rgba(148,163,184,0.15);"><span>${esc(k)}</span><span>🎬 ${formatMediaDurationNearest5m(d.videoSec)} &nbsp;|&nbsp; 🎻 ${formatMediaDurationNearest5m(d.radioSec)} &nbsp;|&nbsp; 🕷️ ${fmtPatienceMin(d.patienceSec)} (${fmtGames(d.patienceGames)})</span></div>`;
       }).join('')
     : `<div style="color:#94a3b8;">No daily stats recorded yet.</div>`;
 
@@ -1294,14 +1310,14 @@ function renderRyanControlsInsights() {
   const metaEl = $('ryan-insights-acc-meta');
   if (metaEl) {
     const warnPart = issueList.length ? ` • ⚠️ ${issueList.length}` : '';
-    metaEl.innerText = `🎬 ${formatMediaDurationNearest5m(todayRec.videoSec)} • 🎻 ${formatMediaDurationNearest5m(todayRec.radioSec)}${warnPart}`;
+    metaEl.innerText = `🎬 ${formatMediaDurationNearest5m(todayRec.videoSec)} • 🎻 ${formatMediaDurationNearest5m(todayRec.radioSec)} • 🕷️ ${fmtPatienceMin(todayRec.patienceSec)} (${Number(todayRec.patienceGames) || 0})${warnPart}`;
     metaEl.style.color = issueList.length ? '#fca5a5' : '#38bdf8';
   }
 
   card.innerHTML = `
-    <div style="font-weight:900;color:#fef08a;margin-bottom:6px;">📊 Nana's Daily Video &amp; Radio Use (nearest 5m)</div>
+    <div style="font-weight:900;color:#fef08a;margin-bottom:6px;">📊 Nana's Daily Video, Radio &amp; Patience Use</div>
     <div style="font-size:0.9rem;color:#bae6fd;font-weight:800;margin-bottom:6px;">
-      Today: 🎬 ${formatMediaDurationNearest5m(todayRec.videoSec)} &nbsp;•&nbsp; 🎻 ${formatMediaDurationNearest5m(todayRec.radioSec)}
+      Today: 🎬 ${formatMediaDurationNearest5m(todayRec.videoSec)} &nbsp;•&nbsp; 🎻 ${formatMediaDurationNearest5m(todayRec.radioSec)} &nbsp;•&nbsp; 🕷️ ${fmtPatienceMin(todayRec.patienceSec)} (${fmtGames(todayRec.patienceGames)})
     </div>
     <details style="margin-bottom:10px;font-size:0.82rem;color:#cbd5e1;">
       <summary style="cursor:pointer;color:#93c5fd;font-weight:700;">📅 Daily History (${dayKeys.length}d)</summary>
@@ -1323,6 +1339,8 @@ function renderRyanControlsInsights() {
 if (role === 'nana') {
   let pendingVideoSec = 0;
   let pendingRadioSec = 0;
+  let pendingPatienceSec = 0;
+  let pendingPatienceGames = 0;
   let lastUsageTickMs = Date.now();
   let lastTrackedVideoTime = -1;
   let lastFlushMs = Date.now();
@@ -1331,9 +1349,13 @@ if (role === 'nana') {
   const flushDailyUsage = () => {
     const addV = Math.floor(pendingVideoSec);
     const addR = Math.floor(pendingRadioSec);
-    if (addV <= 0 && addR <= 0) return;
+    const addP = Math.floor(pendingPatienceSec);
+    const addG = Math.floor(pendingPatienceGames);
+    if (addV <= 0 && addR <= 0 && addP <= 0 && addG <= 0) return;
     pendingVideoSec -= addV;
     pendingRadioSec -= addR;
+    pendingPatienceSec -= addP;
+    pendingPatienceGames -= addG;
     const dayKey = getUsageDateKey();
     runTransaction(refs.dailyUsage, current => {
       const next = (current && typeof current === 'object') ? { ...current } : {};
@@ -1341,6 +1363,8 @@ if (role === 'nana') {
       next[dayKey] = {
         videoSec: (Number(curDay.videoSec) || 0) + addV,
         radioSec: (Number(curDay.radioSec) || 0) + addR,
+        patienceSec: (Number(curDay.patienceSec) || 0) + addP,
+        patienceGames: (Number(curDay.patienceGames) || 0) + addG,
         updatedAt: Date.now()
       };
       // Keep most recent 30 days
@@ -1352,7 +1376,14 @@ if (role === 'nana') {
     }).catch(() => {
       pendingVideoSec += addV;
       pendingRadioSec += addR;
+      pendingPatienceSec += addP;
+      pendingPatienceGames += addG;
     });
+  };
+
+  hooks.onPatienceGameStarted = () => {
+    pendingPatienceGames += 1;
+    flushDailyUsage();
   };
 
   setInterval(() => {
@@ -1393,6 +1424,19 @@ if (role === 'nana') {
     );
     if (radioPlaying) {
       pendingRadioSec += dtSec;
+    }
+
+    const patienceActive = !!(
+      !inCall &&
+      document.visibilityState === 'visible' &&
+      !document.body.classList.contains('screen-dimmed') &&
+      !state.isPhotoScreensaverActive &&
+      $('patience-screen')?.classList.contains('active') &&
+      $('bulletin-modal')?.style.display !== 'flex' &&
+      (now - (Number(state.lastPatienceActivityMs) || 0) < 120000)
+    );
+    if (patienceActive) {
+      pendingPatienceSec += dtSec;
     }
 
     const flushGapMs = lowPower ? 120000 : 30000;

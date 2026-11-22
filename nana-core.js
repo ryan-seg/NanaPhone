@@ -285,6 +285,7 @@ export const state = {
   isCharging: null,
   isBatteryDecreasingWhilePlugged: false,
   isPhotoScreensaverActive: false,
+  lastPatienceActivityMs: 0,
   returnToVideoAfterCall: false,
   callSnap: { status: 'idle' },
   presenceSnap: {},
@@ -324,7 +325,9 @@ export const hooks = {
   renderBulletinFeed: null,
   updateBulletinTicker: null,
   tryStartPhotoScreensaver: null,
-  stopPhotoScreensaver: null
+  stopPhotoScreensaver: null,
+  openPatienceScreen: null,
+  onPatienceGameStarted: null
 };
 
 export const isLowPowerMode = () => {
@@ -437,7 +440,8 @@ window.switchNanaMainTab = async (tab, forceLeaveVideo = false) => {
     const tabLabels = {
       calls: 'Family Calls',
       chat: 'Family Chat',
-      radio: 'Classic FM Radio'
+      radio: 'Classic FM Radio',
+      patience: 'Patience'
     };
     const destName = tabLabels[tab] || 'another screen';
     await askNana('leave_video_prompt', `Your video is paused. Are you sure you want to leave the video to open ${destName}?`, 'Video Player', { targetTab: tab });
@@ -463,6 +467,9 @@ window.switchNanaMainTab = async (tab, forceLeaveVideo = false) => {
   } else if (tab === 'video') {
     showScreen('video-screen');
     hooks.openVideoScreen?.();
+  } else if (tab === 'patience') {
+    showScreen('patience-screen');
+    hooks.openPatienceScreen?.();
   }
 
   hooks.broadcastScreen?.();

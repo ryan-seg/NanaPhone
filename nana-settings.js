@@ -100,7 +100,7 @@ const fmtDelay = (sec) => {
         </div>
         ${isAdminFamilyMember ? `<div class="settings-card">
           <div class="settings-label"><span>👥 Family Members &amp; Call Grid</span></div>
-          <div class="settings-sub" style="margin-bottom:6px;">Add new family members, edit names &amp; face-cropped photos, and copy personal links (top 8 recent Telegram-connected appear on Nana's grid).</div>
+          <div class="settings-sub" style="margin-bottom:6px;">Add new family members, edit names &amp; face-cropped photos, and copy personal links (top 7 recent Telegram-connected appear on Nana's grid alongside Patience).</div>
           <button class="opt-btn" style="width:100%;background:#0f766e;border-color:#5eead4;color:#fff;" onclick="closeSettingsModal(); openFamilyMembersModal();">👥 Add / Manage Family Members</button>
         </div>` : ''}
         <div class="settings-card">

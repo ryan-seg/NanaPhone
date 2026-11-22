@@ -29,6 +29,7 @@
   <title>NanaPhone Portal</title>
   <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
   <link rel="stylesheet" href="styles.css?v=2.9.6">
+  <link rel="stylesheet" href="games/spider-solitaire.css?v=2.9.6">
 </head>
 <body>
   <!-- Top 62px No-Touch Orientation Banner (Day, Time of Day, Date & Clock) -->
@@ -268,6 +269,20 @@
     </div>
   </div>
 
+  <!-- 1D. Nana's Patience (Spider Solitaire) Screen -->
+  <div id="patience-screen" class="screen">
+    <div class="nana-top-nav">
+      <div class="nana-nav-pills">
+        <button class="nav-pill-btn calls-pill" onclick="switchNanaMainTab('calls')">📞 Family Calls</button>
+        <button class="nav-pill-btn chat-pill-x" onclick="switchNanaMainTab('chat')">✈️ Family Chat</button>
+        <button class="nav-pill-btn radio-pill-x" onclick="switchNanaMainTab('radio')">🎻 Classic FM</button>
+        <button class="nav-pill-btn video-pill-x" onclick="switchNanaMainTab('video')">🎬 Video</button>
+      </div>
+      <div style="font-size:1.35rem;font-weight:900;color:var(--text-accent);white-space:nowrap;">🕷️ Patience</div>
+    </div>
+    <div id="patience-game-mount"></div>
+  </div>
+
   <!-- 2. Outbound Call Screen -->
   <div id="outbound-screen" class="screen" style="background:#1e1b4b;justify-content:center;padding-top:68px;">
     <img id="outbound-photo" src="" style="width:180px;height:180px;border-radius:50%;border:7px solid #fff;margin-bottom:14px;object-fit:cover;">
@@ -405,9 +420,12 @@
         </div>
         <div style="border-top:2px solid #334155;padding-top:8px;margin-bottom:10px;width:100%;">
           <div class="settings-sub" style="margin-bottom:5px;font-weight:800;color:#7dd3fc;">✨ Quick Prompts (Starts Automatically if Nana Taps YES):</div>
-          <div class="opt-row">
+          <div class="opt-row" style="margin-bottom:6px;">
             <button type="button" class="opt-btn" style="background:#0c4a6e;border-color:#38bdf8;color:#fff;font-size:0.86rem;padding:8px 6px;" onclick="sendQuickMediaPromptToNana('radio')">🎻 Ask: Listen to Radio?</button>
             <button type="button" class="opt-btn" style="background:#4c1d95;border-color:#a78bfa;color:#fff;font-size:0.86rem;padding:8px 6px;" onclick="sendQuickMediaPromptToNana('video')">🎬 Ask: Watch Judge John Deed?</button>
+          </div>
+          <div class="opt-row">
+            <button type="button" class="opt-btn" style="background:#065f46;border-color:#4ade80;color:#fff;font-size:0.86rem;padding:8px 6px;" onclick="sendQuickMediaPromptToNana('patience')">🕷️ Ask: Play Patience?</button>
           </div>
         </div>
         <div style="border-top:2px solid #334155;padding-top:10px;width:100%;">

@@ -142,7 +142,7 @@ function renderFamilyQuestionHistory() {
       }
       return dispatchFamilyQuestionPopup(item.question, {
         type: item.type || 'family_question',
-        manualPrompt: !!(item.manualPrompt || item.type === 'idle_radio_prompt')
+        manualPrompt: !!(item.manualPrompt || item.type === 'idle_radio_prompt' || item.type === 'idle_patience_prompt')
       });
     };
     box.appendChild(row);
@@ -286,6 +286,13 @@ window.sendQuickMediaPromptToNana = async (kind) => {
       type: 'idle_video_prompt',
       manualPrompt: true
     });
+    return;
+  }
+  if (kind === 'patience') {
+    await dispatchFamilyQuestionPopup('Would you like to play Patience?', {
+      type: 'idle_patience_prompt',
+      manualPrompt: true
+    });
   }
 };
 
@@ -393,6 +400,13 @@ window.submitNanaQuestionAnswer = async (choice) => {
     return;
   }
 
+  if (qData.type === 'idle_patience_prompt') {
+    if (choice === 'YES') {
+      window.switchNanaMainTab?.('patience', true);
+    }
+    return;
+  }
+
   const qText = qData.question || '', askedBy = qData.askedBy || 'Family';
   const replySummary = `${choice === 'YES' ? '✅ YES' : '✖ NO'} — (In reply to ${askedBy}: "${qText}")`;
   await push(refs.bulletin, { author: 'Nana', fromNana: true, text: replySummary, timestamp: now, readByNanaAt: now });
@@ -433,7 +447,8 @@ function showNanaQuestionPopup() {
       next_video_prompt: '🎬 Up Next in Video Queue',
       unread_chat_prompt: '✈️ Unread Family Chat Messages',
       idle_radio_prompt: '🎻 Classic FM Radio',
-      idle_video_prompt: '🎬 Family Video Suggestion'
+      idle_video_prompt: '🎬 Family Video Suggestion',
+      idle_patience_prompt: '🕷️ Patience Card Game'
     };
     $('q-popup-sender').innerText = badgeMap[q.type] || `❓ Question from ${q.askedBy || 'Family'}`;
     $('q-popup-text').innerText = q.question;

@@ -508,7 +508,7 @@ export function renderManageFamilyMembersList() {
 
   const summary = $('fm-grid-summary-lbl');
   if (summary) {
-    summary.innerText = `${CONFIG.familyMembers.length} total • ${connectedCount} with Telegram connected${connectedCount > 8 ? ' (top 8 most recently called shown on Nana’s screen)' : ''}`;
+    summary.innerText = `${CONFIG.familyMembers.length} total • ${connectedCount} with Telegram connected${connectedCount > 7 ? ' (top 7 most recently called shown on Nana’s screen alongside Patience)' : ''}`;
   }
 
   box.innerHTML = CONFIG.familyMembers.map(m => {
@@ -516,9 +516,9 @@ export function renderManageFamilyMembersList() {
     const rank = rankMap[m.id];
     const lastTs = getLastTs(m.id);
     const statusBadge = isTg
-      ? (rank && rank <= 8
+      ? (rank && rank <= 7
           ? `<span class="fm-badge tg-on">🔔 Telegram • Grid #${rank}</span>`
-          : `<span class="fm-badge tg-wait">🔔 Telegram • Outside top 8 (${formatLastCallShort(lastTs)})</span>`)
+          : `<span class="fm-badge tg-wait">🔔 Telegram • Outside top 7 (${formatLastCallShort(lastTs)})</span>`)
       : `<span class="fm-badge tg-off">📞 Can call Nana (No Telegram)</span>`;
 
     return `
