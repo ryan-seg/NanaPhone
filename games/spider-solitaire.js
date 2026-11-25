@@ -424,7 +424,7 @@ export function applyMove(gameState, srcCol, cardIdx, dstCol, { deferCompletion 
   return { moving, flippedCard, completedRuns };
 }
 
-export function applyDealRow(gameState, allowEmptyColumns = true) {
+export function applyDealRow(gameState, allowEmptyColumns = true, { deferCompletion = false } = {}) {
   if (gameState.stock.length < 10) return { ok: false, reason: 'no_stock' };
   if (!allowEmptyColumns && gameState.tableau.some(col => col.length === 0)) {
     return { ok: false, reason: 'empty_column' };
@@ -436,7 +436,7 @@ export function applyDealRow(gameState, allowEmptyColumns = true) {
     gameState.tableau[colIdx].push(card);
     dealt.push({ colIdx, card });
   }
-  const completedRuns = extractCompletedRuns(gameState);
+  const completedRuns = deferCompletion ? [] : extractCompletedRuns(gameState);
   return { ok: true, dealt, completedRuns };
 }
 
@@ -1099,6 +1099,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     audio.playCardSlide();
     if (!gameState.countedInStats) {
       gameState.countedInStats = true;
+      undoStack.forEach(s => { s.countedInStats = true; });
       opts.onGameStarted?.({ suitsCount: gameState.suitsCount });
     }
     saveToStorage();
@@ -1377,6 +1378,11 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     }
 
     isAnimating = true;
+    if (!gameState.countedInStats) {
+      gameState.countedInStats = true;
+      undoStack.forEach(s => { s.countedInStats = true; });
+      opts.onGameStarted?.({ suitsCount: gameState.suitsCount });
+    }
     saveToStorage();
     const dealtIds = new Set(res.dealt.map(d => d.card.id));
     renderBoard(dealtIds);
@@ -1559,6 +1565,14 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     hint: handleHint,
     deal: handleDealClick,
     relayout: () => layoutAllColumnPositions(),
+    cancelInteraction: () => {
+      const g = gesture;
+      cleanupGesture();
+      dragLayer.innerHTML = '';
+      g?.sourceEls?.forEach(el => el.classList.remove('is-dragging-hidden'));
+      clearHint();
+      newModal.classList.remove('open');
+    },
     getState: () => cloneGameState(gameState),
     destroy: () => {
       destroyed = true;
