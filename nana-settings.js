@@ -180,8 +180,8 @@ const fmtDelay = (sec) => {
           <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverDelaySec', [[60,'1m'],[120,'2m'],[180,'3m'],[300,'5m']])}</div>
           <div class="settings-sub" style="margin-bottom:4px;">Change Photo Every:</div>
           <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverIntervalSec', [[15,'15s'],[30,'30s'],[60,'1m'],[120,'2m'],[300,'5m']])}</div>
-          <div class="settings-sub" style="margin-bottom:4px;">Screensaver Brightness (capped below full for burn-in safety):</div>
-          <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverBrightness', [[25,'25%'],[35,'35%'],[40,'40%'],[55,'55%']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Screensaver Max Brightness (auto-reduces if battery drops; burn-in safe):</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverBrightness', [[45,'45%'],[55,'55%'],[65,'65%'],[75,'75%']])}</div>
           <div class="settings-sub" style="margin-bottom:4px;">Captions, Album Labels &amp; Recent Chat Pool:</div>
           <div class="opt-row" style="margin-bottom:6px;">
             ${optBtns('photoScreensaverShowCaption', [[true,'💬 Show Captions'],[false,'🙈 Picture Only']])}
@@ -357,7 +357,8 @@ export function applyScreenBrightness(targetPercent, dimmed = false) {
   document.body.classList.toggle('screen-dimmed', isScreenDimmed);
   const overlay = $('brightness-overlay');
   if (overlay) {
-    overlay.style.opacity = inCallOrRinging ? '0' : Math.max(0, Math.min(0.90, (100 - pct) / 105)).toFixed(2);
+    const divisor = state.isPhotoScreensaverActive ? 180 : 105;
+    overlay.style.opacity = inCallOrRinging ? '0' : Math.max(0, Math.min(0.90, (100 - pct) / divisor)).toFixed(2);
     overlay.style.pointerEvents = isScreenDimmed ? 'auto' : 'none';
   }
 
@@ -727,7 +728,7 @@ export function refreshSettingsUI() {
   const ssOn = settings.photoScreensaverEnabled !== false;
   const ssDelay = Number(settings.photoScreensaverDelaySec ?? 120);
   const ssInt = Number(settings.photoScreensaverIntervalSec ?? 30);
-  const ssBright = Math.max(15, Math.min(55, Number(settings.photoScreensaverBrightness ?? 40)));
+  const ssBright = Math.max(25, Math.min(75, Number(settings.photoScreensaverBrightness ?? 65)));
   const ssSrcMap = { both: 'Chat+Albums', chat_only: 'Chat', albums_only: 'Albums' };
   const ssSrcTxt = ssSrcMap[settings.photoScreensaverSource || 'both'] || 'Chat+Albums';
   document.querySelectorAll('.lbl-screensaver-summary').forEach(e => {
