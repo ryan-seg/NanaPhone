@@ -386,7 +386,8 @@ export function canAutoFinishGame(gs) {
     }
     if (!isMovableStack(gs.tableau, colIdx, 0)) return false;
   }
-  return !!findBestHintMove(gs.tableau);
+  const best = findBestHintMove(gs.tableau);
+  return !!(best && best.score >= 5000);
 }
 
 export function extractCompletedRuns(gameState) {
@@ -590,6 +591,9 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   let toastTimer = null;
   let confettiRaf = null;
   let destroyed = false;
+  let expandedColIdx = -1;
+  let expandedCollapseTimer = null;
+  const colCollapsedFlags = new Array(10).fill(false);
 
   const audio = createCardAudio(opts.soundEnabled);
 
@@ -806,8 +810,8 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   }
 
   // --- DYNAMIC PER-COLUMN VERTICAL COMPRESSION (KEEPS JUMBO RANKS READABLE) ---
-  function computeColumnOffsets(cards, cardWidth, availHeight) {
-    if (!cards.length) return { tops: [], upStep: 44 };
+  function computeColumnOffsets(cards, cardWidth, availHeight, forceExpanded = false) {
+    if (!cards.length) return { tops: [], upStep: 44, hasCollapsedRun: false };
     const cardHeight = cardWidth * 1.20;
     let downStep = Math.max(4, Math.min(9, Math.round(cardHeight * 0.065)));
     let upStep   = Math.max(28, Math.min(46, Math.round(cardHeight * 0.34)));
@@ -832,8 +836,6 @@ export function createSpiderSolitaire(mountEl, options = {}) {
         runEnd++;
       }
       if (runEnd - runStart + 1 >= 4) {
-        // Keep the top card of the run (runStart) and bottom card (runEnd) full-height;
-        // middle cards (runStart+1 .. runEnd-1) can collapse to thin card-edge slivers if needed.
         for (let k = runStart + 1; k < runEnd; k++) {
           isMidSameSuitRun[k] = true;
         }
@@ -852,7 +854,16 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     };
 
     let midStep = null;
-    if (calcTotalHeight(downStep, upStep, null) > maxStackH) {
+    if (forceExpanded) {
+      // Temporarily fan all middle cards open so every rank/suit in the stack can be chosen
+      const numDown = cards.slice(0, -1).filter(c => !c.faceUp).length;
+      const numUp = cards.length - 1 - numDown;
+      if (numDown > 0) downStep = 3;
+      if (numUp > 0) {
+        const targetUp = Math.floor((maxStackH - cardHeight - numDown * downStep) / numUp);
+        upStep = Math.max(22, Math.min(upStep, targetUp));
+      }
+    } else if (calcTotalHeight(downStep, upStep, null) > maxStackH) {
       // 1. Compress face-down cards first
       const numDown = cards.slice(0, -1).filter(c => !c.faceUp).length;
       const numUp = cards.length - 1 - numDown;
@@ -895,7 +906,26 @@ export function createSpiderSolitaire(mountEl, options = {}) {
       else y += upStep;
       tops.push(Math.round(y));
     }
-    return { tops, upStep: Math.floor(upStep) };
+    return { tops, upStep: Math.floor(upStep), hasCollapsedRun: midStep !== null };
+  }
+
+  function collapseExpandedColumn(relayout = true) {
+    clearTimeout(expandedCollapseTimer);
+    expandedCollapseTimer = null;
+    if (expandedColIdx === -1) return;
+    expandedColIdx = -1;
+    if (relayout) layoutAllColumnPositions();
+  }
+
+  function expandColumnTemporarily(colIdx) {
+    clearTimeout(expandedCollapseTimer);
+    expandedColIdx = colIdx;
+    layoutAllColumnPositions();
+    expandedCollapseTimer = setTimeout(() => {
+      if (!gesture?.isDragging) {
+        collapseExpandedColumn(true);
+      }
+    }, 5500);
   }
 
   function layoutAllColumnPositions() {
@@ -908,7 +938,10 @@ export function createSpiderSolitaire(mountEl, options = {}) {
       const colEl = colEls[colIdx];
       const cards = gameState.tableau[colIdx];
       const cardWidth = colEl.clientWidth || 90;
-      const { tops, upStep } = computeColumnOffsets(cards, cardWidth, availH);
+      const isExpanded = expandedColIdx === colIdx;
+      const { tops, upStep, hasCollapsedRun } = computeColumnOffsets(cards, cardWidth, availH, isExpanded);
+      colCollapsedFlags[colIdx] = hasCollapsedRun;
+      colEl.classList.toggle('is-expanded', isExpanded);
       colEl.style.setProperty('--ss-col-up-step', `${Math.max(14, upStep)}px`);
       const cardDomList = colEl.querySelectorAll('.ss-card');
       cardDomList.forEach((el, i) => {
@@ -1153,6 +1186,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     if (isAnimating) return false;
     if (!canDropStackOnColumn(gameState.tableau, srcCol, cardIdx, dstCol)) return false;
 
+    collapseExpandedColumn(false);
     clearHint();
     notifyActivity();
 
@@ -1354,6 +1388,10 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     cleanupGesture();
 
     if (!g.isDragging) {
+      if (g.openedStackOnDown) {
+        // Stay fanned open briefly so the user can choose a card from the stack to tap or drag
+        return;
+      }
       // Quick touch/click -> automatically move to best valid option!
       tryAutoMoveByTap(g.srcCol, g.cardIdx);
       return;
@@ -1364,7 +1402,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
       dragLayer.innerHTML = '';
       commitMove(g.srcCol, g.cardIdx, g.hoverDstCol, false);
     } else if (g.dragStackEl && g.firstRect) {
-      // Smoothly glide back home
+      // Smoothly glide back home, then collapse expanded stack
       isAnimating = true;
       audio.playSoftThud();
       const wrap = g.dragStackEl;
@@ -1374,12 +1412,14 @@ export function createSpiderSolitaire(mountEl, options = {}) {
         wrap.remove();
         g.sourceEls?.forEach(el => el.classList.remove('is-dragging-hidden'));
         isAnimating = false;
+        collapseExpandedColumn(true);
       };
       wrap.addEventListener('transitionend', done, { once: true });
       setTimeout(done, 210);
     } else {
       dragLayer.innerHTML = '';
       g.sourceEls?.forEach(el => el.classList.remove('is-dragging-hidden'));
+      collapseExpandedColumn(true);
     }
   }
 
@@ -1389,20 +1429,36 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     cleanupGesture();
     dragLayer.innerHTML = '';
     g.sourceEls?.forEach(el => el.classList.remove('is-dragging-hidden'));
+    collapseExpandedColumn(true);
   }
 
   boardEl.addEventListener('pointerdown', (e) => {
     if (isAnimating || (e.pointerType === 'mouse' && e.button !== 0)) return;
     const cardEl = e.target.closest('.ss-card.face-up');
-    if (!cardEl) return;
+    if (!cardEl) {
+      collapseExpandedColumn(true);
+      return;
+    }
     const srcCol = Number(cardEl.dataset.col);
     const cardIdx = Number(cardEl.dataset.idx);
     if (!Number.isInteger(srcCol) || !Number.isInteger(cardIdx)) return;
 
     notifyActivity();
+
+    // If pressing a collapsed stack, fan all middle cards open temporarily first
+    let openedStackOnDown = false;
+    if (colCollapsedFlags[srcCol] && expandedColIdx !== srcCol) {
+      openedStackOnDown = true;
+      expandColumnTemporarily(srcCol);
+    } else if (expandedColIdx !== -1 && expandedColIdx !== srcCol) {
+      collapseExpandedColumn(true);
+    }
+
     if (!isMovableStack(gameState.tableau, srcCol, cardIdx)) {
-      audio.playSoftThud();
-      shakeCardEl(srcCol, cardIdx);
+      if (!openedStackOnDown) {
+        audio.playSoftThud();
+        shakeCardEl(srcCol, cardIdx);
+      }
       return;
     }
 
@@ -1413,6 +1469,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
       pointerType: e.pointerType || 'touch',
       srcCol,
       cardIdx,
+      openedStackOnDown,
       startX: e.clientX,
       startY: e.clientY,
       curX: e.clientX,
@@ -1429,6 +1486,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   // --- DEAL 10 CARDS FROM STOCK ---
   function handleDealClick() {
     if (isAnimating || gameState.stock.length < 10) return;
+    collapseExpandedColumn(false);
     clearHint();
     notifyActivity();
 
@@ -1514,6 +1572,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   // --- UNDO ---
   function handleUndo() {
     if (isAnimating || !undoStack.length) return;
+    collapseExpandedColumn(false);
     clearHint();
     notifyActivity();
     gameState = undoStack.pop();
@@ -1570,6 +1629,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   }
 
   function startNewGame(suitsCount = pendingNewSuits) {
+    collapseExpandedColumn(false);
     clearHint();
     stopConfetti();
     newModal.classList.remove('open');
@@ -1600,7 +1660,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
         return;
       }
       const best = findBestHintMove(gameState.tableau);
-      if (!best) return;
+      if (!best || best.score < 5000) return;
       steps++;
       if (commitMove(best.srcCol, best.cardIdx, best.dstCol, true)) {
         setTimeout(step, 210);
