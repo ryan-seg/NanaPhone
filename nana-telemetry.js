@@ -726,17 +726,36 @@ function syncUnpluggedBannerAndVoice(level, isCharging) {
     if (isCharging) {
       unplugVoicePending = false;
       if (typeof level === 'number' && !Number.isNaN(level)) {
+        const prevReduction = Number(state.screensaverPowerReductionPct || 0);
         if (pluggedPeakBatteryLevel === null || level >= pluggedPeakBatteryLevel) {
           pluggedPeakBatteryLevel = level;
           state.isBatteryDecreasingWhilePlugged = false;
-        } else if (level < 97 && (pluggedPeakBatteryLevel - level) >= 3) {
-          state.isBatteryDecreasingWhilePlugged = true;
-          hooks.stopPhotoScreensaver?.('battery_decreasing');
+          state.screensaverPowerReductionPct = 0;
+        } else {
+          const drop = pluggedPeakBatteryLevel - level;
+          if (level >= 98) {
+            state.isBatteryDecreasingWhilePlugged = false;
+            state.screensaverPowerReductionPct = 0;
+          } else if (drop === 1) {
+            state.isBatteryDecreasingWhilePlugged = false;
+            state.screensaverPowerReductionPct = 10;
+          } else if (drop === 2) {
+            state.isBatteryDecreasingWhilePlugged = false;
+            state.screensaverPowerReductionPct = 20;
+          } else if (level < 97 && drop >= 3) {
+            state.isBatteryDecreasingWhilePlugged = true;
+            state.screensaverPowerReductionPct = 35;
+            hooks.stopPhotoScreensaver?.('battery_decreasing');
+          }
+        }
+        if (state.screensaverPowerReductionPct !== prevReduction && state.isPhotoScreensaverActive) {
+          hooks.updateScreensaverBrightness?.();
         }
       }
     } else {
       pluggedPeakBatteryLevel = null;
       state.isBatteryDecreasingWhilePlugged = false;
+      state.screensaverPowerReductionPct = 0;
       hooks.stopPhotoScreensaver?.('unplugged');
       if (prevObservedCharging === true) {
         unplugVoicePending = true;
