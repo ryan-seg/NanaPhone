@@ -834,6 +834,7 @@ onValue(refs.settings, snap => {
     } else if ($('night-dimmer')?.style.display === 'flex') {
       applyScreenBrightness(5, true);
     } else if (wasLoaded && isScreenDimmed && getEffectiveDimDelaySec() > 0) {
+      if (hooks.tryStartPhotoScreensaver?.()) return;
       const dimTarget = NanaCore.isLowPowerMode?.() ? 5 : (settings.dimBrightness ?? 15);
       applyScreenBrightness(dimTarget, true);
     } else {
