@@ -837,7 +837,7 @@ if (role === 'nana' && navigator.getBattery) {
       refreshCachedBatteryValues();
       syncUnpluggedBannerAndVoice(cachedBatteryLevel, cachedIsCharging);
       evaluateNanaBatteryChatAlerts();
-      if (!prevPresenceReady) return;
+      if (!prevPresenceReady || NanaCore.isTelemetryPaused?.()) return;
       update(refs.presence, {
         online: true,
         lastPing: Date.now(),
@@ -862,7 +862,7 @@ if (role === 'nana') readTabletBatteryStatus();
 
 export function recordTouchActivity(customActivity = null) {
   state.lastActivityOrCallMs = Date.now();
-  if (role !== 'nana') return;
+  if (role !== 'nana' || NanaCore.isTelemetryPaused?.()) return;
   const now = Date.now();
   const minGapMs = NanaCore.isLowPowerMode() ? 30000 : 15000;
   if (!customActivity && (now - lastTouchWriteMs < minGapMs)) return;
@@ -887,7 +887,7 @@ NanaCore.recordTouchActivity = recordTouchActivity;
 
 let lastHeartbeatWriteMs = 0;
 function recordBackgroundHeartbeat(force = false) {
-  if (role !== 'nana') return;
+  if (role !== 'nana' || NanaCore.isTelemetryPaused?.()) return;
   const { batteryLevel, isCharging } = readTabletBatteryStatus();
   if (!prevPresenceReady) return;
   const now = Date.now();
@@ -925,7 +925,7 @@ export function broadcastNanaCurrentScreen() {
   if (role !== 'nana') return;
   positionUnpluggedBannerOverRadioAndVideo();
   requestAnimationFrame(positionUnpluggedBannerOverRadioAndVideo);
-  if (!prevPresenceReady) return;
+  if (!prevPresenceReady || NanaCore.isTelemetryPaused?.()) return;
   const videoEl = $('nana-video-el');
   let screenState = 'home';
   const isPlayingVideo = !!(
@@ -958,6 +958,7 @@ hooks.broadcastScreen = broadcastNanaCurrentScreen;
 
 if (role === 'nana') {
   const writeConnectedPresence = () => {
+    if (NanaCore.isTelemetryPaused?.()) return;
     const appState = document.visibilityState === 'hidden' ? 'backgrounded' : 'foreground';
     const payload = {
       online: true,
@@ -969,15 +970,74 @@ if (role === 'nana') {
     update(refs.presence, payload).catch(() => {});
   };
 
+  const ensureTelemetryPausedPill = () => {
+    let pill = $('nana-telemetry-paused-pill');
+    if (pill) return pill;
+    pill = document.createElement('button');
+    pill.id = 'nana-telemetry-paused-pill';
+    pill.type = 'button';
+    pill.style.cssText = 'position:fixed;bottom:10px;left:10px;z-index:260;display:none;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;border:2px solid #fde047;background:rgba(15,23,42,0.92);color:#fef08a;font-size:0.88rem;font-weight:900;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.5);';
+    pill.onclick = () => window.toggleTelemetryPauseMode?.(false);
+    document.body.appendChild(pill);
+    return pill;
+  };
+
+  let lastObservedTelemetryPaused = null;
+  window.syncTelemetryPauseUI = () => {
+    const paused = !!NanaCore.isTelemetryPaused?.();
+    const remMin = Math.max(1, Math.ceil((NanaCore.getTelemetryPauseRemainingMs?.() || 0) / 60000));
+    const btn = $('admin-toggle-telemetry-btn');
+    if (btn) {
+      btn.textContent = paused
+        ? `▶️ Resume Status Updates (${remMin}m left)`
+        : '⏸️ Pause Status Updates (2h Test Mode)';
+      btn.style.background = paused ? '#dc2626' : '#475569';
+    }
+    const pill = ensureTelemetryPausedPill();
+    pill.style.display = paused ? 'inline-flex' : 'none';
+    if (paused) {
+      pill.textContent = `⏸️ Test Mode: Status Paused (${remMin}m) • Tap to Resume`;
+    }
+    if (lastObservedTelemetryPaused !== paused) {
+      const wasPaused = lastObservedTelemetryPaused === true;
+      lastObservedTelemetryPaused = paused;
+      if (paused) {
+        onDisconnect(refs.presence).cancel().catch(() => {});
+      } else if (wasPaused && prevPresenceReady) {
+        if (firebaseConnected) {
+          onDisconnect(refs.presence).update({ online: false, disconnectedAt: Date.now() }).catch(() => {});
+          writeConnectedPresence();
+        }
+        recordBackgroundHeartbeat(true);
+        lastBroadcastScreenState = '';
+        broadcastNanaCurrentScreen();
+      }
+    }
+  };
+
+  window.toggleTelemetryPauseMode = async (forceState = null, durationMin = 120) => {
+    const currentlyPaused = !!NanaCore.isTelemetryPaused?.();
+    const nextPaused = typeof forceState === 'boolean' ? forceState : !currentlyPaused;
+    const untilMs = nextPaused ? (Date.now() + Math.max(1, Number(durationMin) || 120) * 60000) : 0;
+    NanaCore.setTelemetryPaused?.(nextPaused, untilMs ? untilMs - Date.now() : 0);
+    window.syncTelemetryPauseUI?.();
+    await update(refs.settings, { telemetryPauseUntilMs: untilMs }).catch(() => {});
+  };
+
+  hooks.onSettingsChanged.push(() => {
+    window.syncTelemetryPauseUI?.();
+  });
+
   const finalizePrevPresenceCapture = (val) => {
     if (prevPresenceReady) return;
     bootPrevPresence = val || {};
     prevPresenceReady = true;
-    if (firebaseConnected) writeConnectedPresence();
+    if (firebaseConnected && !NanaCore.isTelemetryPaused?.()) writeConnectedPresence();
     recordBackgroundHeartbeat(true);
     lastBroadcastScreenState = '';
     broadcastNanaCurrentScreen();
     evaluateNanaBatteryChatAlerts();
+    window.syncTelemetryPauseUI?.();
   };
   onValue(refs.presence, snap => finalizePrevPresenceCapture(snap.val()), { onlyOnce: true });
   setTimeout(() => finalizePrevPresenceCapture({}), 3000);
@@ -985,6 +1045,10 @@ if (role === 'nana') {
   onValue(refs.connectedInfo, snap => {
     firebaseConnected = (snap.val() === true);
     if (firebaseConnected) {
+      if (NanaCore.isTelemetryPaused?.()) {
+        onDisconnect(refs.presence).cancel().catch(() => {});
+        return;
+      }
       onDisconnect(refs.presence).update({ online: false, disconnectedAt: Date.now() }).catch(() => {});
       if (prevPresenceReady) {
         writeConnectedPresence();
@@ -994,7 +1058,7 @@ if (role === 'nana') {
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (!prevPresenceReady) return;
+    if (!prevPresenceReady || NanaCore.isTelemetryPaused?.()) return;
     const isHidden = document.visibilityState === 'hidden';
     update(refs.presence, {
       appState: isHidden ? 'backgrounded' : 'foreground',
@@ -1004,7 +1068,7 @@ if (role === 'nana') {
   });
 
   window.addEventListener('blur', () => {
-    if (!prevPresenceReady) return;
+    if (!prevPresenceReady || NanaCore.isTelemetryPaused?.()) return;
     if (document.visibilityState !== 'hidden') {
       update(refs.presence, {
         appState: 'shade_or_overlay',
@@ -1015,7 +1079,7 @@ if (role === 'nana') {
   });
 
   window.addEventListener('focus', () => {
-    if (!prevPresenceReady) return;
+    if (!prevPresenceReady || NanaCore.isTelemetryPaused?.()) return;
     update(refs.presence, {
       appState: 'foreground',
       appStateChangedAt: Date.now(),
@@ -1024,7 +1088,7 @@ if (role === 'nana') {
   });
 
   window.addEventListener('offline', () => {
-    if (!prevPresenceReady) return;
+    if (!prevPresenceReady || NanaCore.isTelemetryPaused?.()) return;
     update(refs.presence, {
       networkOnline: false,
       lastExitHint: 'wifi_turned_off',
@@ -1033,7 +1097,7 @@ if (role === 'nana') {
   });
 
   window.addEventListener('online', () => {
-    if (!prevPresenceReady) return;
+    if (!prevPresenceReady || NanaCore.isTelemetryPaused?.()) return;
     update(refs.presence, {
       online: true,
       networkOnline: true,
@@ -1042,6 +1106,7 @@ if (role === 'nana') {
   });
 
   window.addEventListener('pagehide', () => {
+    if (NanaCore.isTelemetryPaused?.()) return;
     update(refs.presence, {
       online: false,
       appState: 'closed',
@@ -1055,8 +1120,12 @@ if (role === 'nana') {
     window.wakeScreenAndResetDimTimer?.();
     recordBackgroundHeartbeat(true);
     broadcastNanaCurrentScreen();
+    window.syncTelemetryPauseUI?.();
   }, 2000);
-  setInterval(() => recordBackgroundHeartbeat(false), 20000);
+  setInterval(() => {
+    window.syncTelemetryPauseUI?.();
+    recordBackgroundHeartbeat(false);
+  }, 20000);
   let screenTickCount = 0;
   setInterval(() => {
     screenTickCount++;
@@ -1422,6 +1491,13 @@ if (role === 'nana') {
   let lpUsageTick = 0;
 
   const flushDailyUsage = () => {
+    if (NanaCore.isTelemetryPaused?.()) {
+      pendingVideoSec = 0;
+      pendingRadioSec = 0;
+      pendingPatienceSec = 0;
+      pendingPatienceGames = 0;
+      return;
+    }
     const addV = Math.floor(pendingVideoSec);
     const addR = Math.floor(pendingRadioSec);
     const addP = Math.floor(pendingPatienceSec);
