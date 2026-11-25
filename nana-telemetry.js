@@ -721,6 +721,7 @@ function syncUnpluggedBannerAndVoice(level, isCharging) {
   if (role !== 'nana') return;
   if (typeof level === 'number' && !Number.isNaN(level)) state.batteryLevel = level;
   if (typeof isCharging === 'boolean') {
+    const prevCharging = state.isCharging;
     state.isCharging = isCharging;
     if (isCharging) {
       unplugVoicePending = false;
@@ -728,7 +729,7 @@ function syncUnpluggedBannerAndVoice(level, isCharging) {
         if (pluggedPeakBatteryLevel === null || level >= pluggedPeakBatteryLevel) {
           pluggedPeakBatteryLevel = level;
           state.isBatteryDecreasingWhilePlugged = false;
-        } else if (level < pluggedPeakBatteryLevel) {
+        } else if (level < 97 && (pluggedPeakBatteryLevel - level) >= 3) {
           state.isBatteryDecreasingWhilePlugged = true;
           hooks.stopPhotoScreensaver?.('battery_decreasing');
         }
@@ -742,6 +743,13 @@ function syncUnpluggedBannerAndVoice(level, isCharging) {
       }
     }
     prevObservedCharging = isCharging;
+    if (prevCharging !== true && isCharging === true) {
+      if (document.body.classList.contains('screen-dimmed') && !state.isPhotoScreensaverActive) {
+        hooks.tryStartPhotoScreensaver?.();
+      } else if (!state.isPhotoScreensaverActive) {
+        window.wakeScreenAndResetDimTimer?.();
+      }
+    }
   }
 
   applyPowerModeFromChargingState(isCharging, level);
@@ -831,6 +839,7 @@ export function readTabletBatteryStatus() {
   evaluateNanaBatteryChatAlerts();
   return { batteryLevel: cachedBatteryLevel, isCharging: cachedIsCharging };
 }
+if (role === 'nana') readTabletBatteryStatus();
 
 export function recordTouchActivity(customActivity = null) {
   state.lastActivityOrCallMs = Date.now();
