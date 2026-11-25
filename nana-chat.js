@@ -3361,7 +3361,13 @@ function showScreensaverSlide(idx) {
 }
 
 function syncActiveScreensaverWithBulletin(forceRebuildOrder = false) {
-  if (role !== 'nana' || !state.isPhotoScreensaverActive) return;
+  if (role !== 'nana') return;
+  if (!state.isPhotoScreensaverActive) {
+    if (document.body.classList.contains('screen-dimmed')) {
+      tryStartPhotoScreensaver();
+    }
+    return;
+  }
   const curItem = screensaverPhotos[screensaverIndex % Math.max(1, screensaverPhotos.length)];
   const nextModeSig = getScreensaverModeSignature();
   const modeChanged = forceRebuildOrder || (nextModeSig !== activeScreensaverModeSig);
