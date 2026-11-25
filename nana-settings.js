@@ -79,14 +79,41 @@ const fmtDelay = (sec) => {
     });
   };
 
+  window.filterControlsSections = (query) => {
+    const q = String(query || '').trim().toLowerCase();
+    document.querySelectorAll('#shared-settings-cards details.controls-accordion, #family-settings-mount details.controls-accordion, #gear-settings-mount details.controls-accordion').forEach(acc => {
+      if (!q) {
+        acc.style.display = '';
+        acc.querySelectorAll('.settings-card').forEach(c => { c.style.display = ''; });
+        return;
+      }
+      const sumMatch = (acc.querySelector('summary')?.textContent || '').toLowerCase().includes(q);
+      let anyCardMatch = false;
+      acc.querySelectorAll('.settings-card').forEach(c => {
+        const hit = sumMatch || (c.textContent || '').toLowerCase().includes(q);
+        c.style.display = hit ? '' : 'none';
+        if (hit) anyCardMatch = true;
+      });
+      acc.style.display = (sumMatch || anyCardMatch) ? '' : 'none';
+      if (sumMatch || anyCardMatch) acc.open = true;
+    });
+  };
+
+  window.setRemoteTelemetryPause = async (minutes) => {
+    const mins = Math.max(0, Number(minutes) || 0);
+    const untilMs = mins > 0 ? (Date.now() + mins * 60000) : 0;
+    await window.updateSetting('telemetryPauseUntilMs', untilMs);
+  };
+
   sc.innerHTML = `
-    <div class="controls-toolbar">
+    <div class="controls-toolbar" style="flex-wrap:wrap;gap:6px;">
+      <input id="controls-filter-input" type="search" placeholder="🔍 Filter controls (e.g. brightness, test, battery, photo)..." oninput="filterControlsSections(this.value)" style="flex:1 1 220px;padding:7px 12px;border-radius:10px;border:1.5px solid #475569;background:#0f172a;color:#fff;font-size:0.9rem;user-select:text;-webkit-user-select:text;">
       <button type="button" class="opt-btn" style="flex:0;padding:6px 12px;font-size:0.82rem;" onclick="toggleAllControlsSections(true)">➕ Expand All</button>
       <button type="button" class="opt-btn" style="flex:0;padding:6px 12px;font-size:0.82rem;" onclick="toggleAllControlsSections(false)">➖ Collapse All</button>
     </div>
 
     <details class="controls-accordion" open>
-      <summary><span>📞 Calling, Family &amp; Quick Actions</span><span class="controls-acc-meta calling-status-lbl"></span></summary>
+      <summary><span>📞 Calling &amp; Family Grid</span><span class="controls-acc-meta calling-status-lbl"></span></summary>
       <div class="controls-acc-body">
         <div class="settings-card">
           <div class="settings-label"><span>📞 Video Calling on Nana's Tablet</span><span class="calling-status-lbl" style="font-size:0.95rem;"></span></div>
@@ -103,8 +130,25 @@ const fmtDelay = (sec) => {
           <div class="settings-sub" style="margin-bottom:6px;">Add new family members, edit names &amp; face-cropped photos, and copy personal links (top 7 recent Telegram-connected appear on Nana's grid alongside Patience).</div>
           <button class="opt-btn" style="width:100%;background:#0f766e;border-color:#5eead4;color:#fff;" onclick="closeSettingsModal(); openFamilyMembersModal();">👥 Add / Manage Family Members</button>
         </div>` : ''}
+      </div>
+    </details>
+
+    <details class="controls-accordion">
+      <summary><span>🧪 Testing &amp; Maintenance</span><span class="controls-acc-meta lbl-telemetry-pause-summary">Live</span></summary>
+      <div class="controls-acc-body">
         <div class="settings-card">
-          <div class="settings-label"><span>🔄 Refresh Nana's Tablet &amp; Prompt Family Devices</span></div>
+          <div class="settings-label"><span>⏸️ Pause Nana Status Updates (Test Mode)</span><span class="lbl-telemetry-pause-summary" style="font-size:0.9rem;">Live</span></div>
+          <div class="settings-sub" style="margin-bottom:8px;">Freezes Nana's "Last Touched", online status &amp; daily stats <b>before</b> you touch the tablet. Automatically resumes when the timer ends or when you tap Resume.</div>
+          <div class="opt-row" style="margin-bottom:6px;">
+            <button type="button" class="opt-btn" onclick="setRemoteTelemetryPause(30)">⏸️ 30m</button>
+            <button type="button" class="opt-btn" onclick="setRemoteTelemetryPause(60)">⏸️ 1h</button>
+            <button type="button" class="opt-btn" onclick="setRemoteTelemetryPause(120)">⏸️ 2h</button>
+            <button type="button" class="opt-btn" onclick="setRemoteTelemetryPause(240)">⏸️ 4h</button>
+          </div>
+          <button type="button" id="btn-resume-telemetry-remote" class="opt-btn" style="width:100%;display:none;background:#16a34a;border-color:#86efac;color:#fff;" onclick="setRemoteTelemetryPause(0)">▶️ Resume Status Updates Now</button>
+        </div>
+        <div class="settings-card">
+          <div class="settings-label"><span>🔄 Refresh Tablet &amp; Family Browsers</span></div>
           <div class="settings-sub" style="margin-bottom:6px;">Refresh Nana's tablet or prompt family members' browsers independently.</div>
           <div class="opt-row">
             <button class="opt-btn" id="remote-refresh-nana-btn" onclick="requestNanaReload()">🔄 Refresh Nana's Tablet</button>
@@ -582,6 +626,7 @@ window.pressPinDigit = async (d) => {
       if ($('admin-modal-sub')) $('admin-modal-sub').innerText = 'Supervisor controls unlocked';
       if ($('pin-keypad-section')) $('pin-keypad-section').style.display = 'none';
       if ($('admin-actions-section')) $('admin-actions-section').style.display = 'flex';
+      window.syncTelemetryPauseUI?.();
       refreshSettingsUI();
     } else {
       if ($('pin-dots-display')) $('pin-dots-display').innerText = "❌";
@@ -773,6 +818,21 @@ export function refreshSettingsUI() {
     ? `🔇 Muted until ${new Date(mutedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
     : (battThresh <= 0 ? '🔕 Unplugged voice alerts switched OFF' : `🔊 Alerts ${battThresh >= 99 ? 'whenever unplugged' : `when unplugged at ≤${battThresh}%`} (${battFreqLabel})`);
   document.querySelectorAll('.lbl-battery-mute').forEach(e => { e.innerText = muteTxt; });
+
+  const pauseUntil = Number(settings.telemetryPauseUntilMs || 0);
+  const pauseRemMs = pauseUntil > Date.now() ? (pauseUntil - Date.now()) : 0;
+  const pauseRemMin = Math.max(1, Math.ceil(pauseRemMs / 60000));
+  document.querySelectorAll('.lbl-telemetry-pause-summary').forEach(e => {
+    e.innerText = pauseRemMs > 0 ? `⏸️ Paused (${pauseRemMin}m left)` : '🟢 Live';
+    e.style.color = pauseRemMs > 0 ? '#fde047' : '#4ade80';
+  });
+  const resumeRemoteBtn = $('btn-resume-telemetry-remote');
+  if (resumeRemoteBtn) {
+    resumeRemoteBtn.style.display = pauseRemMs > 0 ? 'block' : 'none';
+    if (pauseRemMs > 0) {
+      resumeRemoteBtn.textContent = `▶️ Resume Status Updates Now (${pauseRemMin}m left)`;
+    }
+  }
 
   const sCall = Math.min(1.0, Math.max(0.2, callVol / 100)), sRad = Math.min(1.0, Math.max(0.15, radVol / 100));
   if ($('remote-audio')) $('remote-audio').volume = role === 'nana' ? sCall : 1.0;
