@@ -807,10 +807,10 @@ export function createSpiderSolitaire(mountEl, options = {}) {
 
   // --- DYNAMIC PER-COLUMN VERTICAL COMPRESSION (NEVER CLIPS OFF BOTTOM) ---
   function computeColumnOffsets(cards, cardWidth, availHeight) {
-    if (!cards.length) return [];
+    if (!cards.length) return { tops: [], upStep: 44 };
     const cardHeight = cardWidth * 1.38;
-    let downStep = Math.max(5, Math.min(10, Math.round(cardHeight * 0.068)));
-    let upStep   = Math.max(28, Math.min(50, Math.round(cardHeight * 0.34)));
+    let downStep = Math.max(4, Math.min(9, Math.round(cardHeight * 0.06)));
+    let upStep   = Math.max(28, Math.min(48, Math.round(cardHeight * 0.33)));
 
     let numDown = 0;
     let numUpGaps = 0;
@@ -822,19 +822,20 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     const maxStackH = Math.max(cardHeight + 12, availHeight - 6);
     const calcHeight = (ds, us) => numDown * ds + numUpGaps * us + cardHeight;
 
-    if (calcHeight(downStep, upStep) > maxStackH && numUpGaps > 0) {
-      const targetForUp = maxStackH - cardHeight - numDown * downStep;
-      upStep = Math.max(20, Math.floor(targetForUp / numUpGaps));
-    }
+    // Compress face-down cards first so face-up rank headers stay tall and readable
     if (calcHeight(downStep, upStep) > maxStackH && numDown > 0) {
       const targetForDown = maxStackH - cardHeight - numUpGaps * upStep;
-      downStep = Math.max(4, Math.floor(targetForDown / numDown));
+      downStep = Math.max(3, Math.floor(targetForDown / numDown));
+    }
+    if (calcHeight(downStep, upStep) > maxStackH && numUpGaps > 0) {
+      const targetForUp = maxStackH - cardHeight - numDown * downStep;
+      upStep = Math.max(18, Math.floor(targetForUp / numUpGaps));
     }
     if (calcHeight(downStep, upStep) > maxStackH && cards.length > 1) {
       const availGap = Math.max(12, maxStackH - cardHeight);
       const ratio = availGap / Math.max(1, numDown * downStep + numUpGaps * upStep);
-      downStep = Math.max(3, downStep * ratio);
-      upStep = Math.max(15, upStep * ratio);
+      downStep = Math.max(2, downStep * ratio);
+      upStep = Math.max(14, upStep * ratio);
     }
 
     const tops = [0];
@@ -843,7 +844,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
       y += cards[i].faceUp ? upStep : downStep;
       tops.push(Math.round(y));
     }
-    return tops;
+    return { tops, upStep: Math.floor(upStep) };
   }
 
   function layoutAllColumnPositions() {
@@ -856,7 +857,8 @@ export function createSpiderSolitaire(mountEl, options = {}) {
       const colEl = colEls[colIdx];
       const cards = gameState.tableau[colIdx];
       const cardWidth = colEl.clientWidth || 90;
-      const tops = computeColumnOffsets(cards, cardWidth, availH);
+      const { tops, upStep } = computeColumnOffsets(cards, cardWidth, availH);
+      colEl.style.setProperty('--ss-col-up-step', `${Math.max(14, upStep)}px`);
       const cardDomList = colEl.querySelectorAll('.ss-card');
       cardDomList.forEach((el, i) => {
         el.style.top = `${tops[i] ?? 0}px`;
