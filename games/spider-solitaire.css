@@ -193,7 +193,7 @@
   top: 0;
   left: 0;
   width: 100%;
-  aspect-ratio: 1 / 1.38;
+  aspect-ratio: 1 / 1.20;
   border-radius: var(--ss-card-radius);
   border: 2.5px solid rgba(255, 255, 255, 0.68);
   background: rgba(5, 36, 15, 0.34);
@@ -214,7 +214,7 @@
   position: absolute;
   left: 0;
   width: 100%;
-  aspect-ratio: 1 / 1.38;
+  aspect-ratio: 1 / 1.20;
   border-radius: var(--ss-card-radius);
   overflow: hidden;
   transition: box-shadow 0.14s ease, filter 0.14s ease;
@@ -222,11 +222,12 @@
   cursor: default;
 }
 
-/* Face-up crisp white card */
+/* Face-up crisp white card with high-contrast top-edge divider */
 .nana-spider-root .ss-card.face-up {
   background: #ffffff;
   border: 2px solid #94a3b8;
   box-shadow:
+    0 -2px 0 rgba(15, 23, 42, 0.24),
     0 2px 6px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.98);
   display: flex;
