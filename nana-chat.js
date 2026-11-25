@@ -3448,6 +3448,12 @@ function stopPhotoScreensaver(reason = 'manual') {
   }
 }
 
+function getEffectiveScreensaverBrightness() {
+  const base = Math.max(25, Math.min(75, Number(settings.photoScreensaverBrightness ?? 65) || 65));
+  const reduction = Math.max(0, Number(state.screensaverPowerReductionPct || 0));
+  return Math.max(25, base - reduction);
+}
+
 function tryStartPhotoScreensaver() {
   if (!isScreensaverAllowedNow()) return false;
   refreshGoogleAlbumsIfStale(false);
@@ -3462,9 +3468,8 @@ function tryStartPhotoScreensaver() {
   const ov = ensurePhotoScreensaverOverlay();
   ov.style.display = 'flex';
 
-  // Cap brightness below full (max 55%) for burn-in & battery protection
-  const ssBright = Math.max(15, Math.min(55, Number(settings.photoScreensaverBrightness ?? 40) || 40));
-  NanaCore.applyScreenBrightness?.(ssBright, true);
+  // Cap brightness below full (max 75%) and step down automatically if battery dips while plugged in
+  NanaCore.applyScreenBrightness?.(getEffectiveScreensaverBrightness(), true);
 
   showScreensaverSlide(screensaverIndex);
   activeScreensaverIntervalMs = 0;
@@ -3504,11 +3509,15 @@ hooks.onSettingsChanged.push(() => {
     stopPhotoScreensaver('guard');
     return;
   }
-  const ssBright = Math.max(15, Math.min(55, Number(settings.photoScreensaverBrightness ?? 40) || 40));
-  NanaCore.applyScreenBrightness?.(ssBright, true);
+  NanaCore.applyScreenBrightness?.(getEffectiveScreensaverBrightness(), true);
   scheduleScreensaverSlideTimer();
   syncActiveScreensaverWithBulletin();
 });
 
 hooks.tryStartPhotoScreensaver = tryStartPhotoScreensaver;
 hooks.stopPhotoScreensaver = stopPhotoScreensaver;
+hooks.updateScreensaverBrightness = () => {
+  if (role === 'nana' && state.isPhotoScreensaverActive) {
+    NanaCore.applyScreenBrightness?.(getEffectiveScreensaverBrightness(), true);
+  }
+};
