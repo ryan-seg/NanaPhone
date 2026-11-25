@@ -279,7 +279,8 @@ export const settings = {
   guidedStarChat: true, guidedStarRadio: true, guidedStarVideo: true, guidedStarPatience: true,
   photoScreensaverEnabled: true, photoScreensaverDelaySec: 120, photoScreensaverIntervalSec: 30,
   photoScreensaverBrightness: 65, photoScreensaverShowCaption: true, photoScreensaverShowAlbumName: true,
-  photoScreensaverMaxPhotos: 20, photoScreensaverSource: 'both', photoScreensaverOrder: 'recent_plus_shuffle'
+  photoScreensaverMaxPhotos: 20, photoScreensaverSource: 'both', photoScreensaverOrder: 'recent_plus_shuffle',
+  telemetryPauseUntilMs: 0
 };
 
 export function askNana(type, question, askedBy, extra = {}) {
@@ -370,6 +371,31 @@ export const isLowPowerMode = () => {
 export const isVideoBlockedByLowPower = () => isLowPowerMode() && settings.lowPowerBlockVideo !== false;
 
 export const isBatteryVoiceCurrentlyMuted = () => (Number(settings.batteryVoiceMutedUntil) || 0) > Date.now();
+
+const TELEMETRY_PAUSE_KEY = 'nana_telemetry_pause_until_ms';
+export const getTelemetryPauseRemainingMs = () => {
+  const remoteUntil = Number(settings.telemetryPauseUntilMs || 0);
+  if (remoteUntil > Date.now()) return remoteUntil - Date.now();
+  if (role !== 'nana') return 0;
+  try {
+    const localUntil = Number(localStorage.getItem(TELEMETRY_PAUSE_KEY) || 0);
+    if (localUntil > Date.now()) return localUntil - Date.now();
+    if (localUntil > 0) localStorage.removeItem(TELEMETRY_PAUSE_KEY);
+  } catch (_) {}
+  return 0;
+};
+export const isTelemetryPaused = () => getTelemetryPauseRemainingMs() > 0;
+export const setTelemetryPaused = (paused, durationMs = 2 * 60 * 60 * 1000) => {
+  const until = paused ? (Date.now() + Math.max(60000, durationMs)) : 0;
+  settings.telemetryPauseUntilMs = until;
+  if (role === 'nana') {
+    try {
+      if (paused) localStorage.setItem(TELEMETRY_PAUSE_KEY, String(until));
+      else localStorage.removeItem(TELEMETRY_PAUSE_KEY);
+    } catch (_) {}
+  }
+  return isTelemetryPaused();
+};
 
 export function speakMsg(text, isBatt = false, customVol = 1.0) {
   if (!settings.voicePrompts && !isBatt) return;
