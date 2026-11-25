@@ -250,24 +250,24 @@
 /* Top header strip: EXTRA-LARGE bold rank top-left + crisp suit pip top-right */
 .nana-spider-root .ss-card-head {
   width: 100%;
-  padding: 3.5% 6% 0 6%;
+  padding: 2.2% 6% 0 6%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  line-height: 1;
+  line-height: 0.95;
   flex-shrink: 0;
 }
 
 .nana-spider-root .ss-rank {
-  font-size: clamp(18px, 2.75vw, 38px);
+  font-size: min(clamp(18px, 2.75vw, 38px), calc(var(--ss-col-up-step, 44px) * 0.78));
   font-weight: 900;
   letter-spacing: -0.06em;
   line-height: 0.95;
 }
 
 .nana-spider-root .ss-suit-mini {
-  width: clamp(15px, 2.25vw, 30px);
-  height: clamp(15px, 2.25vw, 30px);
+  width: min(clamp(15px, 2.25vw, 30px), calc(var(--ss-col-up-step, 44px) * 0.72));
+  height: min(clamp(15px, 2.25vw, 30px), calc(var(--ss-col-up-step, 44px) * 0.72));
   flex-shrink: 0;
   display: flex;
   align-items: center;
