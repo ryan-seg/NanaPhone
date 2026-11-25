@@ -186,6 +186,9 @@
   height: 100%;
   min-width: 0;
 }
+.nana-spider-root .ss-col.is-expanded {
+  z-index: 25;
+}
 
 /* Empty column slot (MobilityWare clean white-bordered green rectangle) */
 .nana-spider-root .ss-slot-outline {
@@ -217,7 +220,7 @@
   aspect-ratio: 1 / 1.20;
   border-radius: var(--ss-card-radius);
   overflow: hidden;
-  transition: box-shadow 0.14s ease, filter 0.14s ease;
+  transition: top 0.18s ease, box-shadow 0.14s ease, filter 0.14s ease;
   will-change: transform, top;
   cursor: default;
 }
