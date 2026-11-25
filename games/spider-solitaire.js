@@ -805,43 +805,94 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     return el;
   }
 
-  // --- DYNAMIC PER-COLUMN VERTICAL COMPRESSION (NEVER CLIPS OFF BOTTOM) ---
+  // --- DYNAMIC PER-COLUMN VERTICAL COMPRESSION (KEEPS JUMBO RANKS READABLE) ---
   function computeColumnOffsets(cards, cardWidth, availHeight) {
     if (!cards.length) return { tops: [], upStep: 44 };
-    const cardHeight = cardWidth * 1.38;
-    let downStep = Math.max(4, Math.min(9, Math.round(cardHeight * 0.06)));
-    let upStep   = Math.max(28, Math.min(48, Math.round(cardHeight * 0.33)));
-
-    let numDown = 0;
-    let numUpGaps = 0;
-    for (let i = 0; i < cards.length - 1; i++) {
-      if (cards[i].faceUp) numUpGaps++;
-      else numDown++;
-    }
+    const cardHeight = cardWidth * 1.20;
+    let downStep = Math.max(4, Math.min(9, Math.round(cardHeight * 0.065)));
+    let upStep   = Math.max(28, Math.min(46, Math.round(cardHeight * 0.34)));
 
     const maxStackH = Math.max(cardHeight + 12, availHeight - 6);
-    const calcHeight = (ds, us) => numDown * ds + numUpGaps * us + cardHeight;
 
-    // Compress face-down cards first so face-up rank headers stay tall and readable
-    if (calcHeight(downStep, upStep) > maxStackH && numDown > 0) {
-      const targetForDown = maxStackH - cardHeight - numUpGaps * upStep;
-      downStep = Math.max(3, Math.floor(targetForDown / numDown));
+    // Identify middle cards of unbroken same-suit descending runs (length >= 4)
+    const isMidSameSuitRun = new Array(cards.length).fill(false);
+    let runStart = 0;
+    while (runStart < cards.length) {
+      if (!cards[runStart].faceUp) {
+        runStart++;
+        continue;
+      }
+      let runEnd = runStart;
+      while (
+        runEnd + 1 < cards.length &&
+        cards[runEnd + 1].faceUp &&
+        cards[runEnd + 1].suit === cards[runEnd].suit &&
+        cards[runEnd + 1].rank === cards[runEnd].rank - 1
+      ) {
+        runEnd++;
+      }
+      if (runEnd - runStart + 1 >= 4) {
+        // Keep the top card of the run (runStart) and bottom card (runEnd) full-height;
+        // middle cards (runStart+1 .. runEnd-1) can collapse to thin card-edge slivers if needed.
+        for (let k = runStart + 1; k < runEnd; k++) {
+          isMidSameSuitRun[k] = true;
+        }
+      }
+      runStart = runEnd + 1;
     }
-    if (calcHeight(downStep, upStep) > maxStackH && numUpGaps > 0) {
-      const targetForUp = maxStackH - cardHeight - numDown * downStep;
-      upStep = Math.max(18, Math.floor(targetForUp / numUpGaps));
-    }
-    if (calcHeight(downStep, upStep) > maxStackH && cards.length > 1) {
-      const availGap = Math.max(12, maxStackH - cardHeight);
-      const ratio = availGap / Math.max(1, numDown * downStep + numUpGaps * upStep);
-      downStep = Math.max(2, downStep * ratio);
-      upStep = Math.max(14, upStep * ratio);
+
+    const calcTotalHeight = (ds, us, midStep) => {
+      let h = cardHeight;
+      for (let i = 0; i < cards.length - 1; i++) {
+        if (!cards[i].faceUp) h += ds;
+        else if (midStep !== null && isMidSameSuitRun[i]) h += midStep;
+        else h += us;
+      }
+      return h;
+    };
+
+    let midStep = null;
+    if (calcTotalHeight(downStep, upStep, null) > maxStackH) {
+      // 1. Compress face-down cards first
+      const numDown = cards.slice(0, -1).filter(c => !c.faceUp).length;
+      const numUp = cards.length - 1 - numDown;
+      if (numDown > 0) {
+        const targetForDown = maxStackH - cardHeight - numUp * upStep;
+        downStep = Math.max(3, Math.floor(targetForDown / numDown));
+      }
+      // 2. Collapse middle cards of long unbroken same-suit runs so top & bottom stay jumbo-sized
+      if (calcTotalHeight(downStep, upStep, null) > maxStackH && isMidSameSuitRun.some(Boolean)) {
+        midStep = 7;
+      }
+      // 3. Only if still too tall, gently compress remaining face-up gaps
+      if (calcTotalHeight(downStep, upStep, midStep) > maxStackH && numUp > 0) {
+        let fixedH = cardHeight;
+        let flexUp = 0;
+        for (let i = 0; i < cards.length - 1; i++) {
+          if (!cards[i].faceUp) fixedH += downStep;
+          else if (midStep !== null && isMidSameSuitRun[i]) fixedH += midStep;
+          else flexUp++;
+        }
+        if (flexUp > 0) {
+          upStep = Math.max(22, Math.floor((maxStackH - fixedH) / flexUp));
+        }
+      }
+      // 4. Extreme fallback if a column has 15+ ungrouped cards
+      if (calcTotalHeight(downStep, upStep, midStep) > maxStackH && cards.length > 1) {
+        const curGapSum = calcTotalHeight(downStep, upStep, midStep) - cardHeight;
+        const ratio = Math.max(12, maxStackH - cardHeight) / Math.max(1, curGapSum);
+        downStep = Math.max(2, downStep * ratio);
+        upStep = Math.max(16, upStep * ratio);
+        if (midStep !== null) midStep = Math.max(5, midStep * ratio);
+      }
     }
 
     const tops = [0];
     let y = 0;
     for (let i = 0; i < cards.length - 1; i++) {
-      y += cards[i].faceUp ? upStep : downStep;
+      if (!cards[i].faceUp) y += downStep;
+      else if (midStep !== null && isMidSameSuitRun[i]) y += midStep;
+      else y += upStep;
       tops.push(Math.round(y));
     }
     return { tops, upStep: Math.floor(upStep) };
