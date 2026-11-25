@@ -1,5 +1,5 @@
 import {
-  $, NanaCore, esc, ref, update, push, onValue, query, limitToLast
+  $, NanaCore, esc, ref, update, push, remove, onValue, query, limitToLast
 } from "./nana-core.js?v=2.9.6";
 
 const {
@@ -22,7 +22,7 @@ const pendingReadMarks = new Set();
 // --- NANA'S PERSONALIZED TYPO & RUN-TOGETHER WORD AUTO-FIXER ---
 const NANA_TYPO_MAP = {
   // Pronouns & common 'l' for 'I' substitutions
-  "l": "I", "i": "I", "im": "I'm", "iam": "I am", "lam": "I am", "an": "am",
+  "l": "I", "i": "I", "im": "I'm", "iam": "I am", "lam": "I am", "ian": "I am", "lan": "I am",
   "ido": "I do", "ldo": "I do", "lhope": "I hope", "ihope": "I hope", "dohope": "do hope",
   "lhave": "I have", "ihave": "I have", "lwill": "I will", "iwill": "I will",
   "ljust": "I just", "ijust": "I just", "lfeel": "I feel", "ifeel": "I feel",
@@ -582,6 +582,7 @@ async function markSingleMessageReadByNana(msgKey, bubbleEl) {
   const item = state.bulletinSnap[msgKey];
   if (!item || !isMessageUnreadByNana(item)) return;
   pendingReadMarks.add(msgKey);
+  const prevReadAt = item.readByNanaAt;
   const now = Date.now();
   item.readByNanaAt = now;
 
@@ -597,6 +598,10 @@ async function markSingleMessageReadByNana(msgKey, bubbleEl) {
   try {
     await update(ref(db, `${basePath}/bulletin/${msgKey}`), { readByNanaAt: now });
   } catch (_) {
+    if (prevReadAt === undefined) delete item.readByNanaAt;
+    else item.readByNanaAt = prevReadAt;
+    updateBulletinTickerVisibility();
+  } finally {
     pendingReadMarks.delete(msgKey);
   }
 }
@@ -717,9 +722,8 @@ function resetKeyboardAutoHideTimer() {
   const sec = Number(settings.keyboardTimeoutSec ?? 60);
   if (sec > 0) {
     keyboardHideTimer = setTimeout(() => {
-      if ($('nana-chat-input')) $('nana-chat-input').value = '';
-      syncChatInputDisplay();
       window.closeSeniorKeyboard(true);
+      syncChatInputDisplay();
     }, sec * 1000);
   }
 }
@@ -874,39 +878,51 @@ window.handleChatScroll = (el) => {
     scheduleNanaScrollPhotoUpdate(el);
     const feedRect = el.getBoundingClientRect();
     el.querySelectorAll('.tg-bubble.unread-msg[data-msg-key]').forEach(bubble => {
+      const key = bubble.dataset.msgKey;
+      const msg = key ? state.bulletinSnap[key] : null;
+      if (!msg) return;
+      if ((isVoiceMessageItem(msg) && settings.voiceMessagingEnabled !== false) || isVideoChatItem(msg)) return;
       const r = bubble.getBoundingClientRect();
       const visibleHeight = Math.min(r.bottom, feedRect.bottom) - Math.max(r.top, feedRect.top);
       if (visibleHeight >= Math.min(r.height * 0.55, feedRect.height * 0.5)) {
-        markSingleMessageReadByNana(bubble.dataset.msgKey, bubble);
+        markSingleMessageReadByNana(key, bubble);
       }
     });
   }
 };
 
 // Auto-correct the last completed word (de-stuttering tremor doubles & splitting run-togethers) when Nana presses Space or Send
-function autoCorrectLastWordInString(str) {
-  const match = str.match(/^(.*?)([A-Za-z]+)$/);
+function autoCorrectLastWordInString(str, capitalizeFirst = true) {
+  const match = str.match(/^(.*?)([A-Za-z]+)([^A-Za-z]*)$/);
   if (!match) return str;
   const prefix = match[1];
   const word = match[2];
+  const suffix = match[3] || '';
   const lower = word.toLowerCase();
   const destuttered = deStutterWord(lower);
-  let fixed = str;
+  let fixedWord = word;
 
-  if (NANA_TYPO_MAP[lower]) {
-    fixed = prefix + NANA_TYPO_MAP[lower];
+  if (lower === 'an' && /(?:^|\s)[iIl]\s+$/.test(prefix)) {
+    fixedWord = 'am';
+  } else if (NANA_TYPO_MAP[lower]) {
+    fixedWord = NANA_TYPO_MAP[lower];
   } else if (NANA_TYPO_MAP[destuttered]) {
-    fixed = prefix + NANA_TYPO_MAP[destuttered];
+    fixedWord = NANA_TYPO_MAP[destuttered];
   } else {
     const split = trySplitRunTogetherWord(lower);
     if (split) {
-      fixed = prefix + split;
+      fixedWord = split;
     } else if (VALID_WORD_SET.has(destuttered)) {
-      fixed = prefix + restoreProperCasing(destuttered);
+      fixedWord = restoreProperCasing(destuttered);
     }
   }
-  const collapsed = collapseRestartedWordFragment(fixed);
-  return collapsed.charAt(0).toUpperCase() + collapsed.slice(1);
+  const fixedPrefix = lower === 'an' && /(?:^|\s)[iIl]\s+$/.test(prefix)
+    ? prefix.replace(/([iIl])(\s+)$/, 'I$2')
+    : prefix;
+  const collapsed = collapseRestartedWordFragment(fixedPrefix + fixedWord + suffix);
+  return (capitalizeFirst && collapsed.length)
+    ? (collapsed.charAt(0).toUpperCase() + collapsed.slice(1))
+    : collapsed;
 }
 
 window.typeSeniorKey = (char, ev) => {
@@ -937,7 +953,7 @@ window.typeSeniorKey = (char, ev) => {
 
   if (char === ' ') {
     if (!cur.length || cur.endsWith(' ')) return;
-    cur = autoCorrectLastWordInString(cur) + ' ';
+    cur = autoCorrectLastWordInString(cur, true) + ' ';
     lastKeyTapMs = now;
     lastKeyChar = char;
     input.value = cur;
@@ -1025,9 +1041,15 @@ window.submitTypedNanaMessage = async () => {
     if (st) { st.style.color = "#ffff00"; st.innerText = "⏳ One moment, then tap Send again"; }
     return;
   }
-  // Clean up all words in the final sentence before sending
-  const cleanedWords = input.value.trim().split(/\s+/).map(w => autoCorrectLastWordInString(w)).join(' ');
-  const text = collapseRestartedWordFragment(cleanedWords);
+  // Clean up all words in the final sentence before sending without turning mid-sentence words into Title Case
+  const normalizedRaw = input.value.trim().replace(/\b[iIl]\s+an\b/g, 'I am');
+  const rawTokens = normalizedRaw.split(/\s+/);
+  const cleanedWords = rawTokens.map((w, idx) => {
+    const capStart = idx === 0 || /[.!?]$/.test(rawTokens[idx - 1] || '');
+    return autoCorrectLastWordInString(w, capStart);
+  }).join(' ');
+  const collapsed = collapseRestartedWordFragment(cleanedWords);
+  const text = collapsed.length ? (collapsed.charAt(0).toUpperCase() + collapsed.slice(1)) : collapsed;
   input.value = "";
   savedChatScrollTop = null;
   syncChatInputDisplay();
@@ -1048,7 +1070,7 @@ window.sendNanaChatMessage = async (rawText) => {
   const text = (rawText || "").trim();
   if (!text || (Date.now() - lastChatSendMs < 4000)) return;
   lastChatSendMs = Date.now();
-  const author = role === 'nana' ? 'Nana' : activeFamilyMember.name;
+  const author = role === 'nana' ? 'Nana' : (NanaCore.activeFamilyMember?.name || activeFamilyMember?.name || 'Family');
   const st = $('tg-send-status');
   if (st) { st.style.color = "#ffff00"; st.innerText = "⏳ Sending message to Telegram..."; }
   try {
@@ -1087,14 +1109,21 @@ export function renderBulletinFeed(forceInitialScroll = false) {
   container.innerHTML = "";
   const validEntries = Object.entries(state.bulletinSnap || {})
     .filter(([, item]) => item && typeof item === 'object')
-    .slice(-25);
+    .slice(-40);
   lastRenderedReadAloud = !!settings.showReadAloud;
 
   if (validEntries.length) {
-    const newest = validEntries[validEntries.length - 1][1];
+    let newestUnread = null;
+    for (let i = validEntries.length - 1; i >= 0; i--) {
+      if (isMessageUnreadByNana(validEntries[i][1])) {
+        newestUnread = validEntries[i][1];
+        break;
+      }
+    }
+    const previewItem = newestUnread || validEntries[validEntries.length - 1][1];
     if ($('ticker-preview-text')) {
-      const previewTxt = newest.text || (isVoiceMessageItem(newest) ? '🎙️ Sent a voice message' : (isVideoChatItem(newest) ? '📹 Sent a video' : 'Sent a photo 📷'));
-      $('ticker-preview-text').innerText = `💬 ${newest.author || 'Family'}: "${previewTxt}"`;
+      const previewTxt = previewItem.text || (isVoiceMessageItem(previewItem) ? '🎙️ Sent a voice message' : (isVideoChatItem(previewItem) ? '📹 Sent a video' : 'Sent a photo 📷'));
+      $('ticker-preview-text').innerText = `💬 ${previewItem.author || 'Family'}: "${previewTxt}"`;
     }
   } else {
     container.innerHTML = `<div style="margin:auto;color:var(--text-muted);font-size:1.5rem;font-weight:700;padding:30px;">No messages yet. Tap below to send a voice message or open the keyboard!</div>`;
@@ -1182,12 +1211,20 @@ export function renderBulletinFeed(forceInitialScroll = false) {
       if (hasVoice && !isOut && settings.voiceMessagingEnabled !== false) {
         const voiceWrap = document.createElement('div');
         voiceWrap.innerHTML = buildVoiceMessageCardHtml(k, item);
+        bindVoiceCardHandlers(voiceWrap, k);
         b.appendChild(voiceWrap);
+      } else if (hasVoice && !isOut && !item.text) {
+        const fallbackVoice = document.createElement('div');
+        fallbackVoice.className = 'tg-msg-text';
+        const durLabel = fmtVoiceDur(item.voiceDurationSec);
+        fallbackVoice.textContent = `🎙️ Voice message${durLabel ? ` (${durLabel})` : ''}`;
+        b.appendChild(fallbackVoice);
       }
 
       if (hasVideo && !isOut) {
         const vidWrap = document.createElement('div');
         vidWrap.innerHTML = buildChatVideoCardHtml(k, item);
+        bindChatVideoCardHandlers(vidWrap, k);
         b.appendChild(vidWrap);
       }
 
@@ -1285,7 +1322,7 @@ hooks.onSettingsChanged.push((s) => {
 
 let lastBulletinContentSig = null;
 const bulletinContentSig = (snapObj) => Object.entries(snapObj || {})
-  .map(([k, v]) => `${k}|${v?.author || ''}|${v?.fromNana ? 1 : 0}|${v?.type || ''}|${v?.text || ''}|${v?.timestamp || ''}|${v?.fileId || v?.photoFileId || v?.telegramFileId || v?.imageUrl || v?.photoUrl || v?.image || v?.photo || v?.mediaUrl || ''}|${v?.voiceFileId || v?.audioUrl || v?.voiceUrl || v?.audioData || ''}|${v?.listenedByNanaAt || ''}|${v?.videoFileId || ''}|${v?.watchedByNanaAt || ''}`)
+  .map(([k, v]) => `${k}|${v?.author || ''}|${v?.fromNana ? 1 : 0}|${v?.type || ''}|${v?.text || ''}|${v?.hideFromScreensaver ? 1 : 0}|${v?.timestamp || ''}|${v?.fileId || v?.photoFileId || v?.telegramFileId || v?.imageUrl || v?.photoUrl || v?.image || v?.photo || v?.mediaUrl || ''}|${v?.voiceFileId || v?.audioUrl || v?.voiceUrl || v?.audioData || ''}|${v?.listenedByNanaAt || ''}|${v?.videoFileId || ''}|${v?.watchedByNanaAt || ''}`)
   .join('\n');
 
 function syncUnreadMarkersInPlace() {
@@ -1299,7 +1336,7 @@ function syncUnreadMarkersInPlace() {
   updateBulletinTickerVisibility();
 }
 
-onValue(query(refs.bulletin, limitToLast(25)), snap => {
+onValue(query(refs.bulletin, limitToLast(40)), snap => {
   state.bulletinSnap = snap.val() || {};
   if (role === 'nana') {
     const sig = bulletinContentSig(state.bulletinSnap);
@@ -1308,10 +1345,12 @@ onValue(query(refs.bulletin, limitToLast(25)), snap => {
       return;
     }
     renderBulletinFeed(false);
+    syncActiveScreensaverWithBulletin();
     lastBulletinContentSig = sig;
     return;
   }
   renderBulletinFeed(false);
+  renderFamilyPhotosManager();
 });
 
 // --- 5. TWO-WAY VOICE MESSAGING (LISTEN WITH -5s RESUME + SINGLE-TOUCH SPEAK NOW) ---
@@ -1319,6 +1358,7 @@ const VOICE_TAP_GUARD_MS = 1500;
 let lastVoiceTapAt = 0;
 let activeVoiceMsgKey = null;
 let activeVoiceAudio = null;
+let voicePlayReqId = 0;
 const voicePausedPositions = new Map();
 const voiceBlobUrlCache = new Map();
 
@@ -1333,6 +1373,18 @@ function fmtVoiceDur(sec) {
   return m > 0 ? `${m}:${String(r).padStart(2, '0')}` : `${r}s`;
 }
 
+function findVoiceCardEl(msgKey) {
+  return Array.from(document.querySelectorAll('.nana-voice-card')).find(el => el.dataset.voiceKey === msgKey) || null;
+}
+
+function bindVoiceCardHandlers(rootEl, msgKey) {
+  if (!rootEl) return;
+  const playBtn = rootEl.querySelector('[data-voice-action="toggle"]');
+  if (playBtn) playBtn.onclick = () => window.toggleChatVoiceMessage(msgKey);
+  const restartBtn = rootEl.querySelector('[data-voice-action="restart"]');
+  if (restartBtn) restartBtn.onclick = () => window.restartChatVoiceMessage(msgKey);
+}
+
 function buildVoiceMessageCardHtml(msgKey, item) {
   const isPlayingThis = !!(activeVoiceMsgKey === msgKey && activeVoiceAudio && !activeVoiceAudio.paused);
   const pausedAt = voicePausedPositions.get(msgKey) || 0;
@@ -1343,10 +1395,10 @@ function buildVoiceMessageCardHtml(msgKey, item) {
     : (pausedAt > 0 ? '▶️ RESUME (5s BACK)' : (listened ? '▶️ PLAY AGAIN' : '▶️ PLAY VOICE MESSAGE'));
   const btnBg = isPlayingThis ? '#b45309' : (listened ? '#334155' : '#059669');
   const restartBtn = (pausedAt > 0 && !isPlayingThis)
-    ? `<button type="button" onclick="restartChatVoiceMessage('${esc(msgKey)}')" style="margin-top:6px;width:100%;padding:10px;border-radius:12px;border:2px solid #94a3b8;background:#1e293b;color:#e2e8f0;font-size:1.1rem;font-weight:800;cursor:pointer;">↺ Restart from Beginning</button>`
+    ? `<button type="button" data-voice-action="restart" style="margin-top:6px;width:100%;padding:10px;border-radius:12px;border:2px solid #94a3b8;background:#1e293b;color:#e2e8f0;font-size:1.1rem;font-weight:800;cursor:pointer;">↺ Restart from Beginning</button>`
     : '';
   return `<div class="nana-voice-card" data-voice-key="${esc(msgKey)}" style="margin:8px 0;">
-    <button type="button" class="nana-voice-play-btn" onclick="toggleChatVoiceMessage('${esc(msgKey)}')" style="width:100%;padding:16px 14px;border-radius:16px;border:3px solid #fef08a;background:${btnBg};color:#fff;font-size:1.35rem;font-weight:900;cursor:pointer;">
+    <button type="button" class="nana-voice-play-btn" data-voice-action="toggle" style="width:100%;padding:16px 14px;border-radius:16px;border:3px solid #fef08a;background:${btnBg};color:#fff;font-size:1.35rem;font-weight:900;cursor:pointer;">
       ${btnText}${durLabel ? ` (${esc(durLabel)})` : ''}
     </button>
     ${restartBtn}
@@ -1355,18 +1407,23 @@ function buildVoiceMessageCardHtml(msgKey, item) {
 }
 
 function refreshVoiceCardUI(msgKey, statusMsg = '') {
-  const card = document.querySelector(`.nana-voice-card[data-voice-key="${msgKey}"]`);
+  const card = findVoiceCardEl(msgKey);
   const item = state.bulletinSnap[msgKey];
   if (!card || !item) return;
-  card.outerHTML = buildVoiceMessageCardHtml(msgKey, item);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = buildVoiceMessageCardHtml(msgKey, item);
+  const newCard = tmp.firstElementChild;
+  if (!newCard) return;
+  bindVoiceCardHandlers(newCard, msgKey);
+  card.replaceWith(newCard);
   if (statusMsg) {
-    const newCard = document.querySelector(`.nana-voice-card[data-voice-key="${msgKey}"]`);
-    const st = newCard?.querySelector('.nana-voice-status');
+    const st = newCard.querySelector('.nana-voice-status');
     if (st) st.textContent = statusMsg;
   }
 }
 
 function pauseActiveChatVoiceMessage() {
+  voicePlayReqId++;
   if (!activeVoiceAudio || !activeVoiceMsgKey) return;
   const k = activeVoiceMsgKey;
   if (!activeVoiceAudio.paused && !activeVoiceAudio.ended) {
@@ -1423,6 +1480,7 @@ window.toggleChatVoiceMessage = async (msgKey) => {
   if (!item) return;
 
   if (activeVoiceMsgKey === msgKey && activeVoiceAudio && !activeVoiceAudio.paused) {
+    voicePlayReqId++;
     voicePausedPositions.set(msgKey, activeVoiceAudio.currentTime || 0);
     activeVoiceAudio.pause();
     refreshVoiceCardUI(msgKey, '⏸️ Paused — tap Resume to hear from 5s earlier');
@@ -1432,6 +1490,7 @@ window.toggleChatVoiceMessage = async (msgKey) => {
   if (activeVoiceMsgKey && activeVoiceMsgKey !== msgKey) {
     pauseActiveChatVoiceMessage();
   }
+  const reqId = ++voicePlayReqId;
 
   window.stopRadioAndSync?.(false);
   hooks.pauseVideo?.('voice_message');
@@ -1441,6 +1500,10 @@ window.toggleChatVoiceMessage = async (msgKey) => {
     refreshVoiceCardUI(msgKey, '⏳ Loading voice message...');
     if (!activeVoiceAudio || activeVoiceMsgKey !== msgKey) {
       const src = await resolveVoiceAudioUrl(item);
+      if (reqId !== voicePlayReqId || $('bulletin-modal')?.style.display !== 'flex' || (state.currentState && state.currentState !== 'idle')) {
+        refreshVoiceCardUI(msgKey, '');
+        return;
+      }
       if (!src) throw new Error('Audio unavailable');
       if (activeVoiceAudio) {
         try {
@@ -1476,8 +1539,13 @@ window.toggleChatVoiceMessage = async (msgKey) => {
       try { activeVoiceAudio.currentTime = Math.max(0, pausedAt - 5); } catch (_) {}
     }
     await activeVoiceAudio.play();
+    if (reqId !== voicePlayReqId || $('bulletin-modal')?.style.display !== 'flex' || (state.currentState && state.currentState !== 'idle')) {
+      pauseActiveChatVoiceMessage();
+      return;
+    }
     refreshVoiceCardUI(msgKey, '🔊 Playing...');
   } catch (err) {
+    if (reqId !== voicePlayReqId) return;
     console.warn('Voice playback failed:', err);
     activeVoiceMsgKey = null;
     refreshVoiceCardUI(msgKey, '⚠️ Could not load voice message');
@@ -1514,6 +1582,286 @@ let recTotalSpeechMs = 0;
 let recVadAvailable = false;
 let recManualDone = false;
 let recCancelled = false;
+
+// --- WebM/Opus -> True Seekable OGG/Opus Remuxer (RFC 3533 / RFC 7845) ---
+// Chrome/Android MediaRecorder produces unseekable fragmented MP4 or duration-less WebM.
+// Remuxing raw WebM Opus packets into a real OGG/Opus container gives Telegram accurate
+// duration, waveform, and full progress-bar scrubbing with zero re-encoding.
+const OGG_CRC_TABLE = (() => {
+  const tbl = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let r = i << 24;
+    for (let j = 0; j < 8; j++) {
+      r = (r & 0x80000000) ? ((r << 1) ^ 0x04c11db7) : (r << 1);
+    }
+    tbl[i] = r >>> 0;
+  }
+  return tbl;
+})();
+
+function oggCrc32(bytes) {
+  let crc = 0;
+  for (let i = 0; i < bytes.length; i++) {
+    crc = ((crc << 8) ^ OGG_CRC_TABLE[((crc >>> 24) ^ bytes[i]) & 0xff]) >>> 0;
+  }
+  return crc >>> 0;
+}
+
+function getOpusPacketSamples48k(pkt) {
+  if (!pkt || pkt.length < 1) return 960;
+  const toc = pkt[0];
+  const cfg = (toc >>> 3) & 0x1f;
+  let frameSamples = 960;
+  if (cfg < 12) {
+    frameSamples = [480, 960, 1920, 2880][cfg & 3];
+  } else if (cfg < 16) {
+    frameSamples = [480, 960][cfg & 1];
+  } else {
+    frameSamples = [120, 240, 480, 960][cfg & 3];
+  }
+  const code = toc & 0x03;
+  if (code === 0) return frameSamples;
+  if (code === 1 || code === 2) return frameSamples * 2;
+  if (pkt.length >= 2) {
+    const count = pkt[1] & 0x3f;
+    if (count > 0) return frameSamples * count;
+  }
+  return frameSamples;
+}
+
+function readEbmlVint(u8, offset, keepMarkerBit) {
+  if (offset >= u8.length) return null;
+  const first = u8[offset];
+  if (first === 0) return null;
+  let len = 1;
+  let mask = 0x80;
+  while (len <= 8 && (first & mask) === 0) {
+    mask >>>= 1;
+    len++;
+  }
+  if (len > 8 || offset + len > u8.length) return null;
+  let val = keepMarkerBit ? first : (first & (mask - 1));
+  let allOnes = (!keepMarkerBit) && ((first & (mask - 1)) === (mask - 1));
+  for (let i = 1; i < len; i++) {
+    val = val * 256 + u8[offset + i];
+    if (u8[offset + i] !== 0xff) allOnes = false;
+  }
+  return { val, len, unknown: allOnes };
+}
+
+function extractOpusFramesFromBlock(blockBytes) {
+  const frames = [];
+  const trk = readEbmlVint(blockBytes, 0, false);
+  if (!trk) return frames;
+  let pos = trk.len + 2; // skip track number + int16 timecode
+  if (pos >= blockBytes.length) return frames;
+  const flags = blockBytes[pos++];
+  const lacing = (flags >>> 1) & 0x03;
+
+  if (lacing === 0) {
+    if (pos < blockBytes.length) frames.push(blockBytes.subarray(pos));
+    return frames;
+  }
+  if (pos >= blockBytes.length) return frames;
+  const frameCount = blockBytes[pos++] + 1;
+  if (lacing === 2) {
+    const rem = blockBytes.length - pos;
+    if (rem > 0 && rem % frameCount === 0) {
+      const sz = rem / frameCount;
+      for (let i = 0; i < frameCount; i++) {
+        frames.push(blockBytes.subarray(pos + i * sz, pos + (i + 1) * sz));
+      }
+    }
+    return frames;
+  }
+  const sizes = [];
+  if (lacing === 1) {
+    for (let i = 0; i < frameCount - 1 && pos < blockBytes.length; i++) {
+      let sz = 0;
+      while (pos < blockBytes.length) {
+        const b = blockBytes[pos++];
+        sz += b;
+        if (b < 255) break;
+      }
+      sizes.push(sz);
+    }
+  } else if (lacing === 3) {
+    const firstSz = readEbmlVint(blockBytes, pos, false);
+    if (!firstSz) return frames;
+    pos += firstSz.len;
+    let prev = firstSz.val;
+    sizes.push(prev);
+    for (let i = 1; i < frameCount - 1 && pos < blockBytes.length; i++) {
+      const d = readEbmlVint(blockBytes, pos, false);
+      if (!d) break;
+      pos += d.len;
+      const bias = Math.pow(2, 7 * d.len - 1) - 1;
+      prev += (d.val - bias);
+      sizes.push(prev);
+    }
+  }
+  let used = 0;
+  for (const sz of sizes) {
+    if (sz < 0 || pos + used + sz > blockBytes.length) return frames;
+    frames.push(blockBytes.subarray(pos + used, pos + used + sz));
+    used += sz;
+  }
+  if (pos + used < blockBytes.length) {
+    frames.push(blockBytes.subarray(pos + used));
+  }
+  return frames;
+}
+
+function buildOggPage(packets, { headerType = 0, granule = 0, serial = 1, seqNo = 0 }) {
+  const segs = [];
+  let payloadLen = 0;
+  for (const pkt of packets) {
+    payloadLen += pkt.length;
+    let rem = pkt.length;
+    while (rem >= 255) {
+      segs.push(255);
+      rem -= 255;
+    }
+    segs.push(rem);
+  }
+  const headerLen = 27 + segs.length;
+  const page = new Uint8Array(headerLen + payloadLen);
+  const dv = new DataView(page.buffer);
+  page[0] = 0x4f; page[1] = 0x67; page[2] = 0x67; page[3] = 0x53; // "OggS"
+  page[4] = 0;
+  page[5] = headerType;
+  const gLo = granule >>> 0;
+  const gHi = Math.floor(granule / 0x100000000) >>> 0;
+  dv.setUint32(6, gLo, true);
+  dv.setUint32(10, gHi, true);
+  dv.setUint32(14, serial >>> 0, true);
+  dv.setUint32(18, seqNo >>> 0, true);
+  dv.setUint32(22, 0, true);
+  page[26] = segs.length;
+  for (let i = 0; i < segs.length; i++) page[27 + i] = segs[i];
+  let off = headerLen;
+  for (const pkt of packets) {
+    page.set(pkt, off);
+    off += pkt.length;
+  }
+  dv.setUint32(22, oggCrc32(page), true);
+  return page;
+}
+
+export function remuxWebmOpusToOgg(arrayBuffer) {
+  const u8 = new Uint8Array(arrayBuffer);
+  if (u8.length < 16 || u8[0] !== 0x1a || u8[1] !== 0x45 || u8[2] !== 0xdf || u8[3] !== 0xa3) {
+    return null; // Not EBML/WebM
+  }
+
+  const CONTAINER_IDS = new Set([0x18538067, 0x1654ae6b, 0xae, 0xe1, 0x1f43b675, 0xa0]);
+  let opusHead = null;
+  let channels = 1;
+  let codecId = '';
+  const packets = [];
+
+  let pos = 0;
+  while (pos < u8.length) {
+    const idRes = readEbmlVint(u8, pos, true);
+    if (!idRes) break;
+    pos += idRes.len;
+    const szRes = readEbmlVint(u8, pos, false);
+    if (!szRes) break;
+    pos += szRes.len;
+
+    const id = idRes.val;
+    if (CONTAINER_IDS.has(id)) {
+      continue; // Walk directly into container children (handles unknown-size Segment/Cluster)
+    }
+    if (szRes.unknown) break;
+    const dataEnd = Math.min(u8.length, pos + szRes.val);
+    const slice = u8.subarray(pos, dataEnd);
+
+    if (id === 0x86) {
+      codecId = String.fromCharCode(...slice);
+    } else if (id === 0x63a2 && slice.length >= 19) {
+      // Check "OpusHead" magic
+      if (slice[0] === 0x4f && slice[1] === 0x70 && slice[2] === 0x75 && slice[3] === 0x73 &&
+          slice[4] === 0x48 && slice[5] === 0x65 && slice[6] === 0x61 && slice[7] === 0x64) {
+        opusHead = slice.slice(0);
+      }
+    } else if (id === 0x9f && slice.length > 0) {
+      let ch = 0;
+      for (let i = 0; i < slice.length; i++) ch = ch * 256 + slice[i];
+      if (ch >= 1 && ch <= 2) channels = ch;
+    } else if (id === 0xa3 || id === 0xa1) {
+      const frames = extractOpusFramesFromBlock(slice);
+      for (const f of frames) {
+        if (f.length > 0) packets.push(f);
+      }
+    }
+    pos = dataEnd;
+  }
+
+  if (!packets.length || (codecId && !codecId.toUpperCase().includes('OPUS'))) {
+    return null;
+  }
+
+  if (!opusHead) {
+    opusHead = new Uint8Array(19);
+    const hdrDv = new DataView(opusHead.buffer);
+    [0x4f, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64].forEach((b, i) => { opusHead[i] = b; }); // "OpusHead"
+    opusHead[8] = 1;            // Version 1
+    opusHead[9] = channels;     // Channel count
+    hdrDv.setUint16(10, 312, true);   // Standard pre-skip (6.5ms @ 48kHz)
+    hdrDv.setUint32(12, 48000, true); // Input sample rate
+    hdrDv.setInt16(16, 0, true);      // Output gain
+    opusHead[18] = 0;                 // Channel mapping family 0
+  }
+  const preSkip = new DataView(opusHead.buffer, opusHead.byteOffset, opusHead.byteLength).getUint16(10, true);
+
+  const vendor = 'NanaPhone';
+  const opusTags = new Uint8Array(16 + vendor.length);
+  const tagDv = new DataView(opusTags.buffer);
+  [0x4f, 0x70, 0x75, 0x73, 0x54, 0x61, 0x67, 0x73].forEach((b, i) => { opusTags[i] = b; }); // "OpusTags"
+  tagDv.setUint32(8, vendor.length, true);
+  for (let i = 0; i < vendor.length; i++) opusTags[12 + i] = vendor.charCodeAt(i);
+  tagDv.setUint32(12 + vendor.length, 0, true); // 0 user comments
+
+  const serial = (Math.floor(Math.random() * 0x7ffffffe) + 1) >>> 0;
+  const pages = [];
+  let seqNo = 0;
+  pages.push(buildOggPage([opusHead], { headerType: 0x02, granule: 0, serial, seqNo: seqNo++ }));
+  pages.push(buildOggPage([opusTags], { headerType: 0x00, granule: 0, serial, seqNo: seqNo++ }));
+
+  let curBatch = [];
+  let curSegs = 0;
+  let totalSamples = 0;
+
+  for (let i = 0; i < packets.length; i++) {
+    const pkt = packets[i];
+    const pktSegs = Math.floor(pkt.length / 255) + 1;
+    if (curBatch.length > 0 && (curBatch.length >= 20 || curSegs + pktSegs > 255)) {
+      pages.push(buildOggPage(curBatch, { headerType: 0x00, granule: totalSamples, serial, seqNo: seqNo++ }));
+      curBatch = [];
+      curSegs = 0;
+    }
+    curBatch.push(pkt);
+    curSegs += pktSegs;
+    totalSamples += getOpusPacketSamples48k(pkt);
+  }
+  if (curBatch.length > 0) {
+    const finalGranule = Math.max(totalSamples, preSkip + 960);
+    pages.push(buildOggPage(curBatch, { headerType: 0x04, granule: finalGranule, serial, seqNo: seqNo++ }));
+  }
+
+  let totalLen = 0;
+  for (const p of pages) totalLen += p.length;
+  const out = new Uint8Array(totalLen);
+  let off = 0;
+  for (const p of pages) {
+    out.set(p, off);
+    off += p.length;
+  }
+
+  const durationSec = Math.max(1, Math.round(Math.max(0, totalSamples - preSkip) / 48000));
+  return { bytes: out, durationSec };
+}
 
 function playVoiceChime() {
   try {
@@ -1558,8 +1906,13 @@ function stopRecStreams() {
   }
 }
 
+let isAcquiringMic = false;
+let recSessionId = 0;
+
 function cancelNanaVoiceRecording(silent = false) {
   recCancelled = true;
+  recSessionId++;
+  isAcquiringMic = false;
   if (activeRecorder && activeRecorder.state !== 'inactive') {
     try { activeRecorder.stop(); } catch (_) {}
   }
@@ -1617,7 +1970,11 @@ function ensureVoiceRecordOverlay() {
 window.startNanaVoiceRecording = async () => {
   if (role !== 'nana' || settings.voiceMessagingEnabled === false) return;
   if (state.currentState && state.currentState !== 'idle') return;
-  if (activeRecorder && activeRecorder.state === 'recording') return;
+  if (isAcquiringMic || (activeRecorder && activeRecorder.state === 'recording')) return;
+
+  const mySession = ++recSessionId;
+  isAcquiringMic = true;
+  recCancelled = false;
 
   window.closeSeniorKeyboard?.(false);
   pauseActiveChatVoiceMessage();
@@ -1629,30 +1986,49 @@ window.startNanaVoiceRecording = async () => {
   const audioConstraint = useNoiseSupp
     ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }
     : true;
+  let acquiredStream = null;
   try {
-    activeRecStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint });
+    acquiredStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint });
   } catch (err) {
     if (useNoiseSupp) {
       try {
-        activeRecStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        acquiredStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch (fallbackErr) {
         console.warn('Mic access denied:', fallbackErr);
-        activeRecStream = null;
+        acquiredStream = null;
       }
     } else {
       console.warn('Mic access denied:', err);
-      activeRecStream = null;
+      acquiredStream = null;
     }
-    if (!activeRecStream) {
-      if ($('tg-send-status')) {
-        $('tg-send-status').innerText = '⚠️ Microphone unavailable';
-        setTimeout(() => { if ($('tg-send-status')) $('tg-send-status').innerText = '🟢 Connected to Family Group'; }, 4000);
-      }
-      return;
-    }
+  } finally {
+    if (mySession === recSessionId) isAcquiringMic = false;
   }
 
-  const mimeCandidates = ['audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'];
+  if (
+    mySession !== recSessionId ||
+    recCancelled ||
+    $('bulletin-modal')?.style.display !== 'flex' ||
+    (state.currentState && state.currentState !== 'idle')
+  ) {
+    if (acquiredStream) {
+      try { acquiredStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+    }
+    return;
+  }
+
+  if (!acquiredStream) {
+    if ($('tg-send-status')) {
+      $('tg-send-status').innerText = '⚠️ Microphone unavailable';
+      setTimeout(() => { if ($('tg-send-status')) $('tg-send-status').innerText = '🟢 Connected to Family Group'; }, 4000);
+    }
+    return;
+  }
+  activeRecStream = acquiredStream;
+
+  // Prefer native OGG/Opus, then WebM/Opus (remuxed cleanly into seekable OGG/Opus before upload),
+  // leaving fragmented Chrome audio/mp4 as last fallback only (e.g. Safari/iOS).
+  const mimeCandidates = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
   const chosenMime = mimeCandidates.find(m => window.MediaRecorder?.isTypeSupported?.(m)) || '';
   activeRecChunks = [];
   recCancelled = false;
@@ -1737,11 +2113,28 @@ window.startNanaVoiceRecording = async () => {
 
     if ($('tg-send-status')) $('tg-send-status').innerText = '📤 Sending voice message...';
     try {
+      let uploadBlob = blob;
+      let uploadMime = mimeType;
+      let uploadDurationSec = elapsedSec;
+      if (mimeType.toLowerCase().includes('webm')) {
+        try {
+          const ab = await blob.arrayBuffer();
+          const remuxed = remuxWebmOpusToOgg(ab);
+          if (remuxed && remuxed.bytes?.length > 100) {
+            uploadBlob = new Blob([remuxed.bytes], { type: 'audio/ogg' });
+            uploadMime = 'audio/ogg';
+            uploadDurationSec = remuxed.durationSec || elapsedSec;
+          }
+        } catch (remuxErr) {
+          console.warn('WebM->OGG remux fallback:', remuxErr);
+        }
+      }
+
       const dataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(String(reader.result || ''));
         reader.onerror = reject;
-        reader.readAsDataURL(blob);
+        reader.readAsDataURL(uploadBlob);
       });
       const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
 
@@ -1755,8 +2148,8 @@ window.startNanaVoiceRecording = async () => {
             action: 'nana_voice_reply',
             author: 'Nana',
             audioBase64: base64,
-            mimeType,
-            durationSec: elapsedSec
+            mimeType: uploadMime,
+            durationSec: uploadDurationSec
           })
         });
         const resJson = await res.json().catch(() => null);
@@ -2056,6 +2449,8 @@ if (role === 'nana') {
 const chatVideoBlobCache = new Map();
 let chatVideoCallWatchInterval = null;
 let lastChatVideoWakeMs = 0;
+let chatVideoPlayReqId = 0;
+let localFamilyChatVideoVol = 80;
 
 NanaCore.isChatVideoActivelyPlaying = () => {
   const ov = $('nana-chat-video-overlay');
@@ -2075,11 +2470,31 @@ function isVideoChatItem(item) {
 }
 
 function syncChatVideoVolume() {
-  const vol = Math.max(10, Math.min(100, Number(settings.videoVolume) || 80));
+  const rawVol = role === 'nana' ? (Number(settings.videoVolume) || 80) : localFamilyChatVideoVol;
+  const vol = Math.max(10, Math.min(100, rawVol));
   const lbl = $('nana-chat-video-vol-lbl');
   if (lbl) lbl.innerText = `${vol}%`;
   const vid = $('nana-chat-video-el');
   if (vid) vid.volume = Math.min(1.0, Math.max(0.1, vol / 100));
+}
+
+window.stepChatVideoVolume = (delta) => {
+  if (role === 'nana') {
+    window.adjustNanaVideoVolume?.(delta);
+    return;
+  }
+  localFamilyChatVideoVol = Math.max(10, Math.min(100, localFamilyChatVideoVol + (Number(delta) || 0)));
+  syncChatVideoVolume();
+};
+
+function findChatVideoCardEl(msgKey) {
+  return Array.from(document.querySelectorAll('.nana-chat-video-card')).find(el => el.dataset.vidKey === msgKey) || null;
+}
+
+function bindChatVideoCardHandlers(rootEl, msgKey) {
+  if (!rootEl) return;
+  const playBtn = rootEl.querySelector('[data-vid-action="play"]');
+  if (playBtn) playBtn.onclick = () => window.toggleChatVideoMessage(msgKey);
 }
 
 function ensureChatVideoOverlay() {
@@ -2096,9 +2511,9 @@ function ensureChatVideoOverlay() {
       <video id="nana-chat-video-el" controls autoplay playsinline style="width:100%;height:100%;max-height:70vh;border-radius:14px;background:#000;"></video>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;">
-      <button type="button" class="vol-step-btn" onclick="adjustNanaVideoVolume(-15)">🔉 Quieter</button>
+      <button type="button" class="vol-step-btn" onclick="stepChatVideoVolume(-15)">🔉 Quieter</button>
       <span id="nana-chat-video-vol-lbl" style="font-size:1.2rem;font-weight:900;color:#38bdf8;min-width:52px;text-align:center;">80%</span>
-      <button type="button" class="vol-step-btn" style="background:#0284c7;" onclick="adjustNanaVideoVolume(15)">🔊 Louder</button>
+      <button type="button" class="vol-step-btn" style="background:#0284c7;" onclick="stepChatVideoVolume(15)">🔊 Louder</button>
       <button type="button" onclick="closeChatVideoOverlay()" style="flex:1;min-width:190px;padding:16px 20px;border-radius:16px;border:3px solid #fff;background:#dc2626;color:#fff;font-size:1.35rem;font-weight:900;cursor:pointer;">⬅️ Back to Family Chat</button>
     </div>
   `;
@@ -2107,6 +2522,7 @@ function ensureChatVideoOverlay() {
 }
 
 window.closeChatVideoOverlay = () => {
+  chatVideoPlayReqId++;
   clearInterval(chatVideoCallWatchInterval);
   chatVideoCallWatchInterval = null;
   const vid = $('nana-chat-video-el');
@@ -2139,7 +2555,7 @@ function buildChatVideoCardHtml(msgKey, item) {
   const watched = !!item.watchedByNanaAt;
   const btnBg = watched ? '#334155' : '#0284c7';
   return `<div class="nana-chat-video-card" data-vid-key="${esc(msgKey)}" style="margin:8px 0;">
-    <button type="button" onclick="toggleChatVideoMessage('${esc(msgKey)}')" style="width:100%;padding:16px 14px;border-radius:16px;border:3px solid #fef08a;background:${btnBg};color:#fff;font-size:1.35rem;font-weight:900;cursor:pointer;">
+    <button type="button" data-vid-action="play" style="width:100%;padding:16px 14px;border-radius:16px;border:3px solid #fef08a;background:${btnBg};color:#fff;font-size:1.35rem;font-weight:900;cursor:pointer;">
       ${watched ? '▶️ WATCH VIDEO AGAIN' : '▶️ PLAY FAMILY VIDEO'}${durLabel ? ` (${esc(durLabel)})` : ''}
     </button>
     <div class="nana-chat-video-status" style="margin-top:4px;font-size:0.95rem;color:#cbd5e1;font-weight:700;"></div>
@@ -2148,7 +2564,7 @@ function buildChatVideoCardHtml(msgKey, item) {
 
 window.toggleChatVideoMessage = async (msgKey) => {
   const item = state.bulletinSnap[msgKey];
-  const card = document.querySelector(`.nana-chat-video-card[data-vid-key="${msgKey}"]`);
+  const card = findChatVideoCardEl(msgKey);
   if (!item || !card) return;
   const statusEl = card.querySelector('.nana-chat-video-status');
 
@@ -2160,6 +2576,7 @@ window.toggleChatVideoMessage = async (msgKey) => {
     return;
   }
 
+  const reqId = ++chatVideoPlayReqId;
   pauseActiveChatVoiceMessage?.();
   window.stopRadioAndSync?.(false);
   hooks.pauseVideo?.('chat_video');
@@ -2172,6 +2589,10 @@ window.toggleChatVideoMessage = async (msgKey) => {
       const proxyUrl = `${CONFIG.googleScriptUrl}?action=get_media&fileId=${encodeURIComponent(item.videoFileId)}&secret=${encodeURIComponent(SERVICE_TOKEN)}`;
       const res = await fetch(proxyUrl);
       const data = await res.json();
+      if (reqId !== chatVideoPlayReqId || $('bulletin-modal')?.style.display !== 'flex' || (state.currentState && state.currentState !== 'idle')) {
+        if (statusEl) statusEl.textContent = '';
+        return;
+      }
       if (!data?.ok) {
         if (statusEl) statusEl.textContent = data?.tooLarge
           ? '⚠️ Video too large (>20 MB) — ask family to send a shorter clip'
@@ -2190,6 +2611,10 @@ window.toggleChatVideoMessage = async (msgKey) => {
       setBoundedBlobCache(chatVideoBlobCache, item.videoFileId, src, 3);
     }
 
+    if (reqId !== chatVideoPlayReqId || $('bulletin-modal')?.style.display !== 'flex' || (state.currentState && state.currentState !== 'idle')) {
+      if (statusEl) statusEl.textContent = '';
+      return;
+    }
     if (role === 'nana' && NanaCore.isVideoBlockedByLowPower?.()) return;
     if (statusEl) statusEl.textContent = '';
     const ov = ensureChatVideoOverlay();
@@ -2237,18 +2662,301 @@ window.toggleChatVideoMessage = async (msgKey) => {
 
     vid.play().catch(() => {});
   } catch (err) {
+    if (reqId !== chatVideoPlayReqId) return;
     console.warn('Chat video load failed:', err);
     if (statusEl) statusEl.textContent = '⚠️ Could not load video';
   }
 };
 
-// --- 7. PLUGGED-IN FAMILY PHOTO FRAME SCREENSAVER (BURN-IN SAFE) ---
+// --- 7. PLUGGED-IN FAMILY PHOTO FRAME SCREENSAVER & GOOGLE PHOTOS ALBUMS (BURN-IN SAFE) ---
 let screensaverSlideTimer = null;
 let screensaverGuardInterval = null;
+let screensaverFadeTimer = null;
+let activeScreensaverIntervalMs = 0;
+let activeScreensaverModeSig = '';
 let screensaverPhotos = [];
 let screensaverIndex = 0;
 let screensaverDriftToggle = false;
+let lastGoogleAlbumSyncAttemptMs = 0;
+let googleAlbumSyncInFlight = false;
 const SS_ALIGNS = ['align-left', 'align-center', 'align-right'];
+
+function setGoogleAlbumStatusMsg(msg, color = '#38bdf8', autoHideMs = 6000) {
+  const el = $('fam-galbum-status');
+  if (!el) return;
+  clearTimeout(setGoogleAlbumStatusMsg._t);
+  if (!msg) {
+    el.style.display = 'none';
+    el.textContent = '';
+    return;
+  }
+  el.textContent = msg;
+  el.style.color = color;
+  el.style.display = 'block';
+  if (autoHideMs > 0) {
+    setGoogleAlbumStatusMsg._t = setTimeout(() => {
+      if (el) el.style.display = 'none';
+    }, autoHideMs);
+  }
+}
+
+function getNormalizedGoogleAlbumsList() {
+  return Object.entries(state.googleAlbumsSnap || {})
+    .map(([key, rec]) => ({ key, ...(rec || {}) }))
+    .filter(item => item && typeof item === 'object' && item.url)
+    .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+}
+
+async function refreshGoogleAlbumsIfStale(force = false, targetAlbumId = null) {
+  if (!CONFIG?.googleScriptUrl || !SERVICE_TOKEN || googleAlbumSyncInFlight) return null;
+  const albums = getNormalizedGoogleAlbumsList();
+  const enabledAlbums = albums.filter(a => a.enabled !== false);
+  if (!force && !targetAlbumId) {
+    if (!enabledAlbums.length || settings.photoScreensaverSource === 'chat_only') return null;
+    const now = Date.now();
+    const minRetryGapMs = 10 * 60 * 1000;
+    if (now - lastGoogleAlbumSyncAttemptMs < minRetryGapMs) return null;
+    const staleLimitMs = 3 * 3600 * 1000;
+    const hasStale = enabledAlbums.some(a =>
+      !Array.isArray(a.photos) || !a.photos.length || (now - Number(a.lastSyncedAt || 0) > staleLimitMs)
+    );
+    if (!hasStale) return null;
+  }
+
+  googleAlbumSyncInFlight = true;
+  lastGoogleAlbumSyncAttemptMs = Date.now();
+  try {
+    const res = await fetch(CONFIG.googleScriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        secret: SERVICE_TOKEN,
+        portalNode: PORTAL_NODE_ID,
+        action: 'sync_google_albums',
+        albumId: targetAlbumId || null,
+        force: !!force
+      })
+    });
+    return await res.json().catch(() => null);
+  } catch (err) {
+    console.warn('Google Photos album sync failed:', err);
+    return null;
+  } finally {
+    googleAlbumSyncInFlight = false;
+  }
+}
+
+window.syncGooglePhotosAlbumsNow = async (manual = true) => {
+  if (role !== 'family') return;
+  const albums = getNormalizedGoogleAlbumsList();
+  if (!albums.length) {
+    if (manual) setGoogleAlbumStatusMsg('Paste a Google Photos shared album link above first.', '#fbbf24', 4500);
+    return;
+  }
+  const btn = $('fam-galbum-sync-btn');
+  if (btn) btn.disabled = true;
+  setGoogleAlbumStatusMsg('⏳ Syncing Google Photos albums...', '#facc15', 0);
+  try {
+    const data = await refreshGoogleAlbumsIfStale(true, null);
+    if (data?.ok) {
+      setGoogleAlbumStatusMsg(`✅ Albums synced (${data.totalPhotos ?? 0} active photos ready)`, '#4ade80', 5000);
+    } else {
+      setGoogleAlbumStatusMsg(`⚠️ ${data?.error || 'Could not sync albums — check Apps Script deployment'}`, '#f87171', 6500);
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+};
+
+window.addGooglePhotosAlbum = async () => {
+  if (role !== 'family') return;
+  const urlInp = $('fam-galbum-url');
+  const titleInp = $('fam-galbum-title');
+  const addBtn = $('fam-galbum-add-btn');
+  const rawUrl = String(urlInp?.value || '').trim();
+  const customTitle = String(titleInp?.value || '').trim();
+
+  if (!rawUrl) {
+    setGoogleAlbumStatusMsg('Please paste a Google Photos shared link (https://photos.app.goo.gl/...).', '#fbbf24', 5000);
+    return;
+  }
+  if (!/^https:\/\/(photos\.app\.goo\.gl\/[A-Za-z0-9_-]+|photos\.google\.com\/share\/[A-Za-z0-9_-]+)/i.test(rawUrl)) {
+    setGoogleAlbumStatusMsg('⚠️ Link must start with https://photos.app.goo.gl/... or https://photos.google.com/share/...', '#f87171', 6500);
+    return;
+  }
+
+  if (addBtn) addBtn.disabled = true;
+  setGoogleAlbumStatusMsg('⏳ Fetching photos from Google Photos album...', '#facc15', 0);
+  const addedBy = NanaCore.activeFamilyMember?.name || activeFamilyMember?.name || 'Family';
+
+  try {
+    const res = await fetch(CONFIG.googleScriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        secret: SERVICE_TOKEN,
+        portalNode: PORTAL_NODE_ID,
+        action: 'add_google_album',
+        url: rawUrl,
+        customTitle,
+        addedBy
+      })
+    });
+    const data = await res.json().catch(() => null);
+    if (!data?.ok) {
+      const errMsg = data?.error === 'Unknown action'
+        ? 'Please deploy the latest gscript.txt in Google Apps Script (Deploy → Manage deployments → New version).'
+        : (data?.error || 'Could not load that Google Photos album.');
+      setGoogleAlbumStatusMsg(`⚠️ ${errMsg}`, '#f87171', 8000);
+      return;
+    }
+    if (urlInp) urlInp.value = '';
+    if (titleInp) titleInp.value = '';
+    setGoogleAlbumStatusMsg(`✅ "${data.title || 'Album'}" linked (${data.photoCount || 0} photos)!`, '#4ade80', 6000);
+  } catch (err) {
+    console.warn('Could not add Google Photos album:', err);
+    setGoogleAlbumStatusMsg('⚠️ Network error reaching Apps Script gateway.', '#f87171', 6500);
+  } finally {
+    if (addBtn) addBtn.disabled = false;
+  }
+};
+
+window.toggleGooglePhotosAlbumEnabled = async (albumKey) => {
+  if (role !== 'family' || !albumKey) return;
+  const rec = state.googleAlbumsSnap?.[albumKey];
+  if (!rec) return;
+  const nextEnabled = rec.enabled === false;
+  try {
+    await update(ref(db, `${basePath}/googleAlbums/${albumKey}`), {
+      enabled: nextEnabled,
+      updatedAt: Date.now()
+    });
+    if (nextEnabled) refreshGoogleAlbumsIfStale(false, albumKey);
+  } catch (err) {
+    console.warn('Could not toggle Google Photos album:', err);
+  }
+};
+
+window.renameGooglePhotosAlbum = async (albumKey) => {
+  if (role !== 'family' || !albumKey) return;
+  const rec = state.googleAlbumsSnap?.[albumKey];
+  if (!rec) return;
+  const current = String(rec.customTitle || rec.title || '');
+  const next = prompt('Album name shown on Nana’s screensaver (leave blank to use Google Photos album title):', current);
+  if (next === null) return;
+  const trimmed = next.trim().slice(0, 60);
+  const fallbackTitle = String(rec.fetchedTitle || 'Family Album').trim() || 'Family Album';
+  try {
+    await update(ref(db, `${basePath}/googleAlbums/${albumKey}`), {
+      customTitle: trimmed,
+      title: trimmed || fallbackTitle,
+      updatedAt: Date.now()
+    });
+  } catch (err) {
+    console.warn('Could not rename Google Photos album:', err);
+  }
+};
+
+window.removeGooglePhotosAlbum = async (albumKey) => {
+  if (role !== 'family' || !albumKey) return;
+  const rec = state.googleAlbumsSnap?.[albumKey];
+  const label = rec?.title || 'this Google Photos album';
+  if (!confirm(`Remove "${label}" from Nana's screensaver?`)) return;
+  try {
+    await remove(ref(db, `${basePath}/googleAlbums/${albumKey}`));
+  } catch (err) {
+    console.warn('Could not remove Google Photos album:', err);
+  }
+};
+
+function renderGooglePhotosAlbumsManager() {
+  if (role !== 'family') return;
+  const box = $('fam-galbums-list-box');
+  const countLbl = $('fam-galbums-count-lbl');
+  if (!box) return;
+
+  const albums = getNormalizedGoogleAlbumsList();
+  const activeAlbums = albums.filter(a => a.enabled !== false);
+  const activePhotoCount = activeAlbums.reduce((sum, a) => sum + (Array.isArray(a.photos) ? a.photos.length : (Number(a.photoCount) || 0)), 0);
+
+  if (countLbl) {
+    countLbl.textContent = albums.length
+      ? `${activeAlbums.length}/${albums.length} active • ${activePhotoCount} photos`
+      : 'None linked';
+  }
+
+  box.innerHTML = '';
+  if (!albums.length) {
+    box.innerHTML = `<div style="color:#94a3b8;font-size:0.84rem;padding:6px;">No Google Photos albums linked yet. Paste a shared album link above to include it in Nana's screensaver!</div>`;
+    return;
+  }
+
+  albums.forEach(alb => {
+    const isEnabled = alb.enabled !== false;
+    const photosArr = Array.isArray(alb.photos) ? alb.photos : [];
+    const count = photosArr.length || Number(alb.photoCount) || 0;
+    const row = document.createElement('div');
+    row.className = `fam-photo-row${isEnabled ? '' : ' is-hidden'}`;
+
+    const thumb = document.createElement('img');
+    thumb.className = 'fam-photo-thumb';
+    thumb.referrerPolicy = 'no-referrer';
+    thumb.loading = 'lazy';
+    thumb.alt = alb.title || 'Album';
+    if (photosArr[0]) {
+      thumb.src = photosArr[0];
+    } else {
+      thumb.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    }
+
+    const info = document.createElement('div');
+    info.className = 'fam-photo-info';
+    const syncTime = alb.lastSyncedAt
+      ? new Date(alb.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '';
+    const errNote = alb.syncError ? ` • ⚠️ ${alb.syncError}` : '';
+    info.innerHTML = `
+      <div class="fam-photo-cap" style="font-weight:800;">📚 ${esc(alb.title || 'Family Album')}</div>
+      <div class="fam-photo-meta" style="color:${alb.syncError ? '#fca5a5' : '#93c5fd'};">${count} photo${count === 1 ? '' : 's'}${syncTime ? ` • Synced ${esc(syncTime)}` : ''}${esc(errNote)}</div>
+    `;
+
+    const actions = document.createElement('div');
+    actions.className = 'fam-photo-actions';
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = `fam-photo-mini-btn ${isEnabled ? 'on' : 'off'}`;
+    toggleBtn.textContent = isEnabled ? '✅ Active' : '⏸️ Paused';
+    toggleBtn.onclick = () => window.toggleGooglePhotosAlbumEnabled(alb.key);
+
+    const bottomRow = document.createElement('div');
+    bottomRow.className = 'fam-photo-actions-row';
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'fam-photo-mini-btn edit';
+    editBtn.textContent = '✏️';
+    editBtn.title = 'Rename album label';
+    editBtn.onclick = () => window.renameGooglePhotosAlbum(alb.key);
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'fam-photo-mini-btn danger';
+    delBtn.textContent = '🗑️';
+    delBtn.title = 'Remove album';
+    delBtn.onclick = () => window.removeGooglePhotosAlbum(alb.key);
+
+    bottomRow.appendChild(editBtn);
+    bottomRow.appendChild(delBtn);
+    actions.appendChild(toggleBtn);
+    actions.appendChild(bottomRow);
+
+    row.appendChild(thumb);
+    row.appendChild(info);
+    row.appendChild(actions);
+    box.appendChild(row);
+  });
+}
 
 window.editChatPhotoCaption = async (msgKey) => {
   if (role !== 'family' || !msgKey) return;
@@ -2258,10 +2966,11 @@ window.editChatPhotoCaption = async (msgKey) => {
   const next = prompt('Edit photo caption for Nana (leave blank to remove caption):', current);
   if (next === null) return;
   const trimmed = next.trim();
+  const editorName = NanaCore.activeFamilyMember?.name || activeFamilyMember?.name || 'Family';
   try {
     await update(ref(db, `${basePath}/bulletin/${msgKey}`), {
       text: trimmed,
-      captionEditedBy: activeFamilyMember?.name || 'Family',
+      captionEditedBy: editorName,
       captionEditedAt: Date.now()
     });
   } catch (err) {
@@ -2269,6 +2978,197 @@ window.editChatPhotoCaption = async (msgKey) => {
     alert('Could not save caption right now. Please try again.');
   }
 };
+
+window.togglePhotoScreensaverVisibility = async (msgKey) => {
+  if (role !== 'family' || !msgKey) return;
+  const item = state.bulletinSnap?.[msgKey];
+  if (!item) return;
+  const nextHidden = !item.hideFromScreensaver;
+  const editorName = NanaCore.activeFamilyMember?.name || activeFamilyMember?.name || 'Family';
+  try {
+    await update(ref(db, `${basePath}/bulletin/${msgKey}`), {
+      hideFromScreensaver: nextHidden,
+      screensaverToggledBy: editorName,
+      screensaverToggledAt: Date.now()
+    });
+  } catch (err) {
+    console.warn('Could not toggle photo visibility:', err);
+    alert('Could not update photo setting right now. Please try again.');
+  }
+};
+
+function getAllBulletinPhotos() {
+  return Object.entries(state.bulletinSnap || {})
+    .map(([key, item]) => ({ key, sourceType: 'chat', ...(item || {}) }))
+    .filter(item => {
+      if (!item || item.systemAlert) return false;
+      const direct = resolveChatPhotoUrl(item);
+      const fid = item.fileId || item.photoFileId || item.telegramFileId;
+      return !!(direct || fid);
+    })
+    .sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+}
+
+function getAllActiveGoogleAlbumPhotos() {
+  const items = [];
+  const albums = getNormalizedGoogleAlbumsList().filter(a => a.enabled !== false);
+  albums.forEach(alb => {
+    const urls = Array.isArray(alb.photos) ? alb.photos : [];
+    const albumTitle = String(alb.title || alb.fetchedTitle || 'Family Album').trim() || 'Family Album';
+    urls.forEach((url, idx) => {
+      if (typeof url === 'string' && /^https:\/\//i.test(url)) {
+        items.push({
+          key: `galb_${alb.key}_${idx}`,
+          sourceType: 'google_album',
+          albumKey: alb.key,
+          albumTitle,
+          imageUrl: url,
+          text: ''
+        });
+      }
+    });
+  });
+  return items;
+}
+
+function shufflePhotoArray(arr) {
+  const copy = arr.slice();
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = copy[i];
+    copy[i] = copy[j];
+    copy[j] = tmp;
+  }
+  return copy;
+}
+
+function getScreensaverModeSignature() {
+  return [
+    settings.photoScreensaverSource || 'both',
+    settings.photoScreensaverOrder || 'recent_plus_shuffle',
+    Number(settings.photoScreensaverMaxPhotos ?? 20) || 20
+  ].join('|');
+}
+
+function buildScreensaverPlaylist() {
+  const srcMode = settings.photoScreensaverSource || 'both';
+  const orderMode = settings.photoScreensaverOrder || 'recent_plus_shuffle';
+  const maxChat = Math.max(5, Math.min(50, Number(settings.photoScreensaverMaxPhotos ?? 20) || 20));
+
+  const chatPhotos = srcMode === 'albums_only'
+    ? []
+    : getAllBulletinPhotos().filter(item => !item.hideFromScreensaver).slice(0, maxChat);
+  const albumPhotos = srcMode === 'chat_only'
+    ? []
+    : getAllActiveGoogleAlbumPhotos();
+
+  if (!chatPhotos.length && !albumPhotos.length) return [];
+
+  if (orderMode === 'newest_first') {
+    return [...chatPhotos, ...albumPhotos];
+  }
+  if (orderMode === 'shuffle_all') {
+    return shufflePhotoArray([...chatPhotos, ...albumPhotos]);
+  }
+
+  // Default: 'recent_plus_shuffle' — weave newest Telegram Chat photos with shuffled Google Photos album memories
+  if (!albumPhotos.length) return chatPhotos;
+  if (!chatPhotos.length) return shufflePhotoArray(albumPhotos);
+
+  const shuffledAlbums = shufflePhotoArray(albumPhotos);
+  const mixed = [];
+  let cIdx = 0;
+  let aIdx = 0;
+  while (cIdx < chatPhotos.length || aIdx < shuffledAlbums.length) {
+    if (cIdx < chatPhotos.length) {
+      mixed.push(chatPhotos[cIdx++]);
+    }
+    for (let k = 0; k < 2 && aIdx < shuffledAlbums.length; k++) {
+      mixed.push(shuffledAlbums[aIdx++]);
+    }
+  }
+  return mixed;
+}
+
+function renderFamilyPhotosManager() {
+  if (role !== 'family') return;
+  const box = $('fam-photos-list-box');
+  const countLbl = $('fam-photos-count-lbl');
+  if (!box) return;
+
+  const photos = getAllBulletinPhotos();
+  const showingCount = photos.filter(p => !p.hideFromScreensaver).length;
+  if (countLbl) {
+    countLbl.textContent = photos.length
+      ? `${showingCount} showing / ${photos.length} total`
+      : 'No photos yet';
+  }
+
+  box.innerHTML = '';
+  if (!photos.length) {
+    box.innerHTML = `<div style="color:#94a3b8;font-size:0.86rem;padding:10px;">No photos have been shared in Family Chat yet. Send a photo in Telegram and it will appear here!</div>`;
+    return;
+  }
+
+  photos.forEach(item => {
+    const isHidden = !!item.hideFromScreensaver;
+    const row = document.createElement('div');
+    row.className = `fam-photo-row${isHidden ? ' is-hidden' : ''}`;
+
+    const thumb = document.createElement('img');
+    thumb.className = 'fam-photo-thumb';
+    thumb.referrerPolicy = 'no-referrer';
+    thumb.loading = 'lazy';
+    thumb.alt = 'Family Photo';
+    const direct = resolveChatPhotoUrl(item);
+    const legacyFid = item.fileId || item.photoFileId || item.telegramFileId;
+    if (direct) {
+      thumb.src = direct;
+      thumb.onerror = () => {
+        if (legacyFid && !thumb.dataset.retriedProxy) {
+          thumb.dataset.retriedProxy = '1';
+          loadLegacyPhotoIntoImg(legacyFid, thumb);
+        }
+      };
+    } else if (legacyFid) {
+      loadLegacyPhotoIntoImg(legacyFid, thumb);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'fam-photo-info';
+    const sender = item.fromNana ? 'Nana' : (item.author || 'Family');
+    const when = formatScreensaverDayAndAgo(item.timestamp);
+    const rawCap = String(item.text || '').trim();
+    info.innerHTML = `
+      <div class="fam-photo-meta">👤 ${esc(sender)}${when ? ` • ${esc(when)}` : ''}</div>
+      <div class="fam-photo-cap${rawCap ? '' : ' empty'}">${rawCap ? esc(rawCap) : 'No caption yet'}</div>
+    `;
+
+    const actions = document.createElement('div');
+    actions.className = 'fam-photo-actions';
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = `fam-photo-mini-btn ${isHidden ? 'off' : 'on'}`;
+    toggleBtn.textContent = isHidden ? '🙈 Hidden' : '✅ Showing';
+    toggleBtn.title = isHidden ? 'Tap to show on Nana’s Photo Frame' : 'Tap to hide from Nana’s Photo Frame';
+    toggleBtn.onclick = () => window.togglePhotoScreensaverVisibility(item.key);
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'fam-photo-mini-btn edit';
+    editBtn.textContent = rawCap ? '✏️ Caption' : '➕ Caption';
+    editBtn.onclick = () => window.editChatPhotoCaption(item.key);
+
+    actions.appendChild(toggleBtn);
+    actions.appendChild(editBtn);
+
+    row.appendChild(thumb);
+    row.appendChild(info);
+    row.appendChild(actions);
+    box.appendChild(row);
+  });
+}
 
 function formatScreensaverDayAndAgo(tsMs) {
   const ts = Number(tsMs) || 0;
@@ -2293,20 +3193,6 @@ function formatScreensaverDayAndAgo(tsMs) {
   return `${dayStr} • ${agoStr}`;
 }
 
-function getRecentScreensaverPhotos() {
-  const maxPhotos = Math.max(5, Math.min(50, Number(settings.photoScreensaverMaxPhotos ?? 20) || 20));
-  return Object.entries(state.bulletinSnap || {})
-    .map(([key, item]) => ({ key, ...(item || {}) }))
-    .filter(item => {
-      if (!item || item.systemAlert) return false;
-      const direct = resolveChatPhotoUrl(item);
-      const fid = item.fileId || item.photoFileId || item.telegramFileId;
-      return !!(direct || fid);
-    })
-    .sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0))
-    .slice(0, maxPhotos);
-}
-
 function isScreensaverAllowedNow() {
   if (role !== 'nana') return false;
   if (settings.photoScreensaverEnabled === false) return false;
@@ -2319,7 +3205,7 @@ function isScreensaverAllowedNow() {
   const blockingModals = [
     'nana-question-modal', 'confirm-modal', 'admin-pin-modal',
     'care-home-staff-modal', 'bulletin-modal', 'nana-voice-record-overlay',
-    'nana-reply-chooser-overlay', 'chat-video-overlay'
+    'nana-reply-chooser-overlay', 'nana-chat-video-overlay'
   ];
   for (const id of blockingModals) {
     const el = $(id);
@@ -2345,15 +3231,65 @@ function ensurePhotoScreensaverOverlay() {
       </div>
     </div>
   `;
-  const wakeFromScreensaver = (ev) => {
+  let wakeTimer = null;
+  const absorbEvent = (ev) => {
+    ev?.preventDefault?.();
     ev?.stopPropagation?.();
-    stopPhotoScreensaver('tap');
-    window.wakeScreenAndResetDimTimer?.();
   };
-  ov.addEventListener('pointerdown', wakeFromScreensaver);
-  ov.addEventListener('click', wakeFromScreensaver);
+  const completeWakeFromScreensaver = (ev) => {
+    absorbEvent(ev);
+    clearTimeout(wakeTimer);
+    // Keep overlay mounted for 60ms past pointerup/click so synthesized tap events never click a contact underneath
+    wakeTimer = setTimeout(() => {
+      stopPhotoScreensaver('tap');
+      window.wakeScreenAndResetDimTimer?.();
+      NanaCore.recordTouchActivity?.();
+    }, 60);
+  };
+  ov.addEventListener('pointerdown', absorbEvent);
+  ov.addEventListener('pointerup', completeWakeFromScreensaver);
+  ov.addEventListener('click', completeWakeFromScreensaver);
   document.body.appendChild(ov);
   return ov;
+}
+
+function applyScreensaverCaptionForItem(item) {
+  const cap = $('nana-ss-caption');
+  const metaEl = $('nana-ss-meta');
+  const textEl = $('nana-ss-text');
+  if (!cap || !metaEl || !textEl || !item) return;
+
+  const showCaption = settings.photoScreensaverShowCaption !== false;
+  if (!showCaption) {
+    cap.style.display = 'none';
+    return;
+  }
+
+  if (item.sourceType === 'google_album') {
+    if (settings.photoScreensaverShowAlbumName === false) {
+      cap.style.display = 'none';
+      return;
+    }
+    cap.style.display = '';
+    metaEl.textContent = `📚 ${item.albumTitle || 'Family Album'}`;
+    textEl.textContent = '';
+    textEl.style.display = 'none';
+    return;
+  }
+
+  cap.style.display = '';
+  const sender = item.fromNana ? 'Nana' : (item.author || 'Family');
+  const when = formatScreensaverDayAndAgo(item.timestamp);
+  metaEl.textContent = when ? `📷 ${sender} • ${when}` : `📷 ${sender}`;
+
+  const rawCaption = String(item.text || '').trim();
+  if (rawCaption) {
+    textEl.textContent = rawCaption;
+    textEl.style.display = 'block';
+  } else {
+    textEl.textContent = '';
+    textEl.style.display = 'none';
+  }
 }
 
 function showScreensaverSlide(idx) {
@@ -2368,6 +3304,7 @@ function showScreensaverSlide(idx) {
 
   img.classList.remove('visible');
   cap.style.opacity = '0';
+  clearTimeout(screensaverFadeTimer);
 
   const reveal = () => {
     if (!state.isPhotoScreensaverActive) return;
@@ -2383,23 +3320,12 @@ function showScreensaverSlide(idx) {
     const shiftX = Math.round((Math.random() - 0.5) * 14);
     cap.style.transform = `translateX(${shiftX}px)`;
 
-    const sender = item.fromNana ? 'Nana' : (item.author || 'Family');
-    const when = formatScreensaverDayAndAgo(item.timestamp);
-    metaEl.textContent = when ? `📷 ${sender} • ${when}` : `📷 ${sender}`;
-
-    const showCaption = settings.photoScreensaverShowCaption !== false;
-    const rawCaption = String(item.text || '').trim();
-    if (showCaption && rawCaption) {
-      textEl.textContent = rawCaption;
-      textEl.style.display = 'block';
-    } else {
-      textEl.textContent = '';
-      textEl.style.display = 'none';
-    }
+    applyScreensaverCaptionForItem(item);
     cap.style.opacity = '1';
   };
 
-  setTimeout(() => {
+  screensaverFadeTimer = setTimeout(() => {
+    screensaverFadeTimer = null;
     if (!state.isPhotoScreensaverActive) return;
     const direct = resolveChatPhotoUrl(item);
     const legacyFid = item.fileId || item.photoFileId || item.telegramFileId;
@@ -2408,6 +3334,19 @@ function showScreensaverSlide(idx) {
       if (legacyFid && !img.dataset.ssRetried) {
         img.dataset.ssRetried = '1';
         loadLegacyPhotoIntoImg(legacyFid, img);
+        return;
+      }
+      if (item.sourceType === 'google_album') {
+        // Trigger background refresh of Google Photos CDN URLs if a link expired
+        if (Date.now() - lastGoogleAlbumSyncAttemptMs > 5 * 60 * 1000) {
+          refreshGoogleAlbumsIfStale(true, item.albumKey || null);
+        }
+      }
+      if (screensaverPhotos.length > 1) {
+        screensaverIndex = (screensaverIndex + 1) % screensaverPhotos.length;
+        showScreensaverSlide(screensaverIndex);
+      } else {
+        stopPhotoScreensaver('broken_photo');
       }
     };
     delete img.dataset.ssRetried;
@@ -2415,20 +3354,89 @@ function showScreensaverSlide(idx) {
       img.src = direct;
     } else if (legacyFid) {
       loadLegacyPhotoIntoImg(legacyFid, img);
+    } else {
+      reveal();
     }
   }, 280);
+}
+
+function syncActiveScreensaverWithBulletin(forceRebuildOrder = false) {
+  if (role !== 'nana' || !state.isPhotoScreensaverActive) return;
+  const curItem = screensaverPhotos[screensaverIndex % Math.max(1, screensaverPhotos.length)];
+  const nextModeSig = getScreensaverModeSignature();
+  const modeChanged = forceRebuildOrder || (nextModeSig !== activeScreensaverModeSig);
+  activeScreensaverModeSig = nextModeSig;
+
+  const fresh = buildScreensaverPlaylist();
+  if (!fresh.length) {
+    stopPhotoScreensaver('no_photos');
+    return;
+  }
+
+  if (modeChanged) {
+    screensaverPhotos = fresh;
+    screensaverIndex = 0;
+    showScreensaverSlide(0);
+    return;
+  }
+
+  // Keep existing shuffle order for remaining slides while adding/removing newly changed items
+  const freshMap = new Map(fresh.map(p => [p.key, p]));
+  const kept = screensaverPhotos
+    .filter(p => freshMap.has(p.key))
+    .map(p => freshMap.get(p.key));
+  const keptKeys = new Set(kept.map(p => p.key));
+  const added = fresh.filter(p => !keptKeys.has(p.key));
+  screensaverPhotos = added.length ? [...added, ...kept] : kept;
+
+  const nextIdx = curItem ? screensaverPhotos.findIndex(p => p.key === curItem.key) : -1;
+  if (nextIdx === -1) {
+    screensaverIndex = screensaverIndex % screensaverPhotos.length;
+    showScreensaverSlide(screensaverIndex);
+    return;
+  }
+  screensaverIndex = nextIdx;
+  applyScreensaverCaptionForItem(screensaverPhotos[screensaverIndex]);
+}
+
+function scheduleScreensaverSlideTimer() {
+  const intervalMs = Math.max(10, Number(settings.photoScreensaverIntervalSec ?? 30) || 30) * 1000;
+  if (screensaverSlideTimer && activeScreensaverIntervalMs === intervalMs) return;
+  clearInterval(screensaverSlideTimer);
+  activeScreensaverIntervalMs = intervalMs;
+  screensaverSlideTimer = setInterval(() => {
+    if (!isScreensaverAllowedNow()) {
+      stopPhotoScreensaver('guard');
+      return;
+    }
+    screensaverIndex += 1;
+    if (screensaverIndex >= screensaverPhotos.length) {
+      const nextDeck = buildScreensaverPlaylist();
+      if (!nextDeck.length) {
+        stopPhotoScreensaver('no_photos');
+        return;
+      }
+      screensaverPhotos = nextDeck;
+      screensaverIndex = 0;
+    }
+    showScreensaverSlide(screensaverIndex);
+  }, intervalMs);
 }
 
 function stopPhotoScreensaver(reason = 'manual') {
   clearInterval(screensaverSlideTimer);
   clearInterval(screensaverGuardInterval);
+  clearTimeout(screensaverFadeTimer);
   screensaverSlideTimer = null;
   screensaverGuardInterval = null;
+  screensaverFadeTimer = null;
+  activeScreensaverIntervalMs = 0;
   const wasActive = state.isPhotoScreensaverActive;
   state.isPhotoScreensaverActive = false;
   const ov = $('nana-photo-screensaver');
   if (ov) ov.style.display = 'none';
-  if (wasActive && (reason === 'unplugged' || reason === 'battery_decreasing' || reason === 'night_mode')) {
+  const inCall = !!(state.currentState && state.currentState !== 'idle');
+  if (wasActive && reason !== 'wake' && reason !== 'tap' && !inCall && document.body.classList.contains('screen-dimmed')) {
     const dimTarget = NanaCore.isLowPowerMode?.() ? 5 : (settings.dimBrightness ?? 15);
     NanaCore.applyScreenBrightness?.(dimTarget, true);
   }
@@ -2436,9 +3444,11 @@ function stopPhotoScreensaver(reason = 'manual') {
 
 function tryStartPhotoScreensaver() {
   if (!isScreensaverAllowedNow()) return false;
-  const photos = getRecentScreensaverPhotos();
+  refreshGoogleAlbumsIfStale(false);
+  const photos = buildScreensaverPlaylist();
   if (!photos.length) return false;
 
+  activeScreensaverModeSig = getScreensaverModeSignature();
   screensaverPhotos = photos;
   screensaverIndex = 0;
   state.isPhotoScreensaverActive = true;
@@ -2451,23 +3461,8 @@ function tryStartPhotoScreensaver() {
   NanaCore.applyScreenBrightness?.(ssBright, true);
 
   showScreensaverSlide(screensaverIndex);
-
-  const intervalMs = Math.max(10, Number(settings.photoScreensaverIntervalSec ?? 30) || 30) * 1000;
-  clearInterval(screensaverSlideTimer);
-  screensaverSlideTimer = setInterval(() => {
-    if (!isScreensaverAllowedNow()) {
-      stopPhotoScreensaver('guard');
-      return;
-    }
-    const fresh = getRecentScreensaverPhotos();
-    if (!fresh.length) {
-      stopPhotoScreensaver('no_photos');
-      return;
-    }
-    screensaverPhotos = fresh;
-    screensaverIndex = (screensaverIndex + 1) % screensaverPhotos.length;
-    showScreensaverSlide(screensaverIndex);
-  }, intervalMs);
+  activeScreensaverIntervalMs = 0;
+  scheduleScreensaverSlideTimer();
 
   clearInterval(screensaverGuardInterval);
   screensaverGuardInterval = setInterval(() => {
@@ -2479,6 +3474,35 @@ function tryStartPhotoScreensaver() {
   return true;
 }
 
+onValue(refs.googleAlbums, snap => {
+  state.googleAlbumsSnap = snap.val() || {};
+  if (role === 'family') {
+    renderGooglePhotosAlbumsManager();
+  } else if (role === 'nana') {
+    refreshGoogleAlbumsIfStale(false);
+    syncActiveScreensaverWithBulletin();
+  }
+});
+
+if (role === 'nana') {
+  setInterval(() => {
+    if (state.isCharging === true && !NanaCore.isLowPowerMode?.()) {
+      refreshGoogleAlbumsIfStale(false);
+    }
+  }, 30 * 60 * 1000);
+}
+
+hooks.onSettingsChanged.push(() => {
+  if (role !== 'nana' || !state.isPhotoScreensaverActive) return;
+  if (!isScreensaverAllowedNow()) {
+    stopPhotoScreensaver('guard');
+    return;
+  }
+  const ssBright = Math.max(15, Math.min(55, Number(settings.photoScreensaverBrightness ?? 40) || 40));
+  NanaCore.applyScreenBrightness?.(ssBright, true);
+  scheduleScreensaverSlideTimer();
+  syncActiveScreensaverWithBulletin();
+});
+
 hooks.tryStartPhotoScreensaver = tryStartPhotoScreensaver;
 hooks.stopPhotoScreensaver = stopPhotoScreensaver;
-

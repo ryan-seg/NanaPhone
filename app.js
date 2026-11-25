@@ -317,6 +317,7 @@ window.openPatienceScreen = () => {
   hooks.broadcastScreen?.();
 };
 hooks.openPatienceScreen = window.openPatienceScreen;
+hooks.cancelPatienceInteraction = () => patienceGameInstance?.cancelInteraction?.();
 
 let lastContactsRenderSig = null;
 export function renderContacts(connectedList = []) {
@@ -360,7 +361,23 @@ export function renderContacts(connectedList = []) {
     const missed = Number(state.missedCallsByMember[m.id]?.count) || 0;
     const card = document.createElement('div');
     card.className = missed > 0 ? 'family-card has-missed' : 'family-card';
-    card.innerHTML = `${missed > 0 ? `<div class="missed-card-badge">📞 ${missed} MISSED</div>` : ''}<div class="photo-wrapper"><img src="${esc(m.photo)}" onerror="this.src='${esc(m.fallback)}'"></div><div class="contact-nameplate">${esc(m.name)}</div>`;
+    if (missed > 0) {
+      const badge = document.createElement('div');
+      badge.className = 'missed-card-badge';
+      badge.textContent = `📞 ${missed} MISSED`;
+      card.appendChild(badge);
+    }
+    const photoWrap = document.createElement('div');
+    photoWrap.className = 'photo-wrapper';
+    const img = document.createElement('img');
+    img.alt = m.name;
+    img.onerror = () => { img.onerror = null; img.src = m.fallback; };
+    img.src = m.photo;
+    photoWrap.appendChild(img);
+    const plate = document.createElement('div');
+    plate.className = 'contact-nameplate';
+    plate.textContent = m.name;
+    card.append(photoWrap, plate);
     card.onclick = () => window.openCallConfirmation(m);
     grid.appendChild(card);
   });
@@ -421,6 +438,7 @@ window.syncConnectedFamilyFromTelegram = async () => {
     const data = await res.json();
     if (data.ok && Array.isArray(data.connected)) {
       state.connectedMemberIds = data.connected;
+      set(refs.connectedMembers, data.connected).catch(() => {});
       if (role === 'nana') renderContacts(state.connectedMemberIds);
       else {
         hooks.refreshFamilyPresence?.();
@@ -533,9 +551,13 @@ function startLocalRadioStream() {
   radioPlayer.muted = false;
   radioPlayer.volume = Math.min(1.0, Math.max(0.15, (Number(settings.radioVolume ?? 75)) / 100));
   radioPlayer.src = CONFIG.classicFmStream;
-  radioPlayer.play().catch(() => {});
   updateRadioButtonsUI(true);
-  speakMsg("Playing Classic FM");
+  radioPlayer.play().then(() => {
+    if (state.isRadioPlaying) speakMsg("Playing Classic FM");
+  }).catch(() => {
+    state.isRadioPlaying = false;
+    updateRadioButtonsUI(false);
+  });
 }
 
 onValue(refs.entertainment, snap => {
@@ -554,6 +576,8 @@ onValue(refs.entertainment, snap => {
       }
       return;
     }
+    if ($('bulletin-modal')?.style.display === 'flex') window.closeFamilyBulletin?.();
+    if ($('patience-screen')?.classList.contains('active')) hooks.cancelPatienceInteraction?.();
     if ($('video-screen')?.classList.contains('active')) {
       hooks.pauseVideo?.('switched_to_radio');
     }
@@ -662,7 +686,10 @@ window.previewAndSetTone = async (tone) => {
   await window.updateSetting('ringtone', tone);
 };
 
-async function sendSingleTelegramRing(member, step, max) {
+let telegramBurstToken = 0;
+let telegramBurstRunning = false;
+
+async function sendSingleTelegramRing(member, step, max, burstToken) {
   const answerUrl = `${window.location.origin + window.location.pathname}?role=family&id=${encodeURIComponent(member.id)}&key=${encodeURIComponent(SERVICE_TOKEN)}&answer=true`;
   try {
     if ($('outbound-sub')) $('outbound-sub').innerText = `Ringing their mobile now (${step}/${max})...`;
@@ -675,27 +702,41 @@ async function sendSingleTelegramRing(member, step, max) {
       })
     });
     const data = await res.json();
-    if (data.ok && data.messageId) lastTelegramMsgId = data.messageId;
+    if (data.ok && data.messageId) {
+      if (!telegramBurstRunning || burstToken !== telegramBurstToken) {
+        fetch(CONFIG.googleScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ secret: SERVICE_TOKEN, portalNode: PORTAL_NODE_ID, action: "clear_rings", memberId: member.id, messageId: data.messageId })
+        }).catch(() => {});
+      } else {
+        lastTelegramMsgId = data.messageId;
+      }
+    }
   } catch (_) {}
 }
 
 function startTelegramRingBurst(member) {
   stopTelegramRingBurst();
+  const burstToken = ++telegramBurstToken;
+  telegramBurstRunning = true;
   currentDialedMember = member;
   lastTelegramMsgId = null;
   let step = 1;
-  sendSingleTelegramRing(member, step, 6);
+  sendSingleTelegramRing(member, step, 6, burstToken);
   telegramBurstInterval = setInterval(() => {
-    if (state.currentState !== 'calling_family' || step >= 6) {
+    if (!telegramBurstRunning || burstToken !== telegramBurstToken || state.currentState !== 'calling_family' || step >= 6) {
       clearInterval(telegramBurstInterval);
       telegramBurstInterval = null;
       return;
     }
-    sendSingleTelegramRing(member, ++step, 6);
+    sendSingleTelegramRing(member, ++step, 6, burstToken);
   }, 8500);
 }
 
 function stopTelegramRingBurst() {
+  telegramBurstRunning = false;
+  telegramBurstToken++;
   clearInterval(telegramBurstInterval);
   telegramBurstInterval = null;
   if (currentDialedMember && lastTelegramMsgId) {
@@ -729,6 +770,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const withTimeout = (p, ms) => Promise.race([Promise.resolve(p), sleep(ms).then(() => '__timeout__')]);
 let rejoinAttempts = 0;
 let callBeatTimer = null;
+let teardownPromise = Promise.resolve();
 
 // Last 30 call events per device, saved to Firebase (callDiag/<nana|member>) so sporadic failures can be diagnosed
 const diagKey = role === 'nana' ? 'nana' : activeFamilyMember.id;
@@ -757,20 +799,24 @@ function thisTabShouldBeInCall() {
     (!d.familyTabId || d.familyTabId === CLIENT_TAB_ID);
 }
 
-async function teardownCallObject() {
+function teardownCallObject() {
   clearInterval(activeCamWatchdog);
   activeCamWatchdog = null;
-  if (!callObject) return;
+  if (!callObject) return teardownPromise;
   const co = callObject;
   callObject = null;
   logCall('leave');
-  try {
-    const t = co.participants()?.local?.tracks;
-    [t?.video, t?.audio].forEach(x => { try { (x?.persistentTrack || x?.track)?.stop(); } catch (_) {} });
-  } catch (_) {}
-  try { co.setLocalVideo(false); co.setLocalAudio(false); } catch (_) {}
-  try { await withTimeout(co.leave(), 4000); } catch (_) {}
-  try { await withTimeout(co.destroy(), 3000); } catch (_) {}
+  const run = async () => {
+    try {
+      const t = co.participants()?.local?.tracks;
+      [t?.video, t?.audio].forEach(x => { try { (x?.persistentTrack || x?.track)?.stop(); } catch (_) {} });
+    } catch (_) {}
+    try { co.setLocalVideo(false); co.setLocalAudio(false); } catch (_) {}
+    try { await withTimeout(co.leave(), 4000); } catch (_) {}
+    try { await withTimeout(co.destroy(), 3000); } catch (_) {}
+  };
+  teardownPromise = teardownPromise.then(run, run);
+  return teardownPromise;
 }
 
 // Recover browsers that blocked audio autoplay: any touch during a call retries playback
@@ -800,6 +846,11 @@ window.addEventListener('pagehide', () => { try { callObject?.leave(); } catch (
 async function joinDailyRoom() {
   if (isJoiningOrInRoom || callObject) return;
   isJoiningOrInRoom = true;
+  await teardownPromise;
+  if (!thisTabShouldBeInCall() || callObject) {
+    isJoiningOrInRoom = false;
+    return;
+  }
   currentFacingMode = 'user';
   window.wakeInCallControls();
   const banner = $('call-connecting-banner');
@@ -825,25 +876,33 @@ async function joinDailyRoom() {
 
   logCall('join-start');
 
-  // Direct native WebRTC audio and video — lets Android/iOS hardware handle Echo Cancellation, Noise Suppression, and Auto Gain Control with zero buffer lag
-  const co = window.DailyIframe.createCallObject({
-    audioSource: true,
-    videoSource: true,
-    dailyConfig: {
-      avoidEval: true,
-      userMediaAudioConstraints: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      },
-      userMediaVideoConstraints: {
-        facingMode: 'user',
-        width: { ideal: 640, max: 640 },
-        height: { ideal: 480, max: 480 },
-        frameRate: { ideal: 24, max: 30 }
+  let co;
+  try {
+    // Direct native WebRTC audio and video — lets Android/iOS hardware handle Echo Cancellation, Noise Suppression, and Auto Gain Control with zero buffer lag
+    co = window.DailyIframe.createCallObject({
+      audioSource: true,
+      videoSource: true,
+      dailyConfig: {
+        avoidEval: true,
+        userMediaAudioConstraints: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
+        userMediaVideoConstraints: {
+          facingMode: 'user',
+          width: { ideal: 640, max: 640 },
+          height: { ideal: 480, max: 480 },
+          frameRate: { ideal: 24, max: 30 }
+        }
       }
-    }
-  });
+    });
+  } catch (createErr) {
+    logCall('create-fail', createErr?.message || createErr);
+    banner.innerText = '⚠️ Could not start video call';
+    isJoiningOrInRoom = false;
+    return;
+  }
   callObject = co;
   let hadRemote = false, emptyTimer = null;
   let boundVideoTrack = null;
@@ -917,6 +976,7 @@ async function joinDailyRoom() {
     if (vTrack && vTrack !== boundVideoTrack) {
       boundVideoTrack = vTrack;
       vTrack.onunmute = () => {
+        if (callObject !== co || boundVideoTrack !== vTrack) return;
         if (rv) {
           rv.muted = true;
           rv.volume = 0;
@@ -1016,6 +1076,7 @@ async function joinDailyRoom() {
       }
     }
     if (!joined) throw new Error('join failed');
+    if (callObject !== co) return;
     joinedOk = true;
     logCall('joined');
     co.setLocalVideo(true);
@@ -1042,6 +1103,7 @@ async function destroyDailyRoom() {
   clearInterval(callBeatTimer);
   callBeatTimer = null;
   await teardownCallObject();
+  if (callObject || isJoiningOrInRoom) return;
   ['remote-video', 'remote-audio', 'local-video'].forEach(id => {
     const el = $(id);
     if (el) {
@@ -1225,6 +1287,9 @@ window.answerCallAsNana = async (isAuto = false) => {
   });
 };
 
+let nanaCancelledOwnCallAtMs = 0;
+let lastNightBlockedRingSig = null;
+
 async function executeEndCallCleanup() {
   clearTimeout(outboundTimeout);
   clearTimeout(incomingRingTimeout);
@@ -1234,6 +1299,9 @@ async function executeEndCallCleanup() {
   stopTelegramRingBurst();
   stopRingingUI();
   if ($('family-ring-btn')) $('family-ring-btn').disabled = !settings.callingEnabled;
+  if (role === 'nana' && state.currentState === 'calling_family') {
+    nanaCancelledOwnCallAtMs = Date.now();
+  }
   set(refs.callState, { status: 'idle', timestamp: Date.now() }).catch(() => {});
   await destroyDailyRoom();
   logCall('ended');
@@ -1243,10 +1311,26 @@ async function executeEndCallCleanup() {
     state.returnToVideoAfterCall = false;
     showScreen('video-screen');
     hooks.openVideoScreen?.();
-  } else {
+  } else if (state.returnToPatienceAfterCall) {
+    state.returnToPatienceAfterCall = false;
+    hooks.openPatienceScreen?.();
+  } else if (!state.isRadioPlaying && !$('video-screen')?.classList.contains('active') && !$('patience-screen')?.classList.contains('active')) {
     showScreen('grid-screen');
   }
 }
+
+window.declineIncomingNanaCall = async () => {
+  if (role !== 'family') return window.endCall(true);
+  try {
+    await runTransaction(refs.callState, cur => {
+      if (cur && cur.status === 'calling_family' && cur.targetId === activeFamilyMember.id) {
+        return { status: 'idle', declinedBy: activeFamilyMember.id, timestamp: Date.now() };
+      }
+      return; // Abort transaction if call already ended or belongs to someone else
+    });
+  } catch (_) {}
+  showScreen('family-screen');
+};
 
 window.promptEndCallConfirmation = () => {
   const m = $('end-call-confirm-modal');
@@ -1282,7 +1366,9 @@ window.endCall = async (forceImmediate = false) => {
       clearTimeout(jitterHoldTimer);
       jitterHoldTimer = setTimeout(async () => {
         const rv = $('remote-video');
-        const videoRecovered = rv && rv.srcObject && !rv.paused && rv.readyState >= 2;
+        const vTrack = rv?.srcObject?.getVideoTracks?.()[0];
+        const hasRemotePeer = !!(callObject && Object.values(callObject.participants() || {}).some(p => !p.local));
+        const videoRecovered = !!(hasRemotePeer && vTrack?.readyState === 'live' && !rv.paused && rv.readyState >= 2);
         if (!videoRecovered && state.callSnap?.status === 'connected') {
           await executeEndCallCleanup();
         } else if (banner) {
@@ -1335,7 +1421,7 @@ function showFamilyUpdatePromptModal() {
 {
   let reloadPending = false;
   const tryReload = () => {
-    if (!reloadPending || state.currentState === 'connected') return;
+    if (!reloadPending || (state.currentState && state.currentState !== 'idle')) return;
     if (role === 'nana') {
       window.forceCacheBustReload();
     } else {
@@ -1393,9 +1479,12 @@ function showFamilyUpdatePromptModal() {
 onValue(refs.callState, snap => {
   const data = snap.val();
   if (!data) return;
+  const prevStatus = state.currentState;
+  const prevTargetId = state.callSnap?.targetId;
   state.callSnap = data;
   state.currentState = data.status;
   state.lastActivityOrCallMs = Date.now();
+  if (role === 'nana') hooks.syncBatteryUI?.();
 
   if (role === 'nana' && state.settingsLoaded && !settings.callingEnabled && data.status !== 'idle') {
     stopRingingUI();
@@ -1414,11 +1503,16 @@ onValue(refs.callState, snap => {
   } else if (isActiveNanaTab || isActiveFamilyTab) {
     $('bulletin-modal').style.display = 'none';
     if ($('nana-question-modal')) $('nana-question-modal').style.display = 'none';
+    if ($('care-home-staff-modal')) window.closeCareHomeStaffModal?.(false);
     window.closeSeniorKeyboard?.(false);
     if (role === 'nana') {
       if (state.isRadioPlaying) window.stopRadioAndSync(true);
       if ($('video-screen')?.classList.contains('active')) {
         state.returnToVideoAfterCall = true;
+      }
+      if ($('patience-screen')?.classList.contains('active')) {
+        state.returnToPatienceAfterCall = true;
+        hooks.cancelPatienceInteraction?.();
       }
       hooks.pauseVideo?.('incoming_call');
       if (data.status === 'connected') {
@@ -1461,8 +1555,12 @@ onValue(refs.callState, snap => {
     const act = isActiveNanaTab;
     if (data.status === 'ringing_nana') {
       const caller = resolveMemberById(data.callerId, data.callerName);
+      const ringSig = `${data.callerId || ''}_${data.timestamp || ''}`;
       if (isRealAndroidTablet && isCurrentlyInNightWindow() && settings.nightBlockCalls) {
-        incrementMissedCallForMember(caller.id);
+        if (lastNightBlockedRingSig !== ringSig) {
+          lastNightBlockedRingSig = ringSig;
+          incrementMissedCallForMember(caller.id);
+        }
         executeEndCallCleanup();
         return;
       }
@@ -1474,7 +1572,6 @@ onValue(refs.callState, snap => {
       }
 
       // Avoid restarting ringtone/TTS/timers when nanaRingingConfirmedAt echoes back on the same call
-      const ringSig = `${data.callerId || ''}_${data.timestamp || ''}`;
       if (activeIncomingRingSig === ringSig && $('ringing-screen')?.classList.contains('active')) {
         return;
       }
@@ -1512,7 +1609,11 @@ onValue(refs.callState, snap => {
       }
       ringInterval = setInterval(() => {
         playSelectedRingtoneAudio(settings.ringtone, rVol);
-        speakMsg(`${caller.spokenName} is calling you. Touch the green button to answer.`, false, rVol / 100);
+        if (settings.autoAnswer === true) {
+          speakMsg(`${caller.spokenName} is calling you. Connecting automatically.`, false, rVol / 100);
+        } else {
+          speakMsg(`${caller.spokenName} is calling you. Touch anywhere on the screen to answer.`, false, rVol / 100);
+        }
       }, 6000);
       clearTimeout(incomingRingTimeout);
       incomingRingTimeout = setTimeout(async () => {
@@ -1546,11 +1647,18 @@ onValue(refs.callState, snap => {
       stopTelegramRingBurst();
       stopRingingUI();
       destroyDailyRoom();
+      if (prevStatus === 'calling_family' && data.declinedBy && (Date.now() - nanaCancelledOwnCallAtMs > 2500)) {
+        const targetMember = resolveMemberById(prevTargetId || data.declinedBy);
+        speakMsg(`Sorry, ${targetMember.spokenName} is busy right now.`);
+      }
       if (state.returnToVideoAfterCall) {
         state.returnToVideoAfterCall = false;
         showScreen('video-screen');
         hooks.openVideoScreen?.();
-      } else if (!state.isRadioPlaying && !$('video-screen')?.classList.contains('active')) {
+      } else if (state.returnToPatienceAfterCall) {
+        state.returnToPatienceAfterCall = false;
+        hooks.openPatienceScreen?.();
+      } else if (!state.isRadioPlaying && !$('video-screen')?.classList.contains('active') && !$('patience-screen')?.classList.contains('active')) {
         showScreen('grid-screen');
       }
       window.wakeScreenAndResetDimTimer?.();

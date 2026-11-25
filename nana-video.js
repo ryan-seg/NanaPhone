@@ -70,7 +70,7 @@ function releaseVideoWakeLock() {
 }
 
 function keepScreenAwakeIfPlayingVideo() {
-  if (!isNanaVideoActivelyPlaying() || NanaCore.isLowPowerMode()) return;
+  if (!isNanaVideoActivelyPlaying() || NanaCore.isVideoBlockedByLowPower?.()) return;
   const overlay = $('brightness-overlay');
   if (overlay) { overlay.style.opacity = '0'; overlay.style.pointerEvents = 'none'; }
   if ($('night-dimmer') && $('night-dimmer').style.display !== 'none') window.wakeFromNightMode?.();
@@ -85,7 +85,7 @@ hooks.startNormalDimCountdownOnPause = startNormalDimCountdownOnPause;
 
 if (role === 'nana' && videoEl) {
   setInterval(() => {
-    if (NanaCore.isLowPowerMode()) {
+    if (NanaCore.isVideoBlockedByLowPower?.()) {
       releaseVideoWakeLock();
       return;
     }
@@ -155,8 +155,13 @@ hooks.onSettingsChanged.push((s) => {
 });
 
 // --- 3. SUBTITLES & VIDEO PLAYER CONTROLS ---
+let subtitleLoadToken = 0;
+let playAttemptToken = 0;
+
 async function attachSubtitleTrack(subUrl, forceReload = false) {
   if (!videoEl || (!forceReload && subUrl === lastLoadedSubUrl)) return;
+  const mySubToken = ++subtitleLoadToken;
+  const targetItemId = loadedVideoItemId;
   lastLoadedSubUrl = subUrl;
   videoEl.querySelectorAll('track').forEach(t => t.remove());
   if (activeSubBlobUrl) { URL.revokeObjectURL(activeSubBlobUrl); activeSubBlobUrl = null; }
@@ -165,15 +170,25 @@ async function attachSubtitleTrack(subUrl, forceReload = false) {
   let trackSrc = subUrl;
   try {
     const res = await fetch(subUrl);
+    if (mySubToken !== subtitleLoadToken || loadedVideoItemId !== targetItemId) {
+      lastLoadedSubUrl = '';
+      return;
+    }
     if (res.ok) {
       let text = await res.text();
+      if (mySubToken !== subtitleLoadToken || loadedVideoItemId !== targetItemId) {
+        lastLoadedSubUrl = '';
+        return;
+      }
       if (!text.trim().startsWith('WEBVTT')) {
         text = 'WEBVTT\n\n' + text.replace(/\r\n/g, '\n').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
       }
       activeSubBlobUrl = URL.createObjectURL(new Blob([text], { type: 'text/vtt' }));
       trackSrc = activeSubBlobUrl;
     }
-  } catch (_) {}
+  } catch (_) {
+    if (mySubToken !== subtitleLoadToken || loadedVideoItemId !== targetItemId) return;
+  }
 
   const track = document.createElement('track');
   track.kind = 'subtitles'; track.label = 'English'; track.srclang = 'en'; track.default = true;
@@ -187,6 +202,7 @@ async function attachSubtitleTrack(subUrl, forceReload = false) {
 function loadQueueItemIntoVideoElement(item, forceSubReload = false) {
   if (!videoEl || !item || !item.url) return;
   if (lastLoadedVideoUrl !== item.url || loadedVideoItemId !== item.id || !videoEl.getAttribute('src')) {
+    playAttemptToken++;
     clearTimeout(videoRetryTimer);
     videoRetryTimer = null;
     if (lastLoadedVideoUrl !== item.url && item.id) {
@@ -215,10 +231,12 @@ window.openVideoScreen = () => {
   const curItem = getCurrentQueueItem();
   if (videoEl && curItem && curItem.item.url) {
     loadQueueItemIntoVideoElement(curItem.item);
-    const savedSec = getSavedTimeForItem(curItem.item, curItem.index);
-    if (savedSec >= 1 && videoEl.paused) {
+    const itemId = curItem.item.id;
+    if (videoEl.paused) {
       const seekWhenReady = () => {
-        if (loadedVideoItemId === curItem.item.id && Math.abs((videoEl.currentTime || 0) - savedSec) > 1) {
+        const freshCur = getCurrentQueueItem();
+        const savedSec = freshCur && freshCur.item.id === itemId ? getSavedTimeForItem(freshCur.item, freshCur.index) : 0;
+        if (loadedVideoItemId === itemId && savedSec >= 1 && Math.abs((videoEl.currentTime || 0) - savedSec) > 1) {
           try { videoEl.currentTime = savedSec; } catch (_) {}
         }
       };
@@ -227,7 +245,7 @@ window.openVideoScreen = () => {
     }
   }
 
-  update(refs.presence, { online: true, lastActivity: "Opened Video Player", currentScreen: "video_paused", lastTouched: Date.now() }).catch(() => {});
+  hooks.broadcastScreen?.();
   syncVideoUI();
 };
 hooks.openVideoScreen = window.openVideoScreen;
@@ -315,6 +333,7 @@ hooks.syncVideoUI = syncVideoUI;
 
 function pauseVideoAndSavePosition(reason = 'manual') {
   if (isHandlingVideoEnd) return;
+  playAttemptToken++;
   const curItem = getCurrentQueueItem();
   const isSameLoadedItem = !!(curItem && loadedVideoItemId === curItem.item.id && videoEl && videoEl.readyState >= 1);
 
@@ -376,13 +395,15 @@ function startOrResumeVideo() {
   const { item, index } = curItem;
   videoEl.removeAttribute('crossorigin');
   loadQueueItemIntoVideoElement(item);
+  const myPlayToken = ++playAttemptToken;
 
   const targetResume = getSavedTimeForItem(item, index);
   const applySeek = () => {
     if (loadedVideoItemId !== item.id) return;
-    if (targetResume >= 1 && Math.abs((videoEl.currentTime || 0) - targetResume) > 1.5) {
-      try { videoEl.currentTime = targetResume; } catch (_) {}
-    } else if (targetResume === 0 && (videoEl.currentTime || 0) > 2) {
+    const latestResume = getSavedTimeForItem(item, index);
+    if (latestResume >= 1 && Math.abs((videoEl.currentTime || 0) - latestResume) > 1.5) {
+      try { videoEl.currentTime = latestResume; } catch (_) {}
+    } else if (latestResume === 0 && (videoEl.currentTime || 0) > 2) {
       try { videoEl.currentTime = 0; } catch (_) {}
     }
     if (videoEl.textTracks?.[0]) videoEl.textTracks[0].mode = 'showing';
@@ -400,6 +421,11 @@ function startOrResumeVideo() {
   const playPromise = videoEl.play();
   if (playPromise !== undefined) {
     playPromise.then(() => {
+      if (myPlayToken !== playAttemptToken || loadedVideoItemId !== item.id) return;
+      if (state.currentState && state.currentState !== 'idle') {
+        try { videoEl.pause(); } catch (_) {}
+        return;
+      }
       if (role === 'nana' && NanaCore.isVideoBlockedByLowPower?.()) {
         pauseVideoAndSavePosition('low_power_unplugged');
         return;
@@ -409,14 +435,21 @@ function startOrResumeVideo() {
       syncVideoUI();
       hooks.broadcastScreen?.();
       if (role === 'nana') {
-        update(refs.videoStream, {
+        const curFloor = Math.floor(videoEl.currentTime || 0);
+        const posToSave = curFloor >= 1 ? curFloor : Math.floor(targetResume || 0);
+        const payload = {
           state: 'playing',
           currentIndex: index,
-          [`savedTimes/${item.id}`]: Math.floor(videoEl.currentTime || targetResume || 0),
           updatedAt: Date.now()
-        }).catch(() => {});
+        };
+        if (posToSave >= 1 || targetResume === 0) {
+          payload[`savedTimes/${item.id}`] = posToSave;
+        }
+        update(refs.videoStream, payload).catch(() => {});
       }
     }).catch((err) => {
+      if (myPlayToken !== playAttemptToken || loadedVideoItemId !== item.id) return;
+      if (err?.name === 'AbortError' || (state.currentState && state.currentState !== 'idle')) return;
       console.warn("Video play interrupted or blocked:", err);
       syncVideoUI();
       startNormalDimCountdownOnPause();
@@ -458,8 +491,11 @@ window.toggleNanaVideoPlayback = () => {
 window.restartNanaVideoFromBeginning = async () => {
   const curItem = getCurrentQueueItem();
   if (!videoEl || !curItem) return;
+  const wasPlaying = !videoEl.paused && !videoEl.ended;
   pauseVideoAndSavePosition('restart_confirm_prompt');
-  await askNana('restart_video_prompt', 'Are you sure you want to return to the start of the episode?', 'Video Player');
+  await askNana('restart_video_prompt', 'Are you sure you want to return to the start of the episode?', 'Video Player', {
+    resumeOnCancel: wasPlaying
+  });
 };
 
 // Executed only when Nana taps "✅ YES" on the restart confirmation modal
@@ -496,49 +532,50 @@ async function handleVideoEndedOnNana() {
   isHandlingVideoEnd = true;
   startNormalDimCountdownOnPause();
 
-  const curItem = getCurrentQueueItem();
-  if (!curItem) {
+  try {
+    const curItem = getCurrentQueueItem();
+    if (!curItem) return;
+
+    // 1. Reset saved playback position for the finished episode to 0
+    lastSavedTimeSec = 0;
+    localStorage.setItem(`nana_vid_pos_${curItem.item.url}`, '0');
+    if (!state.streamData.savedTimes) state.streamData.savedTimes = {};
+    state.streamData.savedTimes[curItem.item.id] = 0;
+
+    // 2. Increment view count for the finished episode
+    const newViewCount = getViewCountForItem(curItem.item) + 1;
+    if (!state.streamData.viewCounts) state.streamData.viewCounts = {};
+    state.streamData.viewCounts[curItem.item.id] = newViewCount;
+
+    // 3. Calculate the next episode in the queue, but DO NOT change currentIndex yet!
+    // currentIndex only advances after Nana confirms on the popup (or if a family member explicitly activates an episode)
+    const nextIndex = (curItem.index + 1) % curItem.total;
+    const nextItem = state.streamData.queue[nextIndex];
+    state.streamData.state = 'paused';
+
+    await update(refs.videoStream, {
+      state: 'paused',
+      pauseReason: 'video_ended',
+      [`savedTimes/${curItem.item.id}`]: 0,
+      [`viewCounts/${curItem.item.id}`]: newViewCount,
+      updatedAt: Date.now()
+    }).catch(() => {});
+
+    syncVideoUI('🎬 Episode finished!');
+    hooks.broadcastScreen?.();
+
+    const nextTitle = nextItem?.title || `Video ${nextIndex + 1}`;
+    const promptText = curItem.total > 1
+      ? `That episode has finished. Would you like to play the next episode: "${nextTitle}"?`
+      : `That episode has finished. Would you like to watch "${nextTitle}" again?`;
+
+    await askNana('next_video_prompt', promptText, 'Video Player', {
+      fromIndex: curItem.index,
+      nextIndex
+    });
+  } finally {
     isHandlingVideoEnd = false;
-    return;
   }
-
-  // 1. Reset saved playback position for the finished episode to 0
-  lastSavedTimeSec = 0;
-  localStorage.setItem(`nana_vid_pos_${curItem.item.url}`, '0');
-  if (!state.streamData.savedTimes) state.streamData.savedTimes = {};
-  state.streamData.savedTimes[curItem.item.id] = 0;
-
-  // 2. Increment view count for the finished episode
-  const newViewCount = getViewCountForItem(curItem.item) + 1;
-  if (!state.streamData.viewCounts) state.streamData.viewCounts = {};
-  state.streamData.viewCounts[curItem.item.id] = newViewCount;
-
-  // 3. Calculate the next episode in the queue, but DO NOT change currentIndex yet!
-  // currentIndex only advances after Nana confirms on the popup (or if a family member explicitly activates an episode)
-  const nextIndex = (curItem.index + 1) % curItem.total;
-  const nextItem = state.streamData.queue[nextIndex];
-  state.streamData.state = 'paused';
-
-  await update(refs.videoStream, {
-    state: 'paused',
-    pauseReason: 'video_ended',
-    [`savedTimes/${curItem.item.id}`]: 0,
-    [`viewCounts/${curItem.item.id}`]: newViewCount,
-    updatedAt: Date.now()
-  }).catch(() => {});
-
-  syncVideoUI('🎬 Episode finished!');
-  hooks.broadcastScreen?.();
-
-  const nextTitle = nextItem?.title || `Video ${nextIndex + 1}`;
-  const promptText = curItem.total > 1
-    ? `That episode has finished. Would you like to play the next episode: "${nextTitle}"?`
-    : `That episode has finished. Would you like to watch "${nextTitle}" again?`;
-
-  await askNana('next_video_prompt', promptText, 'Video Player', {
-    fromIndex: curItem.index,
-    nextIndex
-  });
 }
 
 function notifyRyanBrokenVideo(item, index, reason = 'not playing') {
@@ -608,6 +645,8 @@ if (role === 'nana' && videoEl) {
   setInterval(() => {
     const curItem = getCurrentQueueItem();
     const shouldBePlaying = !!(
+      document.visibilityState === 'visible' &&
+      !videoEl.paused &&
       !NanaCore.isVideoBlockedByLowPower?.() &&
       curItem &&
       state.streamData.state === 'playing' &&
@@ -800,15 +839,15 @@ window.saveEditedQueueItem = async () => {
   const urlChanged = prevItem.url !== newUrl;
   q[idx] = { ...prevItem, title: newTitle, url: newUrl, subtitleUrl: newSub };
 
-  const nextSavedTimes = { ...(state.streamData.savedTimes || {}) };
+  const payload = { queue: q, updatedBy: NanaCore.senderName, updatedAt: Date.now() };
   if (urlChanged && prevItem.id) {
-    nextSavedTimes[prevItem.id] = 0;
+    payload[`savedTimes/${prevItem.id}`] = 0;
     localStorage.removeItem(`nana_vid_pos_${prevItem.url}`);
     localStorage.removeItem(`nana_vid_pos_${newUrl}`);
   }
 
   window.cancelEditQueueItem();
-  await update(refs.videoStream, { queue: q, savedTimes: nextSavedTimes, updatedBy: senderName, updatedAt: Date.now() });
+  await update(refs.videoStream, payload);
 };
 
 // Selecting a row in the Family/Admin list ONLY highlights it in your controls without changing Nana's active episode!
@@ -828,7 +867,10 @@ function renderFamilyQueueUI() {
   }
 
   const sig = JSON.stringify([
-    q.map(item => [item.id, item.title, item.subtitleUrl ? 1 : 0, getViewCountForItem(item), Math.floor(getSavedTimeForItem(item) / 15)]),
+    q.map(item => {
+      const sv = getSavedTimeForItem(item);
+      return [item.id, item.title, item.subtitleUrl ? 1 : 0, getViewCountForItem(item), sv > 0 ? Math.floor(sv / 15) + 1 : 0];
+    }),
     state.streamData.currentIndex, selectedFamilyQueueIdx, state.presenceSnap?.currentScreen === 'video_playing', editingQueueIndex, canEditQueue
   ]);
   if (sig === lastQueueRenderSig) return;
@@ -909,7 +951,7 @@ window.addVideoToQueue = async (playImmediately = false) => {
     queue: q,
     currentIndex: newIndex,
     state: playImmediately ? 'playing' : (state.streamData.state || 'paused'),
-    updatedBy: senderName,
+    updatedBy: NanaCore.senderName,
     updatedAt: Date.now()
   });
 
@@ -934,7 +976,7 @@ window.selectQueueIndex = async (idx, startPlaying = true, ev = null) => {
   await update(refs.videoStream, {
     currentIndex: idx,
     state: startPlaying ? 'playing' : 'paused',
-    updatedBy: senderName,
+    updatedBy: NanaCore.senderName,
     updatedAt: Date.now()
   });
 };
@@ -954,7 +996,7 @@ window.moveQueueItem = async (idx, direction, ev = null) => {
   const newActiveIndex = activeId ? Math.max(0, q.findIndex(item => item.id === activeId)) : 0;
   selectedFamilyQueueIdx = targetIdx;
 
-  await update(refs.videoStream, { queue: q, currentIndex: newActiveIndex, updatedBy: senderName, updatedAt: Date.now() });
+  await update(refs.videoStream, { queue: q, currentIndex: newActiveIndex, updatedBy: NanaCore.senderName, updatedAt: Date.now() });
 };
 
 window.removeQueueIndex = async (idx, ev = null) => {
@@ -976,7 +1018,7 @@ window.removeQueueIndex = async (idx, ev = null) => {
     queue: q.length ? q : null,
     currentIndex: nextIdx,
     state: q.length ? state.streamData.state : 'paused',
-    updatedBy: senderName,
+    updatedBy: NanaCore.senderName,
     updatedAt: Date.now()
   };
   if (removed?.id) { payload[`savedTimes/${removed.id}`] = null; payload[`viewCounts/${removed.id}`] = null; }
@@ -1005,11 +1047,12 @@ window.remoteCommandVideo = async (cmd) => {
     selectedFamilyQueueIdx = candidateIdx;
   }
 
-  await update(refs.videoStream, { currentIndex: nextIndex, state: nextState, updatedBy: senderName, updatedAt: Date.now() });
+  await update(refs.videoStream, { currentIndex: nextIndex, state: nextState, updatedBy: NanaCore.senderName, updatedAt: Date.now() });
 };
 
 function updateFamilyVideoStatus() {
   if (role !== 'family') return;
+  renderFamilyQueueUI();
   const st = $('fam-vid-status');
   if (!st) return;
   const curItem = getCurrentQueueItem();

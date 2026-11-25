@@ -493,7 +493,7 @@ body.theme-black-cream .todays-call-pill { background: #fff; border-color: #000;
 }
 #video-screen.video-is-playing .video-bottom-bar {
   padding: 5px 12px;
-  background: rgba(30, 41, 59, 0.9);
+  background: var(--bg-card);
 }
 #video-screen.video-is-playing .video-bottom-bar .vol-step-btn,
 #video-screen.video-is-playing .video-bottom-bar .cancel-btn {
@@ -514,8 +514,8 @@ body.theme-black-cream .todays-call-pill { background: #fff; border-color: #000;
 .q-no-btn { background: #ef4444; color: #fff; }
 
 /* Family Screen Tabs & Video Queue UI */
-.fam-tabs-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 92vw; max-width: 540px; background: #0f172a; padding: 5px; border-radius: 16px; border: 2px solid #334155; flex-shrink: 0; }
-.fam-tab-btn { background: transparent; color: #94a3b8; border: 2px solid transparent; border-radius: 11px; padding: 8px 4px; font-size: 0.86rem; font-weight: 900; cursor: pointer; text-align: center; white-space: nowrap; transition: all 0.15s; }
+.fam-tabs-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; width: 92vw; max-width: 540px; background: #0f172a; padding: 5px; border-radius: 16px; border: 2px solid #334155; flex-shrink: 0; }
+.fam-tab-btn { background: transparent; color: #94a3b8; border: 2px solid transparent; border-radius: 11px; padding: 8px 3px; font-size: clamp(0.73rem, 2.7vw, 0.85rem); font-weight: 900; cursor: pointer; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: all 0.15s; }
 .fam-tab-btn.active { background: #1e293b; color: #fef08a; border-color: #38bdf8; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
 .fam-tab-pane { display: none; flex-direction: column; align-items: center; gap: 8px; width: 92vw; max-width: 540px; }
 .fam-tab-pane.active { display: flex; }
@@ -532,7 +532,7 @@ body.theme-black-cream .todays-call-pill { background: #fff; border-color: #000;
 .fam-q-mini-btn:disabled { opacity: 0.35; cursor: default; }
 .admin-drawer-toggle { width: 100%; background: #0f172a; color: #7dd3fc; border: 2px dashed #38bdf8; border-radius: 12px; padding: 7px 10px; font-size: 0.85rem; font-weight: 800; cursor: pointer; margin-bottom: 6px; }
 
-#confirm-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.96); z-index: 130; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+#confirm-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.96); z-index: 141; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
 #confirm-photo { width: 165px; height: 165px; border-radius: 50%; object-fit: cover; border: 6px solid #ff0; margin-bottom: 14px; }
 .confirm-btn-row { display: flex; gap: 20px; margin-top: 20px; }
 .confirm-btn { padding: 16px 36px; font-size: 2rem; font-weight: 900; border-radius: 22px; cursor: pointer; border: 4px solid #fff; }
@@ -555,7 +555,7 @@ body.theme-black-cream .todays-call-pill { background: #fff; border-color: #000;
 .guide-step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 .guide-step strong { color: #fef08a; font-size: 1.08rem; }
 
-#call-screen { padding: 0; position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; background: #000; overflow: hidden; }
+#call-screen { padding: 0; position: fixed; inset: 0; z-index: 165; width: 100vw; height: 100vh; height: 100dvh; background: #000; overflow: hidden; }
 #calling-off-card { display: none; }
 body.calling-off #family-grid, body.calling-off #missed-call-banner { display: none !important; }
 body.calling-off #calling-off-card { display: flex !important; }
@@ -642,6 +642,7 @@ body.role-family #in-call-menu-wrap { display: flex; }
   transition: opacity 0.35s ease;
 }
 #call-screen.touch-awake #call-status-pill { opacity: 0.92; }
+body.role-nana #call-status-pill { top: 70px; }
 
 /* Translucent End Call Button: Always visible at 0.28 opacity, becomes 1.0 opaque for 5s when screen is touched */
 .hangup-btn {
@@ -931,8 +932,17 @@ body.screen-dimmed .tg-flashing-cursor {
 .fam-chat-header-bar { display: none; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .fam-chat-back-btn { background: #334155; color: #fff; border: 2px solid #94a3b8; border-radius: 12px; padding: 7px 14px; font-size: 1rem; font-weight: 800; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .fam-chat-title { font-size: 1.15rem; font-weight: 900; color: var(--text-accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
-.tg-family-native-input { display: none; flex: 1; min-width: 0; height: 48px; background: var(--input-bg); color: #ffffff; border: 2px solid #38bdf8; border-radius: 24px; padding: 8px 16px; font-size: 1rem; font-weight: 600; outline: none; user-select: text; -webkit-user-select: text; }
-.tg-family-native-input::placeholder { color: #94a3b8; font-weight: 600; }
+.tg-family-native-input { display: none; flex: 1; min-width: 0; height: 48px; background: var(--input-bg); color: var(--input-text); border: 2px solid #38bdf8; border-radius: 24px; padding: 8px 16px; font-size: 1rem; font-weight: 600; outline: none; user-select: text; -webkit-user-select: text; }
+.tg-family-native-input::placeholder { color: #64748b; font-weight: 600; }
+#tg-send-status { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+.giant-radio-btn.playing #radio-action-prompt { color: #fef08a !important; }
+body.theme-black-cream .end-confirm-card { background: #1e293b; }
+body.theme-black-cream #todays-calls-label,
+body.theme-black-cream #tg-send-status,
+body.theme-black-cream .q-sender-badge { color: #0f172a !important; }
+body.theme-yellow-black #todays-calls-label { color: #ffff00 !important; }
+body.theme-white-black #todays-calls-label { color: #ffffff !important; }
+body.theme-black-cream .nana-star-target-pulse { outline-color: #d97706 !important; box-shadow: 0 0 0 6px rgba(217, 119, 6, 0.45), 0 0 24px rgba(245, 158, 11, 0.85) !important; }
 body.role-family #bulletin-modal .nana-nav-pills { display: none; }
 body.role-family #bulletin-modal .fam-chat-header-bar { display: flex; }
 body.role-family #bulletin-modal .tg-header { padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 10px 14px; flex-wrap: wrap; gap: 6px; }
@@ -1033,6 +1043,107 @@ body.role-family #bulletin-modal .tg-msg-text { font-size: 1.05rem; line-height:
 }
 .tg-edit-caption-btn:active { transform: scale(0.97); }
 
+/* Family Portal Photos Manager List (Show/Hide on Photo Frame + Edit Caption) */
+.fam-photos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 430px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.fam-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1.5px solid #334155;
+  text-align: left;
+}
+.fam-photo-row.is-hidden {
+  opacity: 0.65;
+  border-style: dashed;
+}
+.fam-photo-thumb {
+  width: 60px;
+  height: 60px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #020617;
+  border: 2px solid #475569;
+  flex-shrink: 0;
+}
+.fam-photo-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.fam-photo-meta {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #fde68a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fam-photo-cap {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  line-height: 1.25;
+  word-wrap: break-word;
+}
+.fam-photo-cap.empty {
+  color: #94a3b8;
+  font-style: italic;
+  font-weight: 600;
+}
+.fam-photo-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.fam-photo-mini-btn {
+  padding: 5px 10px;
+  border-radius: 9px;
+  border: 1.5px solid #475569;
+  background: #1e293b;
+  color: #f8fafc;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fam-photo-mini-btn.on {
+  background: #065f46;
+  border-color: #4ade80;
+  color: #dcfce7;
+}
+.fam-photo-mini-btn.off {
+  background: #334155;
+  border-color: #94a3b8;
+  color: #cbd5e1;
+}
+.fam-photo-mini-btn.edit {
+  background: #0c4a6e;
+  border-color: #38bdf8;
+  color: #e0f2fe;
+}
+.fam-photo-mini-btn.danger {
+  background: #7f1d1d;
+  border-color: #f87171;
+  color: #fee2e2;
+}
+.fam-photo-actions-row {
+  display: flex;
+  gap: 5px;
+}
+
 /* Plugged-In Family Photo Frame Screensaver (burn-in safe, non-overlapping large caption) */
 #nana-photo-screensaver {
   display: none;
@@ -1051,12 +1162,12 @@ body.role-family #bulletin-modal .tg-msg-text { font-size: 1.05rem; line-height:
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 16px 22px;
+  padding: 70px 18px 14px 18px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   overflow: hidden;
   background: #000;
   box-sizing: border-box;
@@ -1068,16 +1179,17 @@ body.role-family #bulletin-modal .tg-msg-text { font-size: 1.05rem; line-height:
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
 .nana-ss-img {
-  max-width: 96%;
-  max-height: 96%;
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   border-radius: 14px;
   opacity: 0;
@@ -1133,4 +1245,83 @@ body.role-family #bulletin-modal .tg-msg-text { font-size: 1.05rem; line-height:
   color: rgba(203, 213, 225, 0.58);
 }
 
+/* Guided Navigation Star Overlay (Pop-Up YES Walkthrough) */
+#nana-guided-star-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 170;
+  pointer-events: none;
+  overflow: hidden;
+  display: none;
+}
+.nana-guided-star {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nana-guided-star svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.nana-guided-star.eng-gentle {
+  filter: drop-shadow(0 0 8px rgba(254, 240, 138, 0.75));
+}
+.nana-guided-star.eng-normal {
+  filter: drop-shadow(0 0 14px rgba(250, 204, 21, 0.92)) drop-shadow(0 0 28px rgba(254, 240, 138, 0.55));
+}
+.nana-guided-star.eng-lively {
+  filter: drop-shadow(0 0 18px rgba(250, 204, 21, 1)) drop-shadow(0 0 38px rgba(253, 224, 71, 0.85));
+}
+.nana-star-trail-dot {
+  position: fixed;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0%, #fde047 55%, rgba(250, 204, 21, 0) 100%);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: nanaStarTrailFade 0.55s ease-out forwards;
+}
+@keyframes nanaStarTrailFade {
+  0%   { opacity: 0.85; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+}
+.nana-star-ripple {
+  position: fixed;
+  border-radius: 50%;
+  border: 4px solid #fef08a;
+  box-shadow: 0 0 18px rgba(250, 204, 21, 0.9);
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.25);
+  animation: nanaStarRippleOut 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes nanaStarRippleOut {
+  0%   { opacity: 0.95; transform: translate(-50%, -50%) scale(0.25); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.65); }
+}
+.nana-star-sparkle {
+  position: fixed;
+  pointer-events: none;
+  color: #fef08a;
+  font-weight: 900;
+  text-shadow: 0 0 10px rgba(250, 204, 21, 0.95), 0 0 4px #ffffff;
+  will-change: transform, opacity;
+  animation: nanaStarSparkleFly var(--sp-dur, 560ms) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes nanaStarSparkleFly {
+  0%   { opacity: 1; transform: translate(-50%, -50%) translate(0px, 0px) scale(0.5) rotate(0deg); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) translate(var(--sp-dx), var(--sp-dy)) scale(1.25) rotate(var(--sp-rot, 120deg)); }
+}
+.nana-star-target-pulse {
+  outline: 5px solid #fef08a !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px rgba(250, 204, 21, 0.55), 0 0 28px rgba(254, 240, 138, 0.95) !important;
+  filter: brightness(1.14);
+  transition: box-shadow 0.2s ease, filter 0.2s ease;
+}
 

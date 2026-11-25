@@ -74,7 +74,7 @@ const fmtDelay = (sec) => {
   const videoTimeSlots = [11, 11.5, 14, 14.5, 16, 16.5, 17, 17.5, 18, 18.5, 19, 19.5, 20, 20.5];
 
   window.toggleAllControlsSections = (expand) => {
-    document.querySelectorAll('#family-settings-mount details.controls-accordion').forEach(d => {
+    document.querySelectorAll('#shared-settings-cards details.controls-accordion, #family-settings-mount details.controls-accordion, #gear-settings-mount details.controls-accordion').forEach(d => {
       d.open = !!expand;
     });
   };
@@ -170,17 +170,24 @@ const fmtDelay = (sec) => {
         </div>
         <div class="settings-card">
           <div class="settings-label"><span>🖼️ Family Photo Frame Screensaver</span><span class="lbl-screensaver-summary" style="color:#38bdf8;font-size:0.9rem;">Plugged In Only</span></div>
-          <div class="settings-sub" style="margin-bottom:6px;">Cycles recent Family Chat photos with burn-in protection. Only runs when plugged in and battery is not dropping.</div>
+          <div class="settings-sub" style="margin-bottom:6px;">Cycles Family Chat photos and/or Google Photos Shared Albums with burn-in protection. Only runs when plugged in and battery is not dropping.</div>
           <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverEnabled', [[true,'🖼️ Photo Frame ON'],[false,'🚫 Off (Normal Dim)']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Which Photos to Show:</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverSource', [['both','🖼️ Chat + Albums'],['chat_only','💬 Chat Only'],['albums_only','📚 Albums Only']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Order &amp; Mixing Style:</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverOrder', [['recent_plus_shuffle','⭐ Recent + Mix Albums'],['shuffle_all','🔀 Shuffle All'],['newest_first','🕒 In Order']])}</div>
           <div class="settings-sub" style="margin-bottom:4px;">Start After Inactivity:</div>
           <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverDelaySec', [[60,'1m'],[120,'2m'],[180,'3m'],[300,'5m']])}</div>
           <div class="settings-sub" style="margin-bottom:4px;">Change Photo Every:</div>
-          <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverIntervalSec', [[15,'15s'],[30,'30s'],[60,'1m'],[120,'2m']])}</div>
+          <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverIntervalSec', [[15,'15s'],[30,'30s'],[60,'1m'],[120,'2m'],[300,'5m']])}</div>
           <div class="settings-sub" style="margin-bottom:4px;">Screensaver Brightness (capped below full for burn-in safety):</div>
           <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverBrightness', [[25,'25%'],[35,'35%'],[40,'40%'],[55,'55%']])}</div>
-          <div class="settings-sub" style="margin-bottom:4px;">Show Family Captions &amp; Recent Photo Pool:</div>
-          <div class="opt-row" style="margin-bottom:6px;">${optBtns('photoScreensaverShowCaption', [[true,'💬 Show Captions'],[false,'🙈 Hide Captions']])}</div>
-          <div class="opt-row">${optBtns('photoScreensaverMaxPhotos', [[10,'Last 10'],[20,'Last 20'],[30,'Last 30']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">Captions, Album Labels &amp; Recent Chat Pool:</div>
+          <div class="opt-row" style="margin-bottom:6px;">
+            ${optBtns('photoScreensaverShowCaption', [[true,'💬 Show Captions'],[false,'🙈 Picture Only']])}
+            <button type="button" class="opt-btn" data-skey="photoScreensaverShowAlbumName" data-sval="true" onclick="toggleSetting('photoScreensaverShowAlbumName')">📚 Album Name</button>
+          </div>
+          <div class="opt-row">${optBtns('photoScreensaverMaxPhotos', [[10,'Last 10'],[20,'Last 20'],[30,'Last 30'],[40,'Last 40']])}</div>
         </div>
         <div class="settings-card">
           <div class="settings-label"><span>🌙 Do Not Disturb (Night Mode)</span><span class="lbl-night-window" style="color:#38bdf8;">21:00 – 08:00</span></div>
@@ -295,6 +302,24 @@ const fmtDelay = (sec) => {
           <div class="settings-sub" style="margin-bottom:4px;">🗣️ Pop-Up Question &amp; Prompt Voice:</div>
           <div class="opt-row">${optBtns('speakQuestions', [[true,'🔊 Read Prompts Aloud'],[false,'🔇 Silent Pop-Ups Only']], 'setGlobalQuestionSpeak')}</div>
         </div>
+        <div class="settings-card">
+          <div class="settings-label"><span>⭐ Guided Navigation Star (Pop-Up Demo)</span><span class="lbl-star-summary" style="color:#4ade80;font-size:0.9rem;">ON • Normal</span></div>
+          <div class="settings-sub" style="margin-bottom:6px;">When Nana taps YES on an action pop-up, a glowing star glides from YES to the button(s) to show her how to navigate there herself, enlarging with sparkles on each click.</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('guidedStarEnabled', [[true,'⭐ Guided Star ON'],[false,'🚫 Off (Open Instantly)']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">⏱️ Star Movement Speed:</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('guidedStarSpeed', [['very_slow','🐢 Very Slow'],['slow','🚶 Slow'],['normal','✨ Normal'],['fast','⚡ Fast']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">📏 Star Size:</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('guidedStarSize', [['small','Small'],['medium','Medium'],['large','Large'],['xl','XL']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">🎇 Engagement (Glow, Trail, Sparkles &amp; Click Pulse):</div>
+          <div class="opt-row" style="margin-bottom:8px;">${optBtns('guidedStarEngagement', [['gentle','✨ Gentle'],['normal','🌟 Normal'],['lively','🎇 Lively']])}</div>
+          <div class="settings-sub" style="margin-bottom:4px;">🎯 Features Using the Guided Star (Tap to Toggle):</div>
+          <div class="opt-row">
+            <button type="button" class="opt-btn" data-skey="guidedStarChat" data-sval="true" onclick="toggleSetting('guidedStarChat')">✈️ Family Chat</button>
+            <button type="button" class="opt-btn" data-skey="guidedStarRadio" data-sval="true" onclick="toggleSetting('guidedStarRadio')">🎻 Classic FM</button>
+            <button type="button" class="opt-btn" data-skey="guidedStarVideo" data-sval="true" onclick="toggleSetting('guidedStarVideo')">🎬 Video</button>
+            <button type="button" class="opt-btn" data-skey="guidedStarPatience" data-sval="true" onclick="toggleSetting('guidedStarPatience')">🕷️ Patience</button>
+          </div>
+        </div>
       </div>
     </details>
   `;
@@ -372,8 +397,10 @@ window.wakeScreenAndResetDimTimer = function () {
       if (state.currentState === 'idle' && !anyVideoPlaying()) {
         window.closeSeniorKeyboard?.(true);
         if (hooks.tryStartPhotoScreensaver?.()) return;
-        const dimTarget = NanaCore.isLowPowerMode?.() ? 5 : (settings.dimBrightness ?? 15);
-        applyScreenBrightness(dimTarget, true);
+        if (getEffectiveDimDelaySec() > 0) {
+          const dimTarget = NanaCore.isLowPowerMode?.() ? 5 : (settings.dimBrightness ?? 15);
+          applyScreenBrightness(dimTarget, true);
+        }
       }
     }, delaySec * 1000);
   }
@@ -381,6 +408,10 @@ window.wakeScreenAndResetDimTimer = function () {
 
 hooks.onPowerModeChanged.push(() => {
   if (role === 'nana') {
+    if ($('night-dimmer')?.style.display === 'flex') {
+      applyScreenBrightness(5, true);
+      return;
+    }
     window.wakeScreenAndResetDimTimer?.();
   }
 });
@@ -394,28 +425,34 @@ export function isCurrentlyInNightWindow() {
 NanaCore.isCurrentlyInNightWindow = isCurrentlyInNightWindow;
 
 let lastClockText = '';
-let lastNightDimDisplay = '';
 export function updateClock() {
   const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   if (t !== lastClockText) {
     lastClockText = t;
     if ($('night-clock')) $('night-clock').innerText = t;
   }
-  if ($('night-dimmer')) {
+  const nightEl = $('night-dimmer');
+  if (nightEl && role === 'nana') {
     const anyVideoPlaying = !!(NanaCore.isNanaVideoActivelyPlaying?.() || NanaCore.isChatVideoActivelyPlaying?.());
     const showNight = isCurrentlyInNightWindow() && state.currentState === 'idle' && !anyVideoPlaying && Date.now() > nightDismissedUntilMs;
-    if (showNight) hooks.stopPhotoScreensaver?.('night_mode');
+    if (showNight) {
+      hooks.stopPhotoScreensaver?.('night_mode');
+      clearTimeout(idleDimTimer);
+      applyScreenBrightness(5, true);
+    }
     const disp = showNight ? 'flex' : 'none';
-    if (disp !== lastNightDimDisplay) {
-      lastNightDimDisplay = disp;
-      $('night-dimmer').style.display = disp;
+    const prevDisp = nightEl.style.display || 'none';
+    if (disp !== prevDisp) {
+      nightEl.style.display = disp;
+      if (!showNight && prevDisp === 'flex') {
+        window.wakeScreenAndResetDimTimer?.();
+      }
     }
   }
 }
 
 window.wakeFromNightMode = () => {
   nightDismissedUntilMs = Date.now() + 15 * 60 * 1000;
-  lastNightDimDisplay = 'none';
   if ($('night-dimmer')) $('night-dimmer').style.display = 'none';
   if (state.currentState === 'ringing_nana') {
     applyScreenBrightness(100, false);
@@ -526,9 +563,15 @@ window.clearPinDigits = () => { enteredPin = ""; if ($('pin-dots-display')) $('p
 window.pressPinDigit = async (d) => {
   if (enteredPin.length >= 4) return;
   enteredPin += d;
+  adminPinSecondsLeft = 5;
+  if ($('admin-modal-sub') && $('pin-keypad-section')?.style.display !== 'none') {
+    $('admin-modal-sub').innerText = `Enter 4-digit Supervisor PIN — closes in ${adminPinSecondsLeft}s`;
+  }
   if ($('pin-dots-display')) $('pin-dots-display').innerText = "●".repeat(enteredPin.length);
   if (enteredPin.length === 4) {
-    const candidateHash = await sha256Hex("nana-pin-salt:" + enteredPin);
+    const pinSnapshot = enteredPin;
+    const candidateHash = await sha256Hex("nana-pin-salt:" + pinSnapshot);
+    if ($('admin-pin-modal')?.style.display !== 'flex') return;
     if (candidateHash === EXPECTED_PIN_HASH) {
       clearAdminPinTimer();
       window.AndroidBridge?.unlockAdminForFiveMinutes?.();
@@ -551,7 +594,9 @@ window.adminExecuteAction = (action) => {
   if (action === 'update_apk') {
     window.AndroidBridge?.downloadAndInstallApk ? window.AndroidBridge.downloadAndInstallApk(apkUrl) : (window.location.href = apkUrl);
   } else if (action === 'update_web') {
-    window.AndroidBridge?.clearCacheAndReload ? window.AndroidBridge.clearCacheAndReload() : window.location.reload(true);
+    if (window.AndroidBridge?.clearCacheAndReload) window.AndroidBridge.clearCacheAndReload();
+    else if (window.forceCacheBustReload) window.forceCacheBustReload();
+    else window.location.reload();
   } else {
     const map = { pin_screen: 'enableScreenPinning', settings: 'openAndroidSettings', wifi: 'openWifiSettings', launcher: 'openLenovoLauncher', relock: 'relockKioskNow' };
     window.AndroidBridge?.[map[action]]?.();
@@ -683,9 +728,23 @@ export function refreshSettingsUI() {
   const ssDelay = Number(settings.photoScreensaverDelaySec ?? 120);
   const ssInt = Number(settings.photoScreensaverIntervalSec ?? 30);
   const ssBright = Math.max(15, Math.min(55, Number(settings.photoScreensaverBrightness ?? 40)));
+  const ssSrcMap = { both: 'Chat+Albums', chat_only: 'Chat', albums_only: 'Albums' };
+  const ssSrcTxt = ssSrcMap[settings.photoScreensaverSource || 'both'] || 'Chat+Albums';
   document.querySelectorAll('.lbl-screensaver-summary').forEach(e => {
-    e.innerText = ssOn ? `ON • ${fmtDelay(ssDelay)} / ${fmtDelay(ssInt)} • ${ssBright}%` : 'Off';
+    e.innerText = ssOn ? `ON • ${ssSrcTxt} • ${fmtDelay(ssDelay)} / ${fmtDelay(ssInt)} • ${ssBright}%` : 'Off';
     e.style.color = ssOn ? '#4ade80' : '#94a3b8';
+  });
+  const starOn = settings.guidedStarEnabled !== false;
+  const starSpdMap = { very_slow: 'Very Slow', slow: 'Slow', normal: 'Normal', fast: 'Fast' };
+  const starSzMap = { small: 'S', medium: 'M', large: 'L', xl: 'XL' };
+  const starEngMap = { gentle: 'Gentle', normal: 'Normal', lively: 'Lively' };
+  const starFeatCount = ['guidedStarChat', 'guidedStarRadio', 'guidedStarVideo', 'guidedStarPatience']
+    .filter(k => settings[k] !== false).length;
+  document.querySelectorAll('.lbl-star-summary').forEach(e => {
+    e.innerText = starOn
+      ? `ON • ${starSpdMap[settings.guidedStarSpeed] || 'Normal'} • ${starSzMap[settings.guidedStarSize] || 'L'} • ${starEngMap[settings.guidedStarEngagement] || 'Lively'} (${starFeatCount}/4)`
+      : 'Off';
+    e.style.color = starOn ? '#4ade80' : '#94a3b8';
   });
   document.querySelectorAll('.lbl-kb-summary').forEach(e => { e.innerText = `${kbLayout.toUpperCase()} • ${fmtDelay(kbHideSec)}`; });
   document.querySelectorAll('.lbl-vol-summary').forEach(e => {
@@ -748,7 +807,9 @@ export function refreshSettingsUI() {
   hooks.onSettingsChanged.forEach(fn => fn(settings));
 }
 
+let prevRemoteSpeakQuestions = undefined;
 onValue(refs.settings, snap => {
+  const wasLoaded = !!state.settingsLoaded;
   const remote = snap.val();
   if (remote) {
     Object.assign(settings, remote);
@@ -758,13 +819,27 @@ onValue(refs.settings, snap => {
     }
     if (remote.radioPromptHours !== undefined) settings.radioPromptHours = parseHoursArray(remote.radioPromptHours, [10, 15]);
     if (remote.videoPromptHours !== undefined) settings.videoPromptHours = parseHoursArray(remote.videoPromptHours, [14, 19]);
-    if (remote.speakQuestions !== undefined) window.setFamilyQuestionSilentMode(!settings.speakQuestions);
+    if (remote.speakQuestions !== undefined && (!wasLoaded || remote.speakQuestions !== prevRemoteSpeakQuestions)) {
+      prevRemoteSpeakQuestions = remote.speakQuestions;
+      window.setFamilyQuestionSilentMode(!settings.speakQuestions);
+    }
   }
   state.settingsLoaded = true;
   refreshSettingsUI();
   updateClock();
   hooks.updateBulletinTicker?.();
-  window.wakeScreenAndResetDimTimer();
+  if (role === 'nana') {
+    if (state.isPhotoScreensaverActive) {
+      // Keep active Photo Screensaver running; hooks.onSettingsChanged updates its interval/brightness/pool live
+    } else if ($('night-dimmer')?.style.display === 'flex') {
+      applyScreenBrightness(5, true);
+    } else if (wasLoaded && isScreenDimmed && getEffectiveDimDelaySec() > 0) {
+      const dimTarget = NanaCore.isLowPowerMode?.() ? 5 : (settings.dimBrightness ?? 15);
+      applyScreenBrightness(dimTarget, true);
+    } else {
+      window.wakeScreenAndResetDimTimer();
+    }
+  }
   hooks.refreshFamilyPresence?.();
 });
 

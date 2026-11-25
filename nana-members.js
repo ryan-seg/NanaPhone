@@ -263,7 +263,7 @@ export function openPhotoCropperForFile(file, onDone) {
   };
   img.onerror = () => {
     try { URL.revokeObjectURL(url); } catch (_) {}
-    cropObjectUrl = null;
+    if (cropObjectUrl === url) cropObjectUrl = null;
     alert('Could not open that photo. Please try a JPG or PNG image.');
   };
   img.src = url;
@@ -275,7 +275,11 @@ function buildPersonalMemberUrl(memberId) {
 }
 
 function generateUniqueMemberId(name) {
-  const existingIds = new Set(CONFIG.familyMembers.map(m => m.id));
+  const usedIds = new Set([
+    ...CONFIG.familyMembers.map(m => m.id),
+    ...(state.connectedMemberIds || [])
+  ]);
+  Object.values(state.callHistorySnap || {}).forEach(c => { if (c?.partnerId) usedIds.add(c.partnerId); });
   let base = String(name || '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -284,7 +288,7 @@ function generateUniqueMemberId(name) {
   if (!base || base === 'nana' || base === 'family') base = base ? `${base}-1` : 'member';
   let candidate = base;
   let n = 2;
-  while (existingIds.has(candidate)) {
+  while (usedIds.has(candidate)) {
     candidate = `${base.slice(0, 14)}-${n++}`;
   }
   return candidate;
@@ -302,7 +306,7 @@ function getMemberRecencyRankMap() {
     Number(state.missedCallsByMember?.[id]?.timestamp || 0),
     Number(historyMax[id] || 0)
   );
-  const connected = CONFIG.familyMembers.filter(m => state.connectedMemberIds.includes(m.id));
+  const connected = CONFIG.familyMembers.filter(m => state.connectedMemberIds.includes(m.id) && !NanaCore.isHiddenFromNana?.(m.id));
   const sorted = [...connected]
     .map((m, idx) => ({ id: m.id, idx, ts: getLastTs(m.id) }))
     .sort((a, b) => (b.ts - a.ts) || (a.idx - b.idx));
@@ -446,7 +450,7 @@ window.saveFamilyMemberForm = async () => {
     const record = {
       id,
       name,
-      spokenName: name,
+      spokenName: (existing && name === existing.name && existing.spokenName) ? existing.spokenName : name,
       isCustom: isEditing ? !existing?.isBuiltIn : true,
       createdAt: Number(oldRec.createdAt || existing?.createdAt || now),
       updatedAt: now
@@ -511,31 +515,68 @@ export function renderManageFamilyMembersList() {
     summary.innerText = `${CONFIG.familyMembers.length} total • ${connectedCount} with Telegram connected${connectedCount > 7 ? ' (top 7 most recently called shown on Nana’s screen alongside Patience)' : ''}`;
   }
 
-  box.innerHTML = CONFIG.familyMembers.map(m => {
+  box.innerHTML = '';
+  CONFIG.familyMembers.forEach(m => {
     const isTg = state.connectedMemberIds.includes(m.id);
+    const isHidden = !!NanaCore.isHiddenFromNana?.(m.id);
     const rank = rankMap[m.id];
     const lastTs = getLastTs(m.id);
     const statusBadge = isTg
-      ? (rank && rank <= 7
-          ? `<span class="fm-badge tg-on">🔔 Telegram • Grid #${rank}</span>`
-          : `<span class="fm-badge tg-wait">🔔 Telegram • Outside top 7 (${formatLastCallShort(lastTs)})</span>`)
+      ? (isHidden
+          ? `<span class="fm-badge tg-wait">🙈 Hidden / Off-hours (${esc(formatLastCallShort(lastTs))})</span>`
+          : (rank && rank <= 7
+              ? `<span class="fm-badge tg-on">🔔 Telegram • Grid #${rank}</span>`
+              : `<span class="fm-badge tg-wait">🔔 Telegram • Outside top 7 (${esc(formatLastCallShort(lastTs))})</span>`))
       : `<span class="fm-badge tg-off">📞 Can call Nana (No Telegram)</span>`;
 
-    return `
-      <div class="fm-member-row">
-        <img src="${esc(m.photo)}" onerror="this.src='${esc(m.fallback)}'" class="fm-row-avatar" alt="${esc(m.name)}">
-        <div class="fm-row-info">
-          <div class="fm-row-name">${esc(m.name)} ${m.isCustom ? '<span style="font-size:0.74rem;color:#7dd3fc;">(Added)</span>' : ''}</div>
-          <div class="fm-row-meta">${statusBadge}</div>
-        </div>
-        <div class="fm-row-actions">
-          <button type="button" class="fm-mini-btn" onclick="copyFamilyMemberLink('${esc(m.id)}', this)" title="Copy personal webpage link">📋 Link</button>
-          <button type="button" class="fm-mini-btn" onclick="startEditFamilyMember('${esc(m.id)}')" title="Edit Name &amp; Photo">✏️</button>
-          ${m.isBuiltIn ? '' : `<button type="button" class="fm-mini-btn danger" onclick="removeCustomFamilyMember('${esc(m.id)}')" title="Remove member">🗑️</button>`}
-        </div>
-      </div>
+    const row = document.createElement('div');
+    row.className = 'fm-member-row';
+
+    const avatar = document.createElement('img');
+    avatar.className = 'fm-row-avatar';
+    avatar.alt = m.name;
+    avatar.onerror = () => { avatar.onerror = null; avatar.src = m.fallback; };
+    avatar.src = m.photo;
+
+    const info = document.createElement('div');
+    info.className = 'fm-row-info';
+    info.innerHTML = `
+      <div class="fm-row-name">${esc(m.name)} ${m.isCustom ? '<span style="font-size:0.74rem;color:#7dd3fc;">(Added)</span>' : ''}</div>
+      <div class="fm-row-meta">${statusBadge}</div>
     `;
-  }).join('');
+
+    const actions = document.createElement('div');
+    actions.className = 'fm-row-actions';
+
+    const linkBtn = document.createElement('button');
+    linkBtn.type = 'button';
+    linkBtn.className = 'fm-mini-btn';
+    linkBtn.title = 'Copy personal webpage link';
+    linkBtn.textContent = '📋 Link';
+    linkBtn.onclick = () => window.copyFamilyMemberLink(m.id, linkBtn);
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'fm-mini-btn';
+    editBtn.title = 'Edit Name & Photo';
+    editBtn.textContent = '✏️';
+    editBtn.onclick = () => window.startEditFamilyMember(m.id);
+
+    actions.append(linkBtn, editBtn);
+
+    if (!m.isBuiltIn) {
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'fm-mini-btn danger';
+      delBtn.title = 'Remove member';
+      delBtn.textContent = '🗑️';
+      delBtn.onclick = () => window.removeCustomFamilyMember(m.id);
+      actions.appendChild(delBtn);
+    }
+
+    row.append(avatar, info, actions);
+    box.appendChild(row);
+  });
 }
 
 // --- 4. ANY FAMILY MEMBER'S SELF-PROFILE MODAL (NAME + CROP PHOTO) ---
@@ -623,7 +664,7 @@ window.saveMyProfileChanges = async () => {
     const record = {
       id,
       name,
-      spokenName: name,
+      spokenName: (name === activeFamilyMember.name && activeFamilyMember.spokenName) ? activeFamilyMember.spokenName : name,
       isCustom: !activeFamilyMember.isBuiltIn,
       createdAt: Number(oldRec.createdAt || activeFamilyMember.createdAt || now),
       updatedAt: now

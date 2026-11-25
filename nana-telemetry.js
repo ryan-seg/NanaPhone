@@ -231,8 +231,12 @@ onValue(refs.alerts, snap => {
   else evaluateFamilyBatteryChatAlerts();
 });
 hooks.onSettingsChanged.push(() => {
-  if (role === 'nana') evaluateNanaBatteryChatAlerts();
-  else evaluateFamilyBatteryChatAlerts();
+  if (role === 'nana') {
+    evaluateNanaBatteryChatAlerts();
+  } else {
+    updateFamilyPresenceBanner();
+    evaluateFamilyBatteryChatAlerts();
+  }
 });
 
 // --- 1. TOP 62PX NO-TOUCH ORIENTATION BANNER & DISCREET STAFF BUTTON ---
@@ -379,7 +383,7 @@ function ensureUnpluggedWarningBanner() {
     'left:50%',
     'right:10px',
     'min-height:46px',
-    'z-index:9995',
+    'z-index:138',
     'background:#991b1b',
     'color:#fef08a',
     'border:3px solid #fde047',
@@ -415,8 +419,19 @@ function ensureUnpluggedWarningBanner() {
 
 // --- CARE HOME STAFF MODAL (10s "CANFORD" CONFIRMATION -> MUTE & ANDROID SETTINGS) ---
 let careHomeCountdownTimer = null;
+let careHomeUnlockedIdleTimer = null;
 let careHomeTypedText = "";
 let careHomeSecondsLeft = 10;
+
+function resetCareHomeUnlockedIdleTimer() {
+  clearTimeout(careHomeUnlockedIdleTimer);
+  careHomeUnlockedIdleTimer = null;
+  if ($('care-home-staff-modal')?.style.display === 'flex' && $('care-home-actions-step')?.style.display === 'flex') {
+    careHomeUnlockedIdleTimer = setTimeout(() => {
+      window.closeCareHomeStaffModal(false);
+    }, 60000);
+  }
+}
 
 function ensureCareHomeModal() {
   let modal = $('care-home-staff-modal');
@@ -426,8 +441,8 @@ function ensureCareHomeModal() {
   modal.id = 'care-home-staff-modal';
   modal.style.cssText = [
     'position:fixed', 'inset:0', 'z-index:10060', 'background:rgba(9,13,22,0.94)',
-    'display:none', 'flex-direction:column', 'align-items:center', 'justify-content:center',
-    'padding:20px', 'text-align:center', 'user-select:none'
+    'display:none', 'flex-direction:column', 'align-items:center', 'justify-content:flex-start',
+    'overflow-y:auto', 'padding:68px 20px 24px 20px', 'text-align:center', 'user-select:none'
   ].join(';');
 
   const rows = [
@@ -448,7 +463,7 @@ function ensureCareHomeModal() {
   `).join('');
 
   modal.innerHTML = `
-    <div style="background:#0f172a;border:4px solid #38bdf8;border-radius:26px;padding:22px 26px;max-width:800px;width:95vw;box-shadow:0 16px 45px rgba(0,0,0,0.9);">
+    <div style="background:#0f172a;border:4px solid #38bdf8;border-radius:26px;padding:22px 26px;max-width:800px;width:95vw;margin:auto;box-shadow:0 16px 45px rgba(0,0,0,0.9);">
       <!-- STEP 1: 10-SECOND "CANFORD" ANTI-TAMPER CONFIRMATION -->
       <div id="care-home-gate-step">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -534,6 +549,7 @@ function ensureCareHomeModal() {
 
   document.body.appendChild(modal);
 
+  modal.addEventListener('pointerdown', resetCareHomeUnlockedIdleTimer, { passive: true });
   modal.querySelectorAll('.ch-key-btn').forEach(btn => {
     btn.addEventListener('click', (ev) => {
       ev.stopPropagation();
@@ -546,6 +562,7 @@ function ensureCareHomeModal() {
 
   modal.querySelectorAll('.ch-mute-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
+      resetCareHomeUnlockedIdleTimer();
       const mins = Number(btn.dataset.mins) || 0;
       await window.muteBatteryVoiceForMinutesCareHome(mins);
       refreshCareHomeUnlockedUI();
@@ -607,19 +624,24 @@ function handleCareHomeKeyPress(key) {
     if ($('care-home-gate-step')) $('care-home-gate-step').style.display = 'none';
     if ($('care-home-actions-step')) $('care-home-actions-step').style.display = 'flex';
     refreshCareHomeUnlockedUI();
+    resetCareHomeUnlockedIdleTimer();
   }
 }
 
-// Physical keyboard support while the 10-second gate is open (case-insensitive)
+// Physical keyboard support while the Care Home modal is open (case-insensitive)
 window.addEventListener('keydown', (ev) => {
   const modal = $('care-home-staff-modal');
+  if (!modal || modal.style.display !== 'flex') return;
+  if (ev.key === 'Escape') {
+    window.closeCareHomeStaffModal(false);
+    return;
+  }
+  if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
   const gate = $('care-home-gate-step');
-  if (!modal || modal.style.display !== 'flex' || !gate || gate.style.display === 'none') return;
+  if (!gate || gate.style.display === 'none') return;
   if (ev.key === 'Backspace') {
     ev.preventDefault();
     handleCareHomeKeyPress('⌫');
-  } else if (ev.key === 'Escape') {
-    window.closeCareHomeStaffModal(false);
   } else if (/^[a-zA-Z]$/.test(ev.key)) {
     handleCareHomeKeyPress(ev.key);
   }
@@ -627,6 +649,8 @@ window.addEventListener('keydown', (ev) => {
 
 window.openCareHomeStaffGate = () => {
   const modal = ensureCareHomeModal();
+  clearTimeout(careHomeUnlockedIdleTimer);
+  careHomeUnlockedIdleTimer = null;
   careHomeTypedText = "";
   careHomeSecondsLeft = 10;
   if ($('care-home-typed-box')) $('care-home-typed-box').textContent = "_";
@@ -650,6 +674,8 @@ window.openCareHomeStaffGate = () => {
 window.closeCareHomeStaffModal = (relockKiosk = false) => {
   clearInterval(careHomeCountdownTimer);
   careHomeCountdownTimer = null;
+  clearTimeout(careHomeUnlockedIdleTimer);
+  careHomeUnlockedIdleTimer = null;
   careHomeTypedText = "";
   const modal = $('care-home-staff-modal');
   if (modal) modal.style.display = 'none';
@@ -871,6 +897,7 @@ export function broadcastNanaCurrentScreen() {
   if (role !== 'nana') return;
   positionUnpluggedBannerOverRadioAndVideo();
   requestAnimationFrame(positionUnpluggedBannerOverRadioAndVideo);
+  if (!prevPresenceReady) return;
   const videoEl = $('nana-video-el');
   let screenState = 'home';
   const isPlayingVideo = !!(
@@ -902,11 +929,26 @@ export function broadcastNanaCurrentScreen() {
 hooks.broadcastScreen = broadcastNanaCurrentScreen;
 
 if (role === 'nana') {
+  const writeConnectedPresence = () => {
+    const appState = document.visibilityState === 'hidden' ? 'backgrounded' : 'foreground';
+    const payload = {
+      online: true,
+      appState,
+      networkOnline: navigator.onLine !== false,
+      lastConnectedAt: Date.now()
+    };
+    if (appState === 'foreground') payload.lastExitHint = 'active_in_app';
+    update(refs.presence, payload).catch(() => {});
+  };
+
   const finalizePrevPresenceCapture = (val) => {
     if (prevPresenceReady) return;
     bootPrevPresence = val || {};
     prevPresenceReady = true;
+    if (firebaseConnected) writeConnectedPresence();
     recordBackgroundHeartbeat(true);
+    lastBroadcastScreenState = '';
+    broadcastNanaCurrentScreen();
     evaluateNanaBatteryChatAlerts();
   };
   onValue(refs.presence, snap => finalizePrevPresenceCapture(snap.val()), { onlyOnce: true });
@@ -916,20 +958,15 @@ if (role === 'nana') {
     firebaseConnected = (snap.val() === true);
     if (firebaseConnected) {
       onDisconnect(refs.presence).update({ online: false, disconnectedAt: Date.now() }).catch(() => {});
-      const appState = document.visibilityState === 'hidden' ? 'backgrounded' : 'foreground';
-      const payload = {
-        online: true,
-        appState,
-        networkOnline: navigator.onLine !== false,
-        lastConnectedAt: Date.now()
-      };
-      if (appState === 'foreground') payload.lastExitHint = 'active_in_app';
-      update(refs.presence, payload).catch(() => {});
-      evaluateNanaBatteryChatAlerts();
+      if (prevPresenceReady) {
+        writeConnectedPresence();
+        evaluateNanaBatteryChatAlerts();
+      }
     }
   });
 
   document.addEventListener('visibilitychange', () => {
+    if (!prevPresenceReady) return;
     const isHidden = document.visibilityState === 'hidden';
     update(refs.presence, {
       appState: isHidden ? 'backgrounded' : 'foreground',
@@ -939,6 +976,7 @@ if (role === 'nana') {
   });
 
   window.addEventListener('blur', () => {
+    if (!prevPresenceReady) return;
     if (document.visibilityState !== 'hidden') {
       update(refs.presence, {
         appState: 'shade_or_overlay',
@@ -949,6 +987,7 @@ if (role === 'nana') {
   });
 
   window.addEventListener('focus', () => {
+    if (!prevPresenceReady) return;
     update(refs.presence, {
       appState: 'foreground',
       appStateChangedAt: Date.now(),
@@ -957,6 +996,7 @@ if (role === 'nana') {
   });
 
   window.addEventListener('offline', () => {
+    if (!prevPresenceReady) return;
     update(refs.presence, {
       networkOnline: false,
       lastExitHint: 'wifi_turned_off',
@@ -965,6 +1005,7 @@ if (role === 'nana') {
   });
 
   window.addEventListener('online', () => {
+    if (!prevPresenceReady) return;
     update(refs.presence, {
       online: true,
       networkOnline: true,
@@ -1096,8 +1137,9 @@ setInterval(renderTodaysCallsBanner, 60000);
 
 // --- 5. UNIFIED FAMILY PRESENCE CARD RENDERER ---
 function formatDurationAgo(timestampMs) {
-  if (!timestampMs) return "No recent touch";
-  const diffMins = Math.max(0, Math.floor((Date.now() - timestampMs) / 60000));
+  const ts = Number(timestampMs);
+  if (!Number.isFinite(ts) || ts <= 0) return "No recent touch";
+  const diffMins = Math.max(0, Math.floor((Date.now() - ts) / 60000));
   if (diffMins < 1) return "Just now";
   if (diffMins < 60) return `${diffMins}m ago`;
   const hrs = Math.floor(diffMins / 60), mins = diffMins % 60;
@@ -1109,9 +1151,10 @@ function formatDurationAgo(timestampMs) {
 function getSimpleNanaStatusSummary() {
   const p = state.presenceSnap || {};
   const now = Date.now();
-  const lastSeenMs = Math.max(Number(p.lastPing || 0), Number(p.disconnectedAt || 0), Number(p.appStateChangedAt || 0));
-  const silenceSec = lastSeenMs ? Math.floor((now - Number(p.lastPing || lastSeenMs)) / 1000) : 0;
-  const isOffline = (p.online === false) || (p.lastPing && silenceSec > 75);
+  const lastAliveMs = Math.max(Number(p.lastPing || 0), Number(p.lastConnectedAt || 0));
+  const lastSeenMs = Math.max(lastAliveMs, Number(p.disconnectedAt || 0), Number(p.appStateChangedAt || 0));
+  const silenceSec = lastSeenMs ? Math.floor((now - (lastAliveMs || lastSeenMs)) / 1000) : 0;
+  const isOffline = (p.online === false) || (lastAliveMs > 0 && silenceSec > 75);
   const batt = p.batteryLevel != null ? Number(p.batteryLevel) : null;
   const charging = !!p.isCharging;
 
@@ -1179,8 +1222,9 @@ export function updateFamilyPresenceBanner() {
   const lpMode = settings.lowPowerModeSetting || 'auto';
   const isLpForFamily = lpMode === 'on' || (lpMode === 'auto' && (p.lowPowerMode || p.isCharging === false));
   const lpLabel = isLpForFamily ? ' • 🔋 Low Power Mode' : '';
-  const battText = p.batteryLevel != null
-    ? ` • ${p.isCharging ? "🔌 Charging" : "⚠️ UNPLUGGED"} (${p.batteryLevel}%)${lpLabel}`
+  const battNum = (p.batteryLevel != null && Number.isFinite(Number(p.batteryLevel))) ? Math.round(Number(p.batteryLevel)) : null;
+  const battText = battNum !== null
+    ? ` • ${p.isCharging ? "🔌 Charging" : "⚠️ UNPLUGGED"} (${battNum}%)${lpLabel}`
     : "";
 
   const callsToday = getTodaysCompletedCallsList();
@@ -1207,12 +1251,11 @@ export function updateFamilyPresenceBanner() {
 
   const st = state.callSnap?.status || 'idle';
   if (ringBtn) {
-    if (st !== 'idle') {
-      const otherId = state.callSnap.callerId === 'nana' ? state.callSnap.targetId : state.callSnap.callerId;
-      if (otherId && otherId !== activeFamilyMember.id) ringBtn.disabled = true;
-    } else {
-      ringBtn.disabled = !settings.callingEnabled;
-    }
+    const otherId = st !== 'idle'
+      ? (state.callSnap.callerId === 'nana' ? state.callSnap.targetId : state.callSnap.callerId)
+      : null;
+    const busyOtherCall = st !== 'idle' && (!otherId || otherId !== activeFamilyMember?.id);
+    ringBtn.disabled = !settings.callingEnabled || busyOtherCall;
   }
   hooks.updateFamilyVideoStatus?.();
 }
@@ -1337,6 +1380,10 @@ function renderRyanControlsInsights() {
 }
 
 if (role === 'nana') {
+  onValue(refs.dailyUsage, snap => {
+    state.dailyUsageSnap = snap.val() || {};
+  });
+
   let pendingVideoSec = 0;
   let pendingRadioSec = 0;
   let pendingPatienceSec = 0;
@@ -1402,7 +1449,7 @@ if (role === 'nana') {
 
     const videoEl = $('nana-video-el');
     const videoPlaying = !!(
-      !lowPower &&
+      !NanaCore.isVideoBlockedByLowPower() &&
       !inCall &&
       $('video-screen')?.classList.contains('active') &&
       videoEl && !videoEl.paused && !videoEl.ended && videoEl.readyState >= 2

@@ -51,7 +51,7 @@ if (params.get('key')) {
 const SERVICE_TOKEN = (localStorage.getItem('nana_service_token') || '').trim();
 const TEST_MODE = params.get('test') === '1';
 const role = params.get('role') || 'nana';
-const callerId = (params.get('id') || 'ryan').toLowerCase();
+const callerId = (params.get('id') || 'ryan').toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'ryan';
 const autoAnswerFromTelegram = params.get('answer') === 'true';
 const isRealAndroidTablet = !!(window.AndroidBridge || /Lenovo|TB-|Tab/i.test(navigator.userAgent));
 
@@ -99,7 +99,8 @@ export const makeFallbackAvatarUrl = (name, idHint = '') => {
   let hash = 0;
   for (let i = 0; i < clean.length; i++) hash = ((hash << 5) - hash + clean.charCodeAt(i)) | 0;
   const bg = CUSTOM_AVATAR_PALETTE[Math.abs(hash) % CUSTOM_AVATAR_PALETTE.length];
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(clean)}&size=256&background=${bg}&color=fff&bold=true`;
+  const safeName = encodeURIComponent(clean).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+  return `https://ui-avatars.com/api/?name=${safeName}&size=256&background=${bg}&color=fff&bold=true`;
 };
 const prettifyMemberId = (id) => String(id || 'family')
   .split(/[-_]+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Family';
@@ -119,7 +120,8 @@ function buildResolvedMemberList(overridesMap = {}) {
     const ov = overridesMap?.[base.id];
     if (!ov || typeof ov !== 'object') return { ...base };
     const name = String(ov.name || base.name).trim() || base.name;
-    const spokenName = String(ov.spokenName || ov.name || base.spokenName).trim() || name;
+    const defaultSpoken = name === base.name ? base.spokenName : name;
+    const spokenName = String(ov.spokenName || defaultSpoken).trim() || defaultSpoken;
     const customPhoto = typeof ov.photoDataUrl === 'string' && ov.photoDataUrl.startsWith('data:image/') ? ov.photoDataUrl : null;
     return {
       ...base,
@@ -135,6 +137,7 @@ function buildResolvedMemberList(overridesMap = {}) {
 
   const customList = Object.entries(overridesMap || {})
     .map(([k, v]) => ({ key: String(v?.id || k).toLowerCase(), raw: v }))
+    .filter(x => /^[a-z0-9_-]+$/.test(x.key))
     .filter(x => x.raw && typeof x.raw === 'object' && !BUILTIN_MEMBER_IDS.has(x.key))
     .filter(x => String(x.raw.name || '').trim().length > 0)
     .sort((a, b) => (Number(a.raw.createdAt || 0) - Number(b.raw.createdAt || 0)) || a.key.localeCompare(b.key));
@@ -201,12 +204,20 @@ export const isAdminFamilyMember = (role === 'family' && callerId === 'ryan');
 // --- 4. TEST MODE SANDBOX INTERCEPTOR ---
 if (TEST_MODE) {
   const realFetch = window.fetch.bind(window);
-  window.fetch = (url, opts) => String(url).startsWith(CONFIG.googleScriptUrl)
-    ? Promise.resolve(new Response(JSON.stringify({
-        ok: true, messageId: null, connected: CONFIG.familyMembers.map(m => m.id),
-        groupChatId: null, broadcastCount: 0, test: true
-      }), { headers: { 'Content-Type': 'application/json' } }))
-    : realFetch(url, opts);
+  window.fetch = (url, opts) => {
+    if (!String(url).startsWith(CONFIG.googleScriptUrl)) return realFetch(url, opts);
+    let parsedBody = null;
+    try { parsedBody = opts?.body ? JSON.parse(opts.body) : null; } catch (_) {}
+    if (parsedBody?.action === 'add_google_album') {
+      return Promise.resolve(new Response(JSON.stringify({
+        ok: false, error: 'Google Photos sync requires live mode (TEST_MODE intercepts Apps Script requests).', test: true
+      }), { headers: { 'Content-Type': 'application/json' } }));
+    }
+    return Promise.resolve(new Response(JSON.stringify({
+      ok: true, messageId: null, connected: CONFIG.familyMembers.map(m => m.id),
+      groupChatId: null, broadcastCount: 0, syncedCount: 0, test: true
+    }), { headers: { 'Content-Type': 'application/json' } }));
+  };
   const r = document.createElement('div');
   r.innerText = "🧪 TEST MODE - separate from Nana's real tablet";
   r.style.cssText = 'position:fixed;top:0;left:0;z-index:99999;background:#7c3aed;color:#fff;font:700 12px sans-serif;padding:3px 10px;border-bottom-right-radius:10px;pointer-events:none;';
@@ -223,6 +234,7 @@ export const refs = {
   callHistory:      ref(db, `${basePath}/callHistory`),
   presence:         ref(db, `${basePath}/presence`),
   bulletin:         ref(db, `${basePath}/bulletin`),
+  googleAlbums:     ref(db, `${basePath}/googleAlbums`),
   settings:         ref(db, `${basePath}/settings`),
   missedCalls:      ref(db, `${basePath}/missedCalls`),
   connectedMembers: ref(db, `${basePath}/connectedMembers`),
@@ -263,15 +275,24 @@ export const settings = {
   callingEnabled: TEST_MODE,
   showTodaysCallsBanner: true, periodicPopupsEnabled: true, unreadChatPopupMin: 30,
   radioPromptHours: [10, 15], videoPromptHours: [14, 19], speakQuestions: true,
+  guidedStarEnabled: true, guidedStarSpeed: 'normal', guidedStarSize: 'large', guidedStarEngagement: 'lively',
+  guidedStarChat: true, guidedStarRadio: true, guidedStarVideo: true, guidedStarPatience: true,
   photoScreensaverEnabled: true, photoScreensaverDelaySec: 120, photoScreensaverIntervalSec: 30,
-  photoScreensaverBrightness: 40, photoScreensaverShowCaption: true, photoScreensaverMaxPhotos: 20
+  photoScreensaverBrightness: 40, photoScreensaverShowCaption: true, photoScreensaverShowAlbumName: true,
+  photoScreensaverMaxPhotos: 20, photoScreensaverSource: 'both', photoScreensaverOrder: 'recent_plus_shuffle'
 };
 
 export function askNana(type, question, askedBy, extra = {}) {
   const now = Date.now();
+  hooks.clearPendingQuestionHistoryIfOverwritten?.(now);
+  const shortPromptTypes = new Set(['leave_video_prompt', 'restart_video_prompt']);
+  const defaultTimeoutMin = shortPromptTypes.has(type) ? 3 : 20;
+  const defaultExpiresAt = now + defaultTimeoutMin * 60 * 1000;
   return set(refs.quickQuestion, {
     id: `q_${type}_${now}`, type, question, askedBy,
-    silent: !settings.speakQuestions, status: 'pending', answer: null, askedAt: now, ...extra
+    silent: !settings.speakQuestions, status: 'pending', answer: null, askedAt: now,
+    timeoutMin: defaultTimeoutMin, expiresAt: defaultExpiresAt,
+    ...extra
   });
 }
 
@@ -287,9 +308,11 @@ export const state = {
   isPhotoScreensaverActive: false,
   lastPatienceActivityMs: 0,
   returnToVideoAfterCall: false,
+  returnToPatienceAfterCall: false,
   callSnap: { status: 'idle' },
   presenceSnap: {},
   bulletinSnap: {},
+  googleAlbumsSnap: {},
   entSnap: { activeKey: 'off', title: 'Off' },
   missedCallsByMember: {},
   connectedMemberIds: [],
@@ -322,11 +345,15 @@ export const hooks = {
   renderTodaysCallsBanner: null,
   startNormalDimCountdownOnPause: null,
   renderContacts: null,
+  renderManageFamily: null,
+  updateFamilyVideoStatus: null,
+  clearPendingQuestionHistoryIfOverwritten: null,
   renderBulletinFeed: null,
   updateBulletinTicker: null,
   tryStartPhotoScreensaver: null,
   stopPhotoScreensaver: null,
   openPatienceScreen: null,
+  cancelPatienceInteraction: null,
   onPatienceGameStarted: null
 };
 
@@ -344,7 +371,7 @@ export const isBatteryVoiceCurrentlyMuted = () => (Number(settings.batteryVoiceM
 
 export function speakMsg(text, isBatt = false, customVol = 1.0) {
   if (!settings.voicePrompts && !isBatt) return;
-  if ((isBatt || /battery|charger|plug|power/i.test(text)) && isBatteryVoiceCurrentlyMuted()) return;
+  if (isBatt && isBatteryVoiceCurrentlyMuted()) return;
   if ('speechSynthesis' in window && text) {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
@@ -411,7 +438,7 @@ onValue(refs.familyMembers, snap => {
 })();
 
 window.switchFamilyPortalTab = (tab) => {
-  ['avail', 'ask', 'media'].forEach(t => {
+  ['avail', 'ask', 'media', 'photos'].forEach(t => {
     $(`fam-tab-btn-${t}`)?.classList.toggle('active', t === tab);
     $(`fam-pane-${t}`)?.classList.toggle('active', t === tab);
   });
@@ -451,6 +478,10 @@ window.switchNanaMainTab = async (tab, forceLeaveVideo = false) => {
   if (tab !== 'video') {
     state.returnToVideoAfterCall = false;
     hooks.pauseVideo?.('switched_tab');
+  }
+  if (tab !== 'patience' && tab !== 'chat') {
+    state.returnToPatienceAfterCall = false;
+    hooks.cancelPatienceInteraction?.();
   }
   if (tab !== 'chat' && $('bulletin-modal')?.style.display === 'flex') {
     window.closeFamilyBulletin?.();

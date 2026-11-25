@@ -14,20 +14,28 @@
     (function () {
       function ok() {
         var sv = (getComputedStyle(document.documentElement).getPropertyValue('--nana-styles-version') || '').replace(/["'\s]/g, '');
-        return window.__nanaAppLoaded === true && sv !== '';
+        var ready = window.__nanaAppLoaded === true && sv !== '';
+        if (ready) {
+          var existing = document.getElementById('nana-boot-retry-banner');
+          if (existing) existing.remove();
+        }
+        return ready;
       }
       setTimeout(function () {
-        if (ok() || !document.body) return;
+        if (ok() || !document.body || document.getElementById('nana-boot-retry-banner')) return;
         var d = document.createElement('div');
+        d.id = 'nana-boot-retry-banner';
         d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7c2d12;color:#fff;font:700 20px sans-serif;padding:14px;text-align:center;';
         d.innerText = 'Loading NanaPhone... (page v' + window.__NANA_PAGE_VERSION + ') - retrying';
         document.body.appendChild(d);
       }, 15000);
+      setInterval(function () { ok(); }, 3000);
       setInterval(function () { if (!ok()) window.location.reload(); }, 60000);
     })();
   </script>
   <title>NanaPhone Portal</title>
-  <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
+  <link rel="preconnect" href="https://lh3.googleusercontent.com" crossorigin>
+  <script defer crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
   <link rel="stylesheet" href="styles.css?v=2.9.6">
   <link rel="stylesheet" href="games/spider-solitaire.css?v=2.9.6">
 </head>
@@ -69,7 +77,7 @@
   <!-- Confirm Call Screen (15s Auto-Cancel) -->
   <div id="confirm-modal">
     <h1 id="confirm-prompt-title" style="font-size:3.2rem;color:#ffff00;margin:0 0 14px 0;">Call Family?</h1>
-    <img id="confirm-photo" src="" alt="Family Member">
+    <img id="confirm-photo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Family Member">
     <p id="confirm-missed-note" style="font-size:1.5rem;color:#fca5a5;margin:0 0 6px 0;font-weight:800;display:none;"></p>
     <p style="font-size:1.5rem;color:#cbd5e1;margin:0;">Cancels in <span id="confirm-timer" style="color:#f87171;font-weight:bold;">15</span>s</p>
     <div class="confirm-btn-row">
@@ -203,8 +211,11 @@
     <div id="calling-off-card" style="flex:1;width:100%;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:18px;">
       <div style="font-size:4rem;">💬</div>
       <div style="font-size:2.2rem;font-weight:900;color:var(--text-accent);">Video calling is switched off for now</div>
-      <div style="font-size:1.6rem;font-weight:700;color:var(--text-muted);">You can still read and send Family Chat messages and listen to Classic FM.</div>
-      <button class="tone-btn" style="font-size:1.6rem;padding:14px 28px;" onclick="openFamilyBulletin()">✈️ Open Family Chat</button>
+      <div style="font-size:1.6rem;font-weight:700;color:var(--text-muted);">You can still play Patience, read and send Family Chat messages, and listen to Classic FM.</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;">
+        <button id="calling-off-patience-btn" class="tone-btn" style="font-size:1.6rem;padding:14px 28px;background:#0f4c22;border-color:#fde047;color:#fef08a;" onclick="switchNanaMainTab('patience')">🕷️ Play Patience</button>
+        <button class="tone-btn" style="font-size:1.6rem;padding:14px 28px;" onclick="openFamilyBulletin()">✈️ Open Family Chat</button>
+      </div>
     </div>
     <div id="family-grid" class="family-grid"></div>
   </div>
@@ -285,7 +296,7 @@
 
   <!-- 2. Outbound Call Screen -->
   <div id="outbound-screen" class="screen" style="background:#1e1b4b;justify-content:center;padding-top:68px;">
-    <img id="outbound-photo" src="" style="width:180px;height:180px;border-radius:50%;border:7px solid #fff;margin-bottom:14px;object-fit:cover;">
+    <img id="outbound-photo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="" style="width:180px;height:180px;border-radius:50%;border:7px solid #fff;margin-bottom:14px;object-fit:cover;">
     <h1 id="outbound-title" style="font-size:3.4rem;margin:0 0 8px 0;color:#fef08a;">Calling...</h1>
     <p id="outbound-sub" style="font-size:1.8rem;color:#cbd5e1;margin:0 0 20px 0;">Ringing their mobile now (1/6)...</p>
     <button class="cancel-btn" onclick="endCall(true)">✖ Cancel Call</button>
@@ -293,7 +304,7 @@
 
   <!-- 3. Incoming Ring Screen -->
   <div id="ringing-screen" class="screen" style="background:#064e3b;justify-content:center;cursor:pointer;padding-top:68px;" onclick="answerCallAsNana()">
-    <img id="caller-photo" src="" style="width:160px;height:160px;border-radius:50%;border:6px solid #fff;margin-bottom:10px;object-fit:cover;">
+    <img id="caller-photo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="" style="width:160px;height:160px;border-radius:50%;border:6px solid #fff;margin-bottom:10px;object-fit:cover;">
     <h1 id="caller-title" style="font-size:3.6rem;color:#fef08a;margin:0 0 14px 0;">Incoming Call!</h1>
     <button class="giant-btn" style="pointer-events:none;">📞 TOUCH ANYWHERE<br>TO ANSWER</button>
   </div>
@@ -325,10 +336,10 @@
     <button id="hangup-btn" class="hangup-btn" onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()" onclick="promptEndCallConfirmation()">End Call</button>
   </div>
 
-  <!-- 5. Family Member Screen (Organized into 3 Clean Tabs) -->
+  <!-- 5. Family Member Screen (Organized into 4 Clean Tabs) -->
   <div id="family-screen" class="screen" style="justify-content:flex-start;gap:8px;padding:12px 12px 28px 12px;overflow-y:auto;">
     <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:4px;flex-wrap:wrap;width:92vw;max-width:540px;">
-      <img id="family-self-photo" src="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:3px solid #fff;cursor:pointer;" onclick="openMyProfileEditorModal()" title="Tap to edit your name or profile photo">
+      <img id="family-self-photo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:3px solid #fff;cursor:pointer;" onclick="openMyProfileEditorModal()" title="Tap to edit your name or profile photo">
       <h1 id="family-greeting" style="font-size:1.4rem;margin:0;">Call Nana</h1>
       <button type="button" class="tone-btn" style="padding:5px 10px;font-size:0.82rem;background:#334155;border-color:#94a3b8;" onclick="openMyProfileEditorModal()" title="Edit your name and profile photo">✏️ Photo / Name</button>
     </div>
@@ -344,11 +355,12 @@
       <button id="family-controls-btn" class="tone-btn" style="flex:1;background:#1e293b;border-color:#facc15;color:#fef08a;display:none;" onclick="openSettingsModal()">⚙️ Controls</button>
     </div>
 
-    <!-- Family Portal 3-Tab Bar: 1. Availability -> 2. Ask Nana -> 3. Entertainment -->
+    <!-- Family Portal 4-Tab Bar: 1. Availability -> 2. Ask Nana -> 3. Entertainment -> 4. Photos -->
     <div class="fam-tabs-bar">
       <button id="fam-tab-btn-avail" class="fam-tab-btn active" onclick="switchFamilyPortalTab('avail')">⏰ Availability</button>
       <button id="fam-tab-btn-ask" class="fam-tab-btn" onclick="switchFamilyPortalTab('ask')">❓ Ask Nana</button>
       <button id="fam-tab-btn-media" class="fam-tab-btn" onclick="switchFamilyPortalTab('media')">🎬 Entertainment</button>
+      <button id="fam-tab-btn-photos" class="fam-tab-btn" onclick="switchFamilyPortalTab('photos')">🖼️ Photos</button>
     </div>
 
     <!-- Tab 1: Availability & Setup -->
@@ -386,7 +398,7 @@
       </div>
 
       <div style="display:flex;gap:8px;width:100%;">
-        <a id="telegram-link-btn" href="#" target="_blank" class="tone-btn" style="flex:1;background:#0284c7;border-color:#38bdf8;">🔔 1. Connect Telegram</a>
+        <a id="telegram-link-btn" href="#" target="_blank" rel="noopener noreferrer" class="tone-btn" style="flex:1;background:#0284c7;border-color:#38bdf8;">🔔 1. Connect Telegram</a>
         <button class="tone-btn" style="flex:1;background:#0f172a;border-color:#22c55e;color:#86efac;" onclick="openPhoneGuideModal()">📱 2. Ringtone Guide</button>
       </div>
     </div>
@@ -479,6 +491,91 @@
         </div>
       </div>
     </div>
+
+    <!-- Tab 4: Family Photos Manager (Display Settings + Google Photos Albums + Telegram Chat Photos) -->
+    <div id="fam-pane-photos" class="fam-tab-pane">
+      <!-- 1. Screensaver Display & Mixing Options -->
+      <div class="settings-card" style="width:100%;margin-bottom:0;padding:12px;">
+        <div class="settings-label" style="font-size:1.02rem;margin-bottom:4px;">
+          <span>🖼️ Screensaver Display Options</span>
+          <span class="lbl-screensaver-summary" style="font-size:0.8rem;color:#4ade80;font-weight:800;"></span>
+        </div>
+        <div class="settings-sub" style="margin-bottom:6px;">Photos appear automatically on Nana's screensaver when plugged in. Choose which photos are shown and how they rotate:</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button type="button" class="opt-btn" data-skey="photoScreensaverEnabled" data-sval="true" style="padding:6px 6px;font-size:0.82rem;" onclick="updateSetting('photoScreensaverEnabled', true)">🖼️ Screensaver ON</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverEnabled" data-sval="false" style="padding:6px 6px;font-size:0.82rem;" onclick="updateSetting('photoScreensaverEnabled', false)">🚫 Off (Normal Dim)</button>
+        </div>
+
+        <div class="settings-sub" style="margin-bottom:4px;font-weight:800;color:#cbd5e1;">📷 Which Photos to Show:</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button type="button" class="opt-btn" data-skey="photoScreensaverSource" data-sval="both" style="padding:6px 4px;font-size:0.8rem;" onclick="updateSetting('photoScreensaverSource', 'both')">🖼️ Chat + Albums</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverSource" data-sval="chat_only" style="padding:6px 4px;font-size:0.8rem;" onclick="updateSetting('photoScreensaverSource', 'chat_only')">💬 Chat Only</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverSource" data-sval="albums_only" style="padding:6px 4px;font-size:0.8rem;" onclick="updateSetting('photoScreensaverSource', 'albums_only')">📚 Albums Only</button>
+        </div>
+
+        <div class="settings-sub" style="margin-bottom:4px;font-weight:800;color:#cbd5e1;">🔀 Order &amp; Mixing Style:</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button type="button" class="opt-btn" data-skey="photoScreensaverOrder" data-sval="recent_plus_shuffle" style="padding:6px 4px;font-size:0.78rem;" onclick="updateSetting('photoScreensaverOrder', 'recent_plus_shuffle')">⭐ Recent + Mix Albums</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverOrder" data-sval="shuffle_all" style="padding:6px 4px;font-size:0.78rem;" onclick="updateSetting('photoScreensaverOrder', 'shuffle_all')">🔀 Shuffle All</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverOrder" data-sval="newest_first" style="padding:6px 4px;font-size:0.78rem;" onclick="updateSetting('photoScreensaverOrder', 'newest_first')">🕒 In Order</button>
+        </div>
+
+        <div class="settings-sub" style="margin-bottom:4px;font-weight:800;color:#cbd5e1;">⏱️ Change Photo Every:</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button type="button" class="opt-btn" data-skey="photoScreensaverIntervalSec" data-sval="15" style="padding:6px 4px;font-size:0.82rem;" onclick="updateSetting('photoScreensaverIntervalSec', 15)">15s</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverIntervalSec" data-sval="30" style="padding:6px 4px;font-size:0.82rem;" onclick="updateSetting('photoScreensaverIntervalSec', 30)">30s</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverIntervalSec" data-sval="60" style="padding:6px 4px;font-size:0.82rem;" onclick="updateSetting('photoScreensaverIntervalSec', 60)">1m</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverIntervalSec" data-sval="120" style="padding:6px 4px;font-size:0.82rem;" onclick="updateSetting('photoScreensaverIntervalSec', 120)">2m</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverIntervalSec" data-sval="300" style="padding:6px 4px;font-size:0.82rem;" onclick="updateSetting('photoScreensaverIntervalSec', 300)">5m</button>
+        </div>
+
+        <div class="settings-sub" style="margin-bottom:4px;font-weight:800;color:#cbd5e1;">💬 Captions &amp; Album Labels on Screen:</div>
+        <div class="opt-row">
+          <button type="button" class="opt-btn" data-skey="photoScreensaverShowCaption" data-sval="true" style="padding:6px 4px;font-size:0.78rem;" onclick="updateSetting('photoScreensaverShowCaption', true)">💬 Show Captions</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverShowCaption" data-sval="false" style="padding:6px 4px;font-size:0.78rem;" onclick="updateSetting('photoScreensaverShowCaption', false)">🙈 Picture Only</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverShowAlbumName" data-sval="true" style="padding:6px 4px;font-size:0.78rem;" onclick="toggleSetting('photoScreensaverShowAlbumName')">📚 Album Name</button>
+        </div>
+      </div>
+
+      <!-- 2. Google Photos Shared Albums Manager -->
+      <div class="settings-card" style="width:100%;margin-bottom:0;padding:12px;">
+        <div class="settings-label" style="font-size:1rem;margin-bottom:4px;gap:6px;flex-wrap:wrap;">
+          <span>📚 Google Photos Albums</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span id="fam-galbums-count-lbl" style="font-size:0.8rem;color:#38bdf8;font-weight:800;"></span>
+            <button type="button" id="fam-galbum-sync-btn" class="fam-q-mini-btn" style="padding:4px 8px;font-size:0.75rem;background:#0284c7;border-color:#7dd3fc;" onclick="syncGooglePhotosAlbumsNow(true)">🔄 Sync</button>
+          </div>
+        </div>
+        <div class="settings-sub" style="margin-bottom:6px;">In Google Photos, open an album → <strong>Share → Create link</strong>, then paste the link below (new photos added to the album sync automatically):</div>
+        <input id="fam-galbum-url" class="fam-text-inp" type="url" placeholder="Paste https://photos.app.goo.gl/... shared album link" />
+        <div class="opt-row" style="margin-bottom:6px;">
+          <input id="fam-galbum-title" class="fam-text-inp" style="margin-bottom:0;flex:1.4;" type="text" maxlength="60" placeholder="Optional label (e.g. Family Holidays)" />
+          <button type="button" id="fam-galbum-add-btn" class="opt-btn" style="background:#059669;border-color:#4ade80;color:#fff;flex:0.85;padding:8px 8px;" onclick="addGooglePhotosAlbum()">➕ Add Album</button>
+        </div>
+        <div id="fam-galbum-status" class="settings-sub" style="display:none;margin-bottom:6px;font-weight:800;"></div>
+        <div id="fam-galbums-list-box" class="fam-photos-list" style="max-height:240px;">
+          <div style="color:#94a3b8;font-size:0.84rem;padding:6px;">No Google Photos albums linked yet.</div>
+        </div>
+      </div>
+
+      <!-- 3. Telegram Chat Photos Manager -->
+      <div class="settings-card" style="width:100%;margin-bottom:0;padding:12px;">
+        <div class="settings-label" style="font-size:1rem;margin-bottom:4px;">
+          <span>💬 Telegram Chat Photos</span>
+          <span id="fam-photos-count-lbl" style="font-size:0.8rem;color:#38bdf8;font-weight:800;"></span>
+        </div>
+        <div class="settings-sub" style="margin-bottom:4px;">Recent photos shared in Family Chat (toggle individual photos ON/OFF or edit captions):</div>
+        <div class="opt-row" style="margin-bottom:8px;">
+          <button type="button" class="opt-btn" data-skey="photoScreensaverMaxPhotos" data-sval="10" style="padding:5px 4px;font-size:0.78rem;" onclick="updateSetting('photoScreensaverMaxPhotos', 10)">Last 10</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverMaxPhotos" data-sval="20" style="padding:5px 4px;font-size:0.78rem;" onclick="updateSetting('photoScreensaverMaxPhotos', 20)">Last 20</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverMaxPhotos" data-sval="30" style="padding:5px 4px;font-size:0.78rem;" onclick="updateSetting('photoScreensaverMaxPhotos', 30)">Last 30</button>
+          <button type="button" class="opt-btn" data-skey="photoScreensaverMaxPhotos" data-sval="40" style="padding:5px 4px;font-size:0.78rem;" onclick="updateSetting('photoScreensaverMaxPhotos', 40)">Last 40</button>
+        </div>
+        <div id="fam-photos-list-box" class="fam-photos-list">
+          <div style="color:#94a3b8;font-size:0.85rem;padding:8px;">Loading photos...</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- 6. Family Pickup Screen -->
@@ -486,14 +583,14 @@
     <h1 style="font-size:2.6rem;color:#fef08a;margin:0;">🚨 Nana is Calling You!</h1>
     <p style="font-size:1.25rem;color:#e2e8f0;margin:0;">Tap the green button below to connect your camera and microphone:</p>
     <button class="giant-btn" style="height:36vh;font-size:2.4rem;" onclick="confirmFamilyPickupFromTelegram()">📞 TAP TO CONNECT<br>WITH NANA</button>
-    <button class="cancel-btn" style="font-size:1.4rem;padding:12px 32px;" onclick="endCall(true)">✖ Decline</button>
+    <button class="cancel-btn" style="font-size:1.4rem;padding:12px 32px;" onclick="declineIncomingNanaCall()">✖ Decline</button>
   </div>
 
   <!-- Manage Family Members Modal (Admin Only) -->
   <div id="family-members-modal">
     <h2 style="font-size:1.65rem;color:#fef08a;margin:0 0 4px 0;">👥 Manage Family Members</h2>
     <p style="font-size:0.88rem;color:#cbd5e1;margin:0 0 10px 0;max-width:600px;line-height:1.4;">
-      Add extra family members below. If they connect Telegram, Nana can call them (her screen shows the <strong>8 most recently called</strong> Telegram-connected people). Without Telegram, they can still call Nana using their personal link, and all chat stays in the shared Telegram group.
+      Add extra family members below. If they connect Telegram, Nana can call them (her screen shows Patience in Slot #1 plus the <strong>7 most recently called</strong> Telegram-connected people). Without Telegram, they can still call Nana using their personal link, and all chat stays in the shared Telegram group.
     </p>
 
     <div class="settings-card" style="width:94vw;max-width:600px;margin-bottom:12px;">
@@ -501,7 +598,7 @@
       <div class="settings-sub" style="margin-bottom:6px;">Every person needs a Name and a Profile Photo cropped to their face.</div>
       <input id="fm-name-input" class="family-input-box" type="text" maxlength="28" placeholder="Person's Name (required, e.g. Sarah or Uncle Bob)" />
       <div style="display:flex;align-items:center;gap:12px;margin:4px 0 8px 0;flex-wrap:wrap;">
-        <img id="fm-photo-preview" src="" alt="Preview" style="display:none;width:68px;height:68px;border-radius:50%;object-fit:cover;border:3px solid #fde047;flex-shrink:0;" />
+        <img id="fm-photo-preview" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Preview" style="display:none;width:68px;height:68px;border-radius:50%;object-fit:cover;border:3px solid #fde047;flex-shrink:0;" />
         <div style="flex:1;min-width:190px;text-align:left;">
           <input id="fm-photo-file-input" type="file" accept="image/*" style="display:none;" />
           <button type="button" class="opt-btn" style="width:100%;background:#0284c7;border-color:#7dd3fc;color:#fff;" onclick="triggerAdminMemberPhotoPick()">📷 Choose &amp; Crop Face Photo</button>
@@ -531,7 +628,7 @@
     <div class="end-confirm-card" style="border-color:#38bdf8;max-width:460px;">
       <div style="font-size:1.45rem;font-weight:900;color:#fef08a;">✏️ My Name &amp; Profile Photo</div>
       <div style="font-size:0.88rem;color:#cbd5e1;font-weight:700;">Nana sees your name and photo when you call or answer.</div>
-      <img id="self-prof-photo-preview" src="" alt="Profile Photo" style="width:112px;height:112px;border-radius:50%;object-fit:cover;border:4px solid #fde047;background:#0f172a;" />
+      <img id="self-prof-photo-preview" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Profile Photo" style="width:112px;height:112px;border-radius:50%;object-fit:cover;border:4px solid #fde047;background:#0f172a;" />
       <input id="self-prof-file-input" type="file" accept="image/*" style="display:none;" />
       <button type="button" class="opt-btn" style="width:100%;background:#0284c7;border-color:#7dd3fc;color:#fff;" onclick="triggerSelfPhotoPick()">📷 Choose &amp; Crop Photo to Face</button>
       <div id="self-prof-photo-status" style="font-size:0.82rem;font-weight:700;color:#93c5fd;"></div>
