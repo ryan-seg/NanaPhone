@@ -376,6 +376,19 @@ export function findBestHintMove(tableau) {
   return best;
 }
 
+export function canAutoFinishGame(gs) {
+  if (!gs || !Array.isArray(gs.tableau) || gs.stock.length > 0 || gs.completed.length >= 8) return false;
+  for (let colIdx = 0; colIdx < 10; colIdx++) {
+    const col = gs.tableau[colIdx];
+    if (!col.length) continue;
+    for (let i = 0; i < col.length; i++) {
+      if (!col[i].faceUp) return false;
+    }
+    if (!isMovableStack(gs.tableau, colIdx, 0)) return false;
+  }
+  return !!findBestHintMove(gs.tableau);
+}
+
 export function extractCompletedRuns(gameState) {
   const extracted = [];
   for (let colIdx = 0; colIdx < 10; colIdx++) {
@@ -674,6 +687,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   const foundTray    = q('found-tray');
   const undoBtn      = q('undo-btn');
   const hintBtn      = q('hint-btn');
+  const autoBtn      = q('auto-btn');
   const newBtn       = q('new-btn');
   const exitBtn      = q('exit');
   const soundBtn     = q('sound-btn');
@@ -728,6 +742,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         gameState,
+        undoStack: undoStack.slice(-30),
         relaxedDeal,
         soundEnabled: audio.isEnabled()
       }));
@@ -747,7 +762,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
       if (typeof parsed.relaxedDeal === 'boolean') relaxedDeal = parsed.relaxedDeal;
       if (typeof parsed.soundEnabled === 'boolean') audio.setEnabled(parsed.soundEnabled);
       pendingNewSuits = gameState.suitsCount || opts.defaultSuits;
-      undoStack = [];
+      undoStack = Array.isArray(parsed.undoStack) ? parsed.undoStack.slice(-30) : [];
       return true;
     } catch (_) {
       return false;
@@ -794,7 +809,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   function computeColumnOffsets(cards, cardWidth, availHeight) {
     if (!cards.length) return [];
     const cardHeight = cardWidth * 1.38;
-    let downStep = Math.max(6, Math.min(13, Math.round(cardHeight * 0.085)));
+    let downStep = Math.max(5, Math.min(10, Math.round(cardHeight * 0.068)));
     let upStep   = Math.max(28, Math.min(50, Math.round(cardHeight * 0.34)));
 
     let numDown = 0;
@@ -859,6 +874,9 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     movesVal.textContent = String(gameState.moves);
     scoreVal.textContent = String(gameState.score);
     undoBtn.disabled = undoStack.length === 0;
+    if (autoBtn) {
+      autoBtn.style.display = canAutoFinishGame(gameState) ? 'inline-flex' : 'none';
+    }
     soundBtn.textContent = audio.isEnabled() ? '🔊 Sound ON' : '🔇 Muted';
 
     // Stock pile (fanned red spider decks: 5 -> 0) inside unified Deal Cards button
@@ -882,11 +900,13 @@ export function createSpiderSolitaire(mountEl, options = {}) {
       stockSub.textContent = dealsLeft === 1 ? '1 deal left' : `${dealsLeft} deals left`;
     }
 
-    // Completed suit foundations (fanned King cards on bottom-right)
+    // Completed suit foundations (hide cramped 0/8 placeholder when empty; show fanned Kings once suits complete)
     foundTray.innerHTML = '';
+    const foundWrap = foundTray.parentElement;
     if (gameState.completed.length === 0) {
-      foundTray.innerHTML = `<div class="ss-found-placeholder"><span>K → A</span><span>0 / 8</span></div>`;
+      if (foundWrap) foundWrap.style.display = 'none';
     } else {
+      if (foundWrap) foundWrap.style.display = '';
       gameState.completed.forEach((suit, idx) => {
         const info = SUIT_META[suit] || SUIT_META.spades;
         const fc = document.createElement('div');
@@ -1510,16 +1530,39 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     notifyActivity();
   }
 
-  // Wire UI buttons
-  stockBtn.addEventListener('click', handleDealClick);
-  undoBtn.addEventListener('click', handleUndo);
-  hintBtn.addEventListener('click', handleHint);
-  newBtn.addEventListener('click', () => {
+  function openNewGameModal() {
     notifyActivity();
     pendingNewSuits = gameState.suitsCount;
     syncNewModalUI();
     newModal.classList.add('open');
-  });
+  }
+
+  function runAutoFinish() {
+    if (isAnimating || !canAutoFinishGame(gameState)) return;
+    let steps = 0;
+    const step = () => {
+      if (destroyed || gameState.completed.length >= 8 || steps >= 64) return;
+      if (isAnimating) {
+        setTimeout(step, 90);
+        return;
+      }
+      const best = findBestHintMove(gameState.tableau);
+      if (!best) return;
+      steps++;
+      if (commitMove(best.srcCol, best.cardIdx, best.dstCol, true)) {
+        setTimeout(step, 210);
+      }
+    };
+    step();
+  }
+
+  // Wire UI buttons
+  stockBtn.addEventListener('click', handleDealClick);
+  undoBtn.addEventListener('click', handleUndo);
+  hintBtn.addEventListener('click', handleHint);
+  autoBtn?.addEventListener('click', runAutoFinish);
+  modePill?.addEventListener('click', openNewGameModal);
+  newBtn.addEventListener('click', openNewGameModal);
   q('new-cancel').addEventListener('click', () => newModal.classList.remove('open'));
   q('new-confirm').addEventListener('click', () => startNewGame(pendingNewSuits));
   q('win-play-again').addEventListener('click', () => startNewGame(gameState.suitsCount));
