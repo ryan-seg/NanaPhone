@@ -390,6 +390,21 @@ export function canAutoFinishGame(gs) {
   return !!(best && best.score >= 5000);
 }
 
+// Adaptive Auto-Hint timing based on rolling average of last 3 successful moves (active play only)
+// - Faster recent play -> longer wait before nudging (don't spoil her flow)
+// - Slower recent play -> shorter wait before nudging (help sooner when struggling)
+// - Failed taps/drags accelerate help gently
+export function computeAdaptiveHintDelaySec(recentMoveDurationsSec = [], failedAttempts = 0) {
+  let baseDelay = 28;
+  const sample = recentMoveDurationsSec.slice(-3).filter(v => Number.isFinite(v) && v >= 0);
+  if (sample.length > 0) {
+    const avgSec = sample.reduce((sum, v) => sum + v, 0) / sample.length;
+    baseDelay = Math.round(Math.max(15, Math.min(40, 44 - avgSec * 1.1)));
+  }
+  const penalty = Math.max(0, Number(failedAttempts) || 0) * 4;
+  return Math.max(10, baseDelay - penalty);
+}
+
 export function extractCompletedRuns(gameState) {
   const extracted = [];
   for (let colIdx = 0; colIdx < 10; colIdx++) {
@@ -573,6 +588,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   const opts = {
     defaultSuits: [1, 2, 4].includes(Number(options.defaultSuits)) ? Number(options.defaultSuits) : 1,
     relaxedDeal: options.relaxedDeal !== false,
+    autoHintEnabled: options.autoHintEnabled !== false,
     soundEnabled: options.soundEnabled !== false,
     persist: options.persist !== false,
     onExit: typeof options.onExit === 'function' ? options.onExit : null,
@@ -582,6 +598,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   };
 
   let relaxedDeal = opts.relaxedDeal;
+  let autoHintEnabled = opts.autoHintEnabled;
   let pendingNewSuits = opts.defaultSuits;
   let gameState = null;
   let undoStack = [];
@@ -594,6 +611,14 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   let expandedColIdx = -1;
   let expandedCollapseTimer = null;
   const colCollapsedFlags = new Array(10).fill(false);
+
+  // Adaptive active-play Auto-Hint tracking (counts only active, visible, awake play)
+  let recentMoveDurationsSec = [];
+  let activePlaySinceMoveSec = 0;
+  let failedAttemptsSinceMove = 0;
+  let autoHintShownForCurrentMove = false;
+  let lastPlayerTouchMs = Date.now();
+  let autoHintInterval = null;
 
   const audio = createCardAudio(opts.soundEnabled);
 
@@ -663,6 +688,13 @@ export function createSpiderSolitaire(mountEl, options = {}) {
           </div>
           <button type="button" class="ss-toggle-pill" data-ss="relaxed-toggle">ON</button>
         </div>
+        <div class="ss-toggle-row">
+          <div>
+            <div class="ss-toggle-text">💡 Gentle Auto-Hint</div>
+            <div class="ss-toggle-sub">Automatically highlights a helpful move if Nana seems stuck</div>
+          </div>
+          <button type="button" class="ss-toggle-pill" data-ss="autohint-toggle">ON</button>
+        </div>
         <div class="ss-modal-actions">
           <button type="button" class="ss-btn" data-ss="new-cancel">Keep Playing</button>
           <button type="button" class="ss-btn ss-btn-new" data-ss="new-confirm">Deal New Game</button>
@@ -707,6 +739,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   const winModal     = q('win-modal');
   const winSummary   = q('win-summary');
   const relaxedToggleBtn = q('relaxed-toggle');
+  const autoHintToggleBtn = q('autohint-toggle');
 
   // Create 10 permanent column containers
   const colEls = [];
@@ -722,7 +755,38 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   }
 
   function notifyActivity() {
+    lastPlayerTouchMs = Date.now();
     opts.onActivity?.();
+  }
+
+  function isActivelyPlayingBoardNow() {
+    if (destroyed || !gameState || gameState.completed.length >= 8) return false;
+    if (isAnimating || gesture?.isDragging) return false;
+    if (newModal.classList.contains('open') || winModal.classList.contains('open')) return false;
+    if (document.visibilityState !== 'visible') return false;
+    if (document.body.classList.contains('screen-dimmed')) return false;
+    if (root.offsetParent === null) return false;
+    // Require a touch within the last 120s so we know Nana is actively sitting at the board
+    if (Date.now() - lastPlayerTouchMs > 120000) return false;
+    return true;
+  }
+
+  function recordSuccessfulMoveForAutoHint() {
+    const dur = Math.max(2, Math.min(60, activePlaySinceMoveSec));
+    if (activePlaySinceMoveSec > 0) {
+      recentMoveDurationsSec.push(dur);
+      if (recentMoveDurationsSec.length > 3) recentMoveDurationsSec.shift();
+    }
+    activePlaySinceMoveSec = 0;
+    failedAttemptsSinceMove = 0;
+    autoHintShownForCurrentMove = false;
+  }
+
+  function resetAutoHintClockOnly(clearHistory = false) {
+    if (clearHistory) recentMoveDurationsSec = [];
+    activePlaySinceMoveSec = 0;
+    failedAttemptsSinceMove = 0;
+    autoHintShownForCurrentMove = false;
   }
 
   function showToast(msg, durationMs = 2400) {
@@ -748,6 +812,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
         gameState,
         undoStack: undoStack.slice(-30),
         relaxedDeal,
+        autoHintEnabled,
         soundEnabled: audio.isEnabled()
       }));
     } catch (_) {}
@@ -764,6 +829,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
       }
       gameState = parsed.gameState;
       if (typeof parsed.relaxedDeal === 'boolean') relaxedDeal = parsed.relaxedDeal;
+      if (typeof parsed.autoHintEnabled === 'boolean') autoHintEnabled = parsed.autoHintEnabled;
       if (typeof parsed.soundEnabled === 'boolean') audio.setEnabled(parsed.soundEnabled);
       pendingNewSuits = gameState.suitsCount || opts.defaultSuits;
       undoStack = Array.isArray(parsed.undoStack) ? parsed.undoStack.slice(-30) : [];
@@ -1187,6 +1253,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     if (!canDropStackOnColumn(gameState.tableau, srcCol, cardIdx, dstCol)) return false;
 
     collapseExpandedColumn(false);
+    recordSuccessfulMoveForAutoHint();
     clearHint();
     notifyActivity();
 
@@ -1403,6 +1470,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
       commitMove(g.srcCol, g.cardIdx, g.hoverDstCol, false);
     } else if (g.dragStackEl && g.firstRect) {
       // Smoothly glide back home, then collapse expanded stack
+      failedAttemptsSinceMove++;
       isAnimating = true;
       audio.playSoftThud();
       const wrap = g.dragStackEl;
@@ -1456,6 +1524,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
 
     if (!isMovableStack(gameState.tableau, srcCol, cardIdx)) {
       if (!openedStackOnDown) {
+        failedAttemptsSinceMove++;
         audio.playSoftThud();
         shakeCardEl(srcCol, cardIdx);
       }
@@ -1487,6 +1556,7 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   function handleDealClick() {
     if (isAnimating || gameState.stock.length < 10) return;
     collapseExpandedColumn(false);
+    resetAutoHintClockOnly(false);
     clearHint();
     notifyActivity();
 
@@ -1626,10 +1696,15 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     });
     relaxedToggleBtn.textContent = relaxedDeal ? 'ON' : 'Classic';
     relaxedToggleBtn.classList.toggle('off', !relaxedDeal);
+    if (autoHintToggleBtn) {
+      autoHintToggleBtn.textContent = autoHintEnabled ? 'ON' : 'OFF';
+      autoHintToggleBtn.classList.toggle('off', !autoHintEnabled);
+    }
   }
 
   function startNewGame(suitsCount = pendingNewSuits) {
     collapseExpandedColumn(false);
+    resetAutoHintClockOnly(true);
     clearHint();
     stopConfetti();
     newModal.classList.remove('open');
@@ -1672,7 +1747,10 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   // Wire UI buttons
   stockBtn.addEventListener('click', handleDealClick);
   undoBtn.addEventListener('click', handleUndo);
-  hintBtn.addEventListener('click', handleHint);
+  hintBtn.addEventListener('click', () => {
+    autoHintShownForCurrentMove = true;
+    handleHint();
+  });
   autoBtn?.addEventListener('click', runAutoFinish);
   modePill?.addEventListener('click', openNewGameModal);
   newBtn.addEventListener('click', openNewGameModal);
@@ -1689,6 +1767,12 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     syncNewModalUI();
     saveToStorage();
   });
+  autoHintToggleBtn?.addEventListener('click', () => {
+    autoHintEnabled = !autoHintEnabled;
+    resetAutoHintClockOnly(false);
+    syncNewModalUI();
+    saveToStorage();
+  });
   root.querySelectorAll('[data-suits]').forEach(btn => {
     btn.addEventListener('click', () => {
       pendingNewSuits = Number(btn.dataset.suits) || 1;
@@ -1698,6 +1782,18 @@ export function createSpiderSolitaire(mountEl, options = {}) {
   if (opts.onExit) {
     exitBtn.addEventListener('click', () => opts.onExit());
   }
+
+  // Adaptive active-play Auto-Hint monitor (ticks only while board is visible & awake)
+  autoHintInterval = setInterval(() => {
+    if (!autoHintEnabled || !isActivelyPlayingBoardNow()) return;
+    activePlaySinceMoveSec += 1;
+    if (activeHint || autoHintShownForCurrentMove) return;
+    const thresholdSec = computeAdaptiveHintDelaySec(recentMoveDurationsSec, failedAttemptsSinceMove);
+    if (activePlaySinceMoveSec >= thresholdSec) {
+      autoHintShownForCurrentMove = true;
+      handleHint();
+    }
+  }, 1000);
 
   // Keep layout perfectly fitted on orientation change or window resize
   let resizeObserver = null;
@@ -1732,6 +1828,9 @@ export function createSpiderSolitaire(mountEl, options = {}) {
     getState: () => cloneGameState(gameState),
     destroy: () => {
       destroyed = true;
+      clearInterval(autoHintInterval);
+      autoHintInterval = null;
+      collapseExpandedColumn(false);
       cleanupGesture();
       clearHint();
       stopConfetti();
