@@ -278,7 +278,7 @@ export const settings = {
   guidedStarEnabled: true, guidedStarSpeed: 'normal', guidedStarSize: 'large', guidedStarEngagement: 'lively',
   guidedStarChat: true, guidedStarRadio: true, guidedStarVideo: true, guidedStarPatience: true,
   photoScreensaverEnabled: true, photoScreensaverDelaySec: 120, photoScreensaverIntervalSec: 30,
-  photoScreensaverBrightness: 40, photoScreensaverShowCaption: true, photoScreensaverShowAlbumName: true,
+  photoScreensaverBrightness: 65, photoScreensaverShowCaption: true, photoScreensaverShowAlbumName: true,
   photoScreensaverMaxPhotos: 20, photoScreensaverSource: 'both', photoScreensaverOrder: 'recent_plus_shuffle'
 };
 
@@ -305,6 +305,7 @@ export const state = {
   batteryLevel: null,
   isCharging: null,
   isBatteryDecreasingWhilePlugged: false,
+  screensaverPowerReductionPct: 0,
   isPhotoScreensaverActive: false,
   lastPatienceActivityMs: 0,
   returnToVideoAfterCall: false,
@@ -352,6 +353,7 @@ export const hooks = {
   updateBulletinTicker: null,
   tryStartPhotoScreensaver: null,
   stopPhotoScreensaver: null,
+  updateScreensaverBrightness: null,
   openPatienceScreen: null,
   cancelPatienceInteraction: null,
   onPatienceGameStarted: null
